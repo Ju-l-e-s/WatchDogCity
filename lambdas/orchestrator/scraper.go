@@ -31,35 +31,31 @@ func NewScraper(listURL string) *Scraper {
 }
 
 func (sc *Scraper) ScrapeCouncilList() ([]CouncilListing, error) {
-	resp, err := http.Get(sc.listURL)
+	doc, err := fetchDocument(sc.listURL)
 	if err != nil {
 		return nil, fmt.Errorf("http get list page: %w", err)
 	}
-	defer resp.Body.Close()
-
-	doc, err := goquery.NewDocumentFromReader(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("parse html: %w", err)
-	}
 
 	var listings []CouncilListing
-	doc.Find("article.publications-list-item").Each(func(_ int, s *goquery.Selection) {
+	doc.Find("li.list__item").Each(func(_ int, s *goquery.Selection) {
 		link := s.Find("a.publications-list-item__title-link")
 		url, _ := link.Attr("href")
-		title := strings.TrimSpace(link.Find("span.underline").Text())
-		
+		if url == "" {
+			return
+		}
+		title := strings.TrimSpace(link.Text())
+
 		category := strings.TrimSpace(s.Find("span.theme").Text())
 		if category == "" {
 			category = "Conseil municipal"
 		}
-		
-		pubDate, _ := s.Find("time").Attr("datetime")
 
-		if url == "" || pubDate == "" {
+		pubDate, _ := s.Find("time").Attr("datetime")
+		if pubDate == "" {
 			return
 		}
 		listings = append(listings, CouncilListing{
-			CouncilID: url, 
+			CouncilID: url,
 			Title:     title,
 			Category:  normalizeCategory(category),
 			Date:      pubDate,

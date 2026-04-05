@@ -153,11 +153,19 @@ func (h *WorkerHandler) invokePublisher(ctx context.Context, councilID string) {
 }
 
 func downloadPDF(url string) ([]byte, error) {
-	resp, err := http.Get(url)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("download PDF: HTTP %d for %s", resp.StatusCode, url)
+	}
 	return io.ReadAll(resp.Body)
 }
 

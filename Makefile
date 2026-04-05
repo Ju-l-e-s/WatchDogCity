@@ -6,16 +6,16 @@
 build:
 	mkdir -p dist
 	# Orchestrator
-	cd lambdas/orchestrator && GOOS=linux GOARCH=amd64 go build -o bootstrap main.go scraper.go
+	cd lambdas/orchestrator && GOOS=linux GOARCH=arm64 go build -o bootstrap main.go scraper.go
 	cd lambdas/orchestrator && zip -j ../../dist/orchestrator.zip bootstrap && rm bootstrap
 	# Worker
-	cd lambdas/worker && GOOS=linux GOARCH=amd64 go build -o bootstrap main.go gemini.go handler.go
+	cd lambdas/worker && GOOS=linux GOARCH=arm64 go build -o bootstrap main.go gemini.go handler.go
 	cd lambdas/worker && zip -j ../../dist/worker.zip bootstrap && rm bootstrap
 	# Publisher
-	cd lambdas/publisher && GOOS=linux GOARCH=amd64 go build -o bootstrap main.go handler.go
+	cd lambdas/publisher && GOOS=linux GOARCH=arm64 go build -o bootstrap main.go handler.go
 	cd lambdas/publisher && zip -j ../../dist/publisher.zip bootstrap && rm bootstrap
 	# Subscriber
-	cd lambdas/subscriber && GOOS=linux GOARCH=amd64 go build -o bootstrap main.go handler.go
+	cd lambdas/subscriber && GOOS=linux GOARCH=arm64 go build -o bootstrap main.go handler.go
 	cd lambdas/subscriber && zip -j ../../dist/subscriber.zip bootstrap && rm bootstrap
 
 deploy: build

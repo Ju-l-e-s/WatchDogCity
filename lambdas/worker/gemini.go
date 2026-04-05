@@ -9,17 +9,21 @@ import (
 	"google.golang.org/genai"
 )
 
-const geminiModel = "gemini-3.1-pro"
+const geminiModel = "gemini-2.5-pro"
 
 const deliberationPrompt = `Tu es un analyste de données factuel et neutre spécialisé dans les affaires publiques locales. 
 Analyse ce document PDF de délibération du conseil municipal de Bègles.
 
 Retourne UNIQUEMENT un objet JSON valide avec cette structure exacte :
 {
-  "title": "titre exact de la délibération",
+  "title": "titre de la délibération (en casse normale, évite les MAJUSCULES intégrales)",
   "summary": "résumé factuel en 2 à 3 phrases maximum, vulgarisé pour un citoyen",
   "topic_tag": "Un seul mot parmi cette liste stricte: Budget, Urbanisme, Social, Culture, Environnement, Éducation, Sport, Sécurité, Mobilité, Administration",
   "is_substantial": true/false,
+  "acronyms": {
+    "ACRONYME1": "Définition complète",
+    "ACRONYME2": "Définition complète"
+  },
   "analysis_data": {
     "contexte": "en 1 à 2 phrases : pourquoi ce point est à l'ordre du jour, son origine",
     "decision": "en 1 phrase : ce qui a été concrètement acté ou voté",
@@ -41,6 +45,7 @@ Retourne UNIQUEMENT un objet JSON valide avec cette structure exacte :
 }
 
 Règles d'exécution strictes :
+- Identifie systématiquement les acronymes ou sigles techniques (ex: CCAS, CREPAQ, EPCI, DSP) présents dans le PDF et donne leur définition complète dans le champ "acronyms".
 - Le champ "is_substantial" doit être "true" uniquement si le document est dense (budget, DSP, projet structurant).
 - Séparation des préoccupations : Ne génère JAMAIS de balises HTML. Retourne uniquement du texte brut dans les champs.
 - Si le document ne mentionne pas de vote, "has_vote" doit être "false" et les compteurs à "null".
@@ -48,10 +53,11 @@ Règles d'exécution strictes :
 - Assure-toi que le JSON est valide et ne contient pas de caractères d'échappement incorrects.`
 
 type GeminiResult struct {
-	Title         string   `json:"title"`
-	Summary       string   `json:"summary"`
-	TopicTag      string   `json:"topic_tag"`
-	IsSubstantial bool     `json:"is_substantial"`
+	Title         string            `json:"title"`
+	Summary       string            `json:"summary"`
+	TopicTag      string            `json:"topic_tag"`
+	IsSubstantial bool              `json:"is_substantial"`
+	Acronyms      map[string]string `json:"acronyms"`
 	AnalysisData  struct {
 		Contexte       *string `json:"contexte"`
 		Decision       *string `json:"decision"`
@@ -74,7 +80,8 @@ type GeminiResult struct {
 
 func analyzeWithGemini(ctx context.Context, apiKey string, pdfBytes []byte) (*GeminiResult, error) {
 	client, err := genai.NewClient(ctx, &genai.ClientConfig{
-		APIKey: apiKey,
+		APIKey:   apiKey,
+		HTTPOptions: genai.HTTPOptions{APIVersion: "v1"},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("create gemini client: %w", err)
@@ -101,9 +108,7 @@ func analyzeWithGemini(ctx context.Context, apiKey string, pdfBytes []byte) (*Ge
 		ctx,
 		geminiModel,
 		contents,
-		&genai.GenerateContentConfig{
-			ResponseMIMEType: "application/json",
-		},
+		nil,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("gemini generate: %w", err)

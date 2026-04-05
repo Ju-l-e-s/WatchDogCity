@@ -34,20 +34,21 @@ type CouncilRecord struct {
 }
 
 type DeliberationRecord struct {
-	ID             string       `dynamodbav:"id"`
-	CouncilID      string       `dynamodbav:"council_id"`
-	Title          string       `dynamodbav:"title"`
-	TopicTag       string       `dynamodbav:"topic_tag"`
-	PDFURL         string       `dynamodbav:"pdf_url"`
-	Summary        string       `dynamodbav:"summary"`
-	IsSubstantial  bool         `dynamodbav:"is_substantial"`
-	AnalysisData   AnalysisData `dynamodbav:"analysis_data"`
-	HasVote        bool         `dynamodbav:"has_vote"`
-	VotePour       *int         `dynamodbav:"vote_pour"`
-	VoteContre     *int         `dynamodbav:"vote_contre"`
-	VoteAbstention *int         `dynamodbav:"vote_abstention"`
-	Disagreements  *string      `dynamodbav:"disagreements"`
-	ProcessedAt    string       `dynamodbav:"processed_at"`
+	ID             string            `dynamodbav:"id"`
+	CouncilID      string            `dynamodbav:"council_id"`
+	Title          string            `dynamodbav:"title"`
+	TopicTag       string            `dynamodbav:"topic_tag"`
+	PDFURL         string            `dynamodbav:"pdf_url"`
+	Summary        string            `dynamodbav:"summary"`
+	IsSubstantial  bool              `dynamodbav:"is_substantial"`
+	Acronyms       map[string]string `dynamodbav:"acronyms"`
+	AnalysisData   AnalysisData      `dynamodbav:"analysis_data"`
+	HasVote        bool              `dynamodbav:"has_vote"`
+	VotePour       *int              `dynamodbav:"vote_pour"`
+	VoteContre     *int              `dynamodbav:"vote_contre"`
+	VoteAbstention *int              `dynamodbav:"vote_abstention"`
+	Disagreements  *string           `dynamodbav:"disagreements"`
+	ProcessedAt    string            `dynamodbav:"processed_at"`
 }
 
 // ── JSON output format ────────────────────────────────────────────────────────
@@ -68,15 +69,16 @@ type CouncilOutput struct {
 }
 
 type DeliberationOutput struct {
-	ID            string       `json:"id"`
-	Title         string       `json:"title"`
-	TopicTag      string       `json:"topic_tag"`
-	PDFURL        string       `json:"pdf_url"`
-	Summary       string       `json:"summary"`
-	IsSubstantial bool         `json:"is_substantial"`
-	AnalysisData  AnalysisData `json:"analysis_data"`
-	Vote          VoteCount    `json:"vote"`
-	Disagreements *string      `json:"disagreements"`
+	ID            string            `json:"id"`
+	Title         string            `json:"title"`
+	TopicTag      string            `json:"topic_tag"`
+	PDFURL        string            `json:"pdf_url"`
+	Summary       string            `json:"summary"`
+	IsSubstantial bool              `json:"is_substantial"`
+	Acronyms      map[string]string `json:"acronyms"`
+	AnalysisData  AnalysisData      `json:"analysis_data"`
+	Vote          VoteCount         `json:"vote"`
+	Disagreements *string           `json:"disagreements"`
 }
 
 type AnalysisData struct {
@@ -116,6 +118,7 @@ func buildDataJSON(ctx context.Context, ddb *dynamodb.Client, councils []Council
 				PDFURL:        d.PDFURL,
 				Summary:       d.Summary,
 				IsSubstantial: d.IsSubstantial,
+				Acronyms:      d.Acronyms,
 				AnalysisData:  d.AnalysisData,
 				Vote: VoteCount{
 					HasVote:    d.HasVote || d.VotePour != nil || d.VoteContre != nil || d.VoteAbstention != nil,

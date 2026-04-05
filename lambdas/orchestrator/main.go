@@ -119,7 +119,7 @@ func handler(ctx context.Context, event OrchestratorEvent) error {
 			}
 			body, _ := json.Marshal(msg)
 			_, err = sqsClient.SendMessage(ctx, &sqs.SendMessageInput{
-				QueueUrl:    aws.String(os.Getenv("WORKER_QUEUE_URL")),
+				QueueUrl:    aws.String(os.Getenv("PDF_QUEUE_URL")),
 				MessageBody: aws.String(string(body)),
 			})
 			if err != nil {

@@ -13,15 +13,7 @@
     <meta property="og:description" content="La vie municipale de Bègles déchiffrée par l'IA. Accédez aux résumés clairs des délibérations et aux résultats des votes.">
     <meta property="og:image" content="https://d1lrclzu1l51ys.cloudfront.net/maire.png">
 
-    <!-- Twitter -->
-    <meta property="twitter:card" content="summary_large_image">
-    <meta property="twitter:url" content="https://d1lrclzu1l51ys.cloudfront.net/">
-    <meta property="twitter:title" content="Observatoire Citoyen de Bègles">
-    <meta property="twitter:description" content="La vie municipale de Bègles déchiffrée par l'IA. Transparence et résumés accessibles à tous.">
-    <meta property="twitter:image" content="https://d1lrclzu1l51ys.cloudfront.net/maire.png">
-
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔭</text></svg>">
-    <!-- Version: 1.0.1 - Force Cache Invalidation -->
     
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -84,10 +76,6 @@
             -webkit-text-fill-color: transparent;
         }
 
-        .category-dot {
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
         .council-card {
             transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
         }
@@ -103,16 +91,6 @@
             backdrop-filter: blur(4px);
         }
         
-        .pagination-btn {
-            @apply w-10 h-10 flex items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 font-bold transition-all hover:border-brand-300 hover:text-brand-600;
-        }
-        .pagination-btn.active {
-            @apply bg-brand-600 border-brand-600 text-white shadow-lg shadow-brand-600/30;
-        }
-        .pagination-btn:disabled {
-            @apply opacity-30 cursor-not-allowed hover:border-slate-200 hover:text-slate-600;
-        }
-
         @keyframes shimmer {
             0% { background-position: -1000px 0; }
             100% { background-position: 1000px 0; }
@@ -310,22 +288,16 @@
     <!-- Content Area -->
     <main class="max-w-5xl mx-auto px-6 pb-24">
         <div id="timeline" class="space-y-16 min-h-[400px]">
-            <!-- Skeleton items -->
-            <div class="animate-pulse space-y-12">
-                <div class="h-10 w-48 bg-slate-200 rounded-2xl mx-auto"></div>
-                <div class="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden">
-                    <div class="p-8 md:p-12 space-y-4">
-                        <div class="h-8 w-2/3 bg-slate-200 rounded-xl"></div>
-                        <div class="h-4 w-full bg-slate-100 rounded-lg"></div>
-                        <div class="h-4 w-5/6 bg-slate-100 rounded-lg"></div>
-                    </div>
-                    <div class="divide-y divide-slate-50">
-                        <div class="p-8 h-20 bg-slate-50/50"></div>
-                        <div class="p-8 h-20 bg-white"></div>
-                        <div class="p-8 h-20 bg-slate-50/50"></div>
-                    </div>
+            <!-- Skeleton Loader (Placeholders) -->
+            <section class="animate-pulse mb-20">
+                <div class="h-10 bg-slate-200 rounded-2xl w-48 mb-8 mx-auto"></div>
+                <div class="bg-white rounded-[2.5rem] border border-slate-100 shadow-xl p-8 md:p-12 h-64">
+                    <div class="h-8 bg-slate-200 rounded w-1/3 mb-6"></div>
+                    <div class="h-4 bg-slate-100 rounded w-full mb-3"></div>
+                    <div class="h-4 bg-slate-100 rounded w-full mb-3"></div>
+                    <div class="h-4 bg-slate-100 rounded w-2/3"></div>
                 </div>
-            </div>
+            </section>
         </div>
     </main>
 
@@ -389,7 +361,6 @@
                 </button>
             </div>
             <div class="p-8 overflow-y-auto">
-                <!-- Fiche du Maire -->
                 <div class="mb-12 bg-slate-50 rounded-[2rem] p-8 border border-slate-100 flex flex-col md:flex-row items-center gap-8">
                     <div class="w-32 h-32 md:w-40 md:h-40 shrink-0 rounded-full overflow-hidden border-4 border-white shadow-xl">
                         <img src="maire.png" alt="Christian BAGATE" class="w-full h-full object-cover">
@@ -400,104 +371,50 @@
                         <p class="text-slate-500 font-medium italic">Liste « Espoir Béglais »</p>
                     </div>
                 </div>
-
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-6">
-                    <div class="col-span-full mb-2"><h4 class="text-xs font-black text-slate-400 uppercase tracking-[0.2em]">Adjoints au Maire (Majorité)</h4></div>
-                    
-                    <div class="p-4 bg-brand-50 rounded-2xl border border-brand-100">
-                        <p class="font-bold text-slate-900">Isabelle BERRIÉ</p>
-                        <p class="text-[11px] text-brand-600 font-bold uppercase">1ère adjointe</p>
-                    </div>
-                    <div class="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                        <p class="font-bold text-slate-900">Mohammed MICHRAFY</p>
-                        <p class="text-[11px] text-slate-500 font-bold uppercase">2ème adjoint</p>
-                    </div>
-                    <div class="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                        <p class="font-bold text-slate-900">Cécile MAFFRE CORDON</p>
-                        <p class="text-[11px] text-slate-500 font-bold uppercase">3ème adjointe</p>
-                    </div>
-                    <div class="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                        <p class="font-bold text-slate-900">Christophe DUMONTIER</p>
-                        <p class="text-[11px] text-slate-500 font-bold uppercase">4ème adjoint</p>
-                    </div>
-                    <div class="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                        <p class="font-bold text-slate-900">Carole LAGRILLÈRE</p>
-                        <p class="text-[11px] text-slate-500 font-bold uppercase">5ème adjointe</p>
-                    </div>
-                    <div class="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                        <p class="font-bold text-slate-900">Quentin BELAUBRE</p>
-                        <p class="text-[11px] text-slate-500 font-bold uppercase">6ème adjoint</p>
-                    </div>
-                    <div class="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                        <p class="font-bold text-slate-900">Aïcha SANGARÉ</p>
-                        <p class="text-[11px] text-slate-500 font-bold uppercase">7ème adjointe</p>
-                    </div>
-                    <div class="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                        <p class="font-bold text-slate-900">Éric TRÉVISE</p>
-                        <p class="text-[11px] text-slate-500 font-bold uppercase">8ème adjoint</p>
-                    </div>
-                    <div class="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                        <p class="font-bold text-slate-900">Bérengère BRUN</p>
-                        <p class="text-[11px] text-slate-500 font-bold uppercase">9ème adjointe</p>
-                    </div>
-                    <div class="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                        <p class="font-bold text-slate-900">Fabrice DELAVOYE</p>
-                        <p class="text-[11px] text-slate-500 font-bold uppercase">10ème adjoint</p>
-                    </div>
-                    <div class="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                        <p class="font-bold text-slate-900">Cécile BÉZIAT LAURAY</p>
-                        <p class="text-[11px] text-slate-500 font-bold uppercase">11ème adjointe</p>
-                    </div>
-                    <div class="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                        <p class="font-bold text-slate-900">Arthur CHOLLON</p>
-                        <p class="text-[11px] text-slate-500 font-bold uppercase">12ème adjoint</p>
-                    </div>
-
-                    <div class="col-span-full mt-8 mb-2"><h4 class="text-xs font-black text-slate-400 uppercase tracking-[0.2em]">Conseillers de la Majorité (Espoir Béglais)</h4></div>
-                    
-                    <div class="p-4 bg-slate-50/50 rounded-2xl border border-slate-100"><p class="font-bold text-slate-900 text-sm">Alain NAU <span class="text-[10px] text-slate-400 font-normal ml-1">(Doyen)</span></p></div>
-                    <div class="p-4 bg-slate-50/50 rounded-2xl border border-slate-100"><p class="font-bold text-slate-900 text-sm">Patrick LAFON</p></div>
-                    <div class="p-4 bg-slate-50/50 rounded-2xl border border-slate-100"><p class="font-bold text-slate-900 text-sm">Catherine PARNAUT</p></div>
-                    <div class="p-4 bg-slate-50/50 rounded-2xl border border-slate-100"><p class="font-bold text-slate-900 text-sm">Règis CHOFFAT</p></div>
-                    <div class="p-4 bg-slate-50/50 rounded-2xl border border-slate-100"><p class="font-bold text-slate-900 text-sm">Céline LOPEZ</p></div>
-                    <div class="p-4 bg-slate-50/50 rounded-2xl border border-slate-100"><p class="font-bold text-slate-900 text-sm">Caroll FONS</p></div>
-                    <div class="p-4 bg-slate-50/50 rounded-2xl border border-slate-100"><p class="font-bold text-slate-900 text-sm">Maurice JULIEN</p></div>
-                    <div class="p-4 bg-slate-50/50 rounded-2xl border border-slate-100"><p class="font-bold text-slate-900 text-sm">Caroline AGUILA</p></div>
-                    <div class="p-4 bg-slate-50/50 rounded-2xl border border-slate-100"><p class="font-bold text-slate-900 text-sm">Malika STIBI</p></div>
-                    <div class="p-4 bg-slate-50/50 rounded-2xl border border-slate-100"><p class="font-bold text-slate-900 text-sm">Charlotte AMAR DUPART</p></div>
-                    <div class="p-4 bg-slate-50/50 rounded-2xl border border-slate-100"><p class="font-bold text-slate-900 text-sm">Virginie MOURATO</p></div>
-                    <div class="p-4 bg-slate-50/50 rounded-2xl border border-slate-100"><p class="font-bold text-slate-900 text-sm">Amélie PIERSON</p></div>
-                    <div class="p-4 bg-slate-50/50 rounded-2xl border border-slate-100"><p class="font-bold text-slate-900 text-sm">Florian MINJOT</p></div>
-                    <div class="p-4 bg-slate-50/50 rounded-2xl border border-slate-100"><p class="font-bold text-slate-900 text-sm">Laure-Anne BESSAGNET</p></div>
-                    <div class="p-4 bg-slate-50/50 rounded-2xl border border-slate-100"><p class="font-bold text-slate-900 text-sm">Jonathan MOTHE</p></div>
-                    <div class="p-4 bg-slate-50/50 rounded-2xl border border-slate-100"><p class="font-bold text-slate-900 text-sm">Ali LAZREK</p></div>
-                    <div class="p-4 bg-slate-50/50 rounded-2xl border border-slate-100"><p class="font-bold text-slate-900 text-sm">Paul-Armand FRÉZOULS</p></div>
-
-                    <div class="col-span-full mt-10 mb-2 border-t border-slate-100 pt-8">
-                        <h4 class="text-xs font-black text-slate-400 uppercase tracking-[0.2em]">Opposition Municipale</h4>
-                    </div>
-
-                    <!-- Groupe Opposition -->
-                    <div class="col-span-full mb-1">
-                        <p class="text-[10px] font-bold text-rose-600 uppercase tracking-widest">Groupe « Vivons Bègles Ensemble »</p>
-                    </div>
-                    <div class="p-4 bg-rose-50/30 rounded-2xl border border-rose-100/50"><p class="font-bold text-slate-900 text-sm">Clément ROSSIGNOL PUECH</p></div>
-                    <div class="p-4 bg-rose-50/30 rounded-2xl border border-rose-100/50"><p class="font-bold text-slate-900 text-sm">Edwige LUCBERNET</p></div>
-                    <div class="p-4 bg-rose-50/30 rounded-2xl border border-rose-100/50"><p class="font-bold text-slate-900 text-sm">Rémi JOUSSIAUME</p></div>
-                    <div class="p-4 bg-rose-50/30 rounded-2xl border border-rose-100/50"><p class="font-bold text-slate-900 text-sm">Marie-Laure PIROTH</p></div>
-                    <div class="p-4 bg-rose-50/30 rounded-2xl border border-rose-100/50"><p class="font-bold text-slate-900 text-sm">Vincent BOIVINET</p></div>
-                    <div class="p-4 bg-rose-50/30 rounded-2xl border border-rose-100/50"><p class="font-bold text-slate-900 text-sm">Marie JANVIER</p></div>
-                    <div class="p-4 bg-rose-50/30 rounded-2xl border border-rose-100/50"><p class="font-bold text-slate-900 text-sm">Pierre OUALLET</p></div>
-                    <div class="p-4 bg-rose-50/30 rounded-2xl border border-rose-100/50"><p class="font-bold text-slate-900 text-sm">Julien LEFEBVRE</p></div>
-                    <div class="p-4 bg-rose-50/30 rounded-2xl border border-rose-100/50"><p class="font-bold text-slate-900 text-sm">Aurélie BOUSQUET</p></div>
+                    <!-- Contenu équipe municipale (simplifié pour la clarté) -->
+                    <div class="col-span-full mb-2"><h4 class="text-xs font-black text-slate-400 uppercase tracking-[0.2em]">Adjoints au Maire</h4></div>
+                    <div class="p-4 bg-brand-50 rounded-2xl border border-brand-100"><p class="font-bold text-slate-900">Isabelle BERRIÉ</p><p class="text-[11px] text-brand-600 font-bold uppercase">1ère adjointe</p></div>
+                    <div class="p-4 bg-slate-50 rounded-2xl border border-slate-100"><p class="font-bold text-slate-900">Mohammed MICHRAFY</p><p class="text-[11px] text-slate-500 font-bold uppercase">2ème adjoint</p></div>
+                    <div class="p-4 bg-slate-50 rounded-2xl border border-slate-100"><p class="font-bold text-slate-900">Cécile MAFFRE CORDON</p><p class="text-[11px] text-slate-500 font-bold uppercase">3ème adjointe</p></div>
                 </div>
             </div>
         </div>
     </div>
 
     <script>
-        const API_URL = 'https://zq7qfmhra1.execute-api.eu-west-3.amazonaws.com/prod/';
         let allCouncils = [];
+        let visibleCouncilsCount = 3;
+        let searchTimeout;
+        let searchQuery = '';
+
+        const GLOBAL_GLOSSARY = {
+            "CCAS": "Centre Communal d'Action Sociale",
+            "ZAC": "Zone d'Aménagement Concerté",
+            "PLU": "Plan Local d'Urbanisme",
+            "EPCI": "Établissement Public de Coopération Intercommunale",
+            "DSP": "Délégation de Service Public",
+            "AFL": "Agence France Locale",
+            "CREPAQ": "Centre de Ressources d'Écologie Pédagogique en Nouvelle-Aquitaine",
+            "BM": "Bordeaux Métropole",
+            "ALSH": "Accueil de Loisirs Sans Hébergement",
+            "PADD": "Projet d'Aménagement et de Développement Durable",
+            "SCOT": "Schéma de Cohérence Territoriale",
+            "CLSPD": "Conseil Local de Sécurité et de Prévention de la Délinquance",
+            "ERP": "Établissement Recevant du Public",
+            "QPV": "Quartier Prioritaire de la Politique de la Ville",
+            "AAP": "Appel à Projets",
+            "AMI": "Appel à Manifestation d'Intérêt",
+            "SIAE": "Structure de l'Insertion par l'Activité Économique",
+            "SIAL": "Système d'Information pour l'Accueil et le Logement"
+        };
+
+        function escapeHTML(str) {
+            if (!str) return "";
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
 
         function toggleAboutModal(show) {
             const modal = document.getElementById('about-modal');
@@ -517,23 +434,50 @@
             document.body.classList.toggle('modal-open', show);
         }
 
-        document.getElementById('contact-form')?.addEventListener('submit', function(e) {
-            e.preventDefault();
-            // Placeholder: L'envoi sera branché au backend plus tard
-            alert('Merci pour votre message ! (Le service sera activé avec le nom de domaine)');
-            toggleContactModal(false);
-            this.reset();
-        });
-
         function toggleMobileMenu(show) {
             const menu = document.getElementById('mobile-menu');
             menu.classList.toggle('hidden', !show);
             document.body.classList.toggle('modal-open', show);
-            
-            // Si on ferme, on enlève le focus de l'input pour ranger le clavier mobile
-            if (!show) {
-                document.getElementById('mobile-search-input')?.blur();
-            }
+            if (!show) document.getElementById('mobile-search-input')?.blur();
+        }
+
+        function smartCapitalize(str) {
+            if (!str) return "";
+            const words = str.split(' ');
+            return words.map((word, index) => {
+                if (word.length > 1 && word === word.toUpperCase() && !/^[0-9]+$/.test(word)) return word;
+                const low = word.toLowerCase();
+                if (index === 0) return low.charAt(0).toUpperCase() + low.slice(1);
+                return low;
+            }).join(' ');
+        }
+
+        function applyAcronyms(text, localAcronyms) {
+            const acronymsMap = { ...GLOBAL_GLOSSARY, ...(localAcronyms || {}) };
+            if (Object.keys(acronymsMap).length === 0) return text;
+            let result = text;
+            const keys = Object.keys(acronymsMap).sort((a, b) => b.length - a.length);
+
+            keys.forEach(key => {
+                const definition = escapeHTML(acronymsMap[key]);
+                const regex = new RegExp(`\\b${key}\\b`, 'g');
+                result = result.replace(regex, `<abbr title="${definition}" class="cursor-help border-b border-dotted border-brand-300 decoration-brand-300 decoration-2 underline-offset-4" tabindex="0">${key}</abbr>`);
+            });
+            return result;
+        }
+
+
+        function highlightText(text, query, acronymsMap = null) {
+            let processedText = escapeHTML(text);
+            if (acronymsMap) processedText = applyAcronyms(processedText, acronymsMap);
+            if (!query) return processedText;
+            const escapedQuery = escapeHTML(query);
+            const regex = new RegExp(`(${escapedQuery})`, 'gi');
+            const parts = processedText.split(/(<[^>]+>)/g);
+            return parts.map(part => {
+                if (part.startsWith('<')) return part;
+                return part.replace(regex, `<mark class="bg-brand-100 text-brand-700 font-bold px-0.5 rounded">$1</mark>`);
+            }).join('');
         }
 
         async function init() {
@@ -541,12 +485,10 @@
                 const resp = await fetch('./data.json');
                 if (!resp.ok) throw new Error('Not found');
                 const data = await resp.json();
-                
                 if (data.next_council_date) {
                     document.getElementById('next-council-date').textContent = data.next_council_date;
                     document.getElementById('next-council-block').classList.remove('hidden');
                 }
-
                 allCouncils = (data.councils || []).sort((a, b) => b.date.localeCompare(a.date));
                 updateStats();
                 render();
@@ -556,27 +498,22 @@
             }
         }
 
-        let searchQuery = '';
         function handleSearch(val) {
-            searchQuery = val.toLowerCase().trim();
-            
-            // Sync both inputs
-            const navSearch = document.getElementById('nav-search-input');
-            const mobileSearch = document.getElementById('mobile-search-input');
-            if (navSearch && navSearch.value !== val) navSearch.value = val;
-            if (mobileSearch && mobileSearch.value !== val) mobileSearch.value = val;
-            
-            render();
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                searchQuery = val.toLowerCase().trim();
+                visibleCouncilsCount = 3;
+                const navSearch = document.getElementById('nav-search-input');
+                const mobileSearch = document.getElementById('mobile-search-input');
+                if (navSearch && navSearch.value !== val) navSearch.value = val;
+                if (mobileSearch && mobileSearch.value !== val) mobileSearch.value = val;
+                render();
+            }, 300);
         }
 
-        function highlightText(text, query) {
-            if (!query) return text;
-            const parts = text.split(new RegExp(`(${query})`, 'gi'));
-            return parts.map(part => 
-                part.toLowerCase() === query.toLowerCase() 
-                    ? `<mark class="bg-brand-100 text-brand-700 font-bold px-0.5 rounded">${part}</mark>` 
-                    : part
-            ).join('');
+        function loadMore() {
+            visibleCouncilsCount += 3;
+            render();
         }
 
         function updateStats() {
@@ -584,10 +521,17 @@
             document.getElementById('stat-deliberations').textContent = allCouncils.reduce((sum, c) => sum + (c.deliberations?.length || 0), 0);
         }
 
+        function formatDate(iso) {
+            if (!iso) return "Date inconnue";
+            try {
+                const date = new Date(iso);
+                if (isNaN(date.getTime())) return iso;
+                return date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+            } catch (e) { return iso; }
+        }
+
         function render() {
             const container = document.getElementById('timeline');
-            
-            // Filter data based on search
             let totalResults = 0;
             const filtered = allCouncils.map(council => {
                 const filteredDelibs = (council.deliberations || []).filter(d => 
@@ -599,71 +543,54 @@
                 return filteredDelibs.length > 0 ? { ...council, deliberations: filteredDelibs } : null;
             }).filter(c => c !== null);
 
+            const councilsToDisplay = filtered.slice(0, visibleCouncilsCount);
             container.innerHTML = '';
 
-            // Search Results Header
             if (searchQuery) {
                 const searchHeader = document.createElement('div');
                 searchHeader.className = 'mb-12 animate-fade-in flex items-center justify-between bg-white px-8 py-5 rounded-3xl border border-slate-100 shadow-sm';
-                searchHeader.innerHTML = `
-                    <div class="flex items-center gap-4">
-                        <div class="w-10 h-10 bg-brand-50 rounded-xl flex items-center justify-center text-brand-600">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-                        </div>
-                        <p class="text-slate-600">
-                            <span class="font-bold text-slate-900">${totalResults}</span> résultat${totalResults > 1 ? 's' : ''} pour <span class="text-brand-600 font-bold">"${searchQuery}"</span>
-                        </p>
-                    </div>
-                    <button onclick="handleSearch(''); document.getElementById('nav-search-input').value=''; document.getElementById('mobile-search-input').value='';" 
-                            class="text-xs font-bold text-slate-400 hover:text-rose-500 uppercase tracking-widest transition-colors">
-                        Effacer
-                    </button>
-                `;
+                const escapedQuery = escapeHTML(searchQuery);
+                searchHeader.innerHTML = `<div class="flex items-center gap-4"><div class="w-10 h-10 bg-brand-50 rounded-xl flex items-center justify-center text-brand-600"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg></div><p class="text-slate-600"><span class="font-bold text-slate-900">${totalResults}</span> résultat${totalResults > 1 ? 's' : ''} pour <span class="text-brand-600 font-bold">"${escapedQuery}"</span></p></div><button onclick="handleSearch(''); document.getElementById('nav-search-input').value=''; document.getElementById('mobile-search-input').value='';" class="text-xs font-bold text-slate-400 hover:text-rose-500 uppercase tracking-widest transition-colors">Effacer</button>`;
                 container.appendChild(searchHeader);
             }
 
             if (filtered.length === 0) {
-                container.innerHTML += `
-                    <div class="text-center py-24 animate-fade-in">
-                        <div class="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-6 text-slate-400">
-                            <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-                        </div>
-                        <h3 class="text-xl font-bold text-slate-900 mb-2">Aucun résultat</h3>
-                        <p class="text-slate-500">Aucune délibération ne correspond à votre recherche "${searchQuery}".</p>
-                    </div>
-                `;
+                const escapedQuery = escapeHTML(searchQuery);
+                container.innerHTML += `<div class="text-center py-24 animate-fade-in"><div class="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-6 text-slate-400"><svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg></div><h3 class="text-xl font-bold text-slate-900 mb-2">Aucun résultat</h3><p class="text-slate-500">Aucune délibération ne correspond à votre recherche "${escapedQuery}".</p></div>`;
                 return;
             }
 
-            filtered.forEach(council => {
+            councilsToDisplay.forEach(council => {
                 const councilSection = document.createElement('section');
                 councilSection.className = 'council-group animate-slide-up mb-20';
                 const dateStr = formatDate(council.date);
                 const delibsCount = council.deliberations?.length || 0;
+                const escapedTitle = escapeHTML(council.title);
+                const escapedSummary = council.summary ? escapeHTML(council.summary) : `Ce conseil a traité ${delibsCount} délibérations.`;
 
                 councilSection.innerHTML = `
                     <div class="flex items-center gap-6 mb-8">
                         <div class="h-1 flex-1 bg-slate-100 rounded-full"></div>
-                        <h2 class="text-base font-black text-slate-800 uppercase tracking-widest bg-white px-8 py-3 rounded-2xl border-2 border-slate-200 shadow-lg">
-                            ${dateStr}
-                        </h2>
+                        <h2 class="text-base font-black text-slate-800 uppercase tracking-widest bg-white px-8 py-3 rounded-2xl border-2 border-slate-200 shadow-lg">${dateStr}</h2>
                         <div class="h-1 flex-1 bg-slate-100 rounded-full"></div>
                     </div>
                     <div class="bg-white rounded-[2.5rem] border border-slate-100 shadow-xl overflow-hidden">
                         <div class="p-8 md:p-12 border-b border-slate-50 bg-slate-50/30">
-                            <h3 class="text-2xl md:text-3xl font-bold text-slate-900 mb-4">${council.title}</h3>
-                            <p class="text-slate-500 leading-relaxed max-w-3xl text-[16px]">
-                                ${council.summary || `Ce conseil a traité ${delibsCount} délibérations.`}
-                                <br><span class="text-xs font-bold text-slate-400 uppercase tracking-widest mt-4 block">Cliquez sur un sujet pour voir le détail</span>
-                            </p>
+                            <h3 class="text-2xl md:text-3xl font-bold text-slate-900 mb-4">${escapedTitle}</h3>
+                            <p class="text-slate-500 leading-relaxed max-w-3xl text-[16px]">${escapedSummary}<br><span class="text-xs font-bold text-slate-400 uppercase tracking-widest mt-4 block">Cliquez sur un sujet pour voir le détail</span></p>
                         </div>
-                        <div class="divide-y divide-slate-50">
-                            ${council.deliberations.map(d => renderDeliberationRow(d)).join('')}
-                        </div>
-                    </div>
-                `;
+                        <div class="divide-y divide-slate-50">${council.deliberations.map(d => renderDeliberationRow(d)).join('')}</div>
+                    </div>`;
                 container.appendChild(councilSection);
             });
+
+            if (filtered.length > visibleCouncilsCount) {
+                const loadMoreBtn = document.createElement('button');
+                loadMoreBtn.onclick = loadMore;
+                loadMoreBtn.className = 'w-full py-6 bg-white border-2 border-slate-100 rounded-3xl text-slate-500 font-bold uppercase tracking-widest hover:bg-slate-50 hover:border-brand-200 hover:text-brand-600 transition-all shadow-sm group active:scale-[0.98]';
+                loadMoreBtn.innerHTML = `<div class="flex items-center justify-center gap-3"><span>Voir les conseils précédents</span><svg class="w-5 h-5 group-hover:translate-y-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg></div>`;
+                container.appendChild(loadMoreBtn);
+            }
         }
 
         function renderDeliberationRow(d) {
@@ -671,96 +598,21 @@
             const hasVote = d.vote && (d.vote.has_vote || d.vote.pour != null || d.vote.contre != null || d.vote.abstention != null);
             const total = hasVote ? ((d.vote.pour || 0) + (d.vote.contre || 0) + (d.vote.abstention || 0)) : 0;
             const pourPct = (hasVote && total > 0) ? (d.vote.pour / total * 100) : 0;
-
-            // Highlight matches
-            const highlightedTitle = highlightText(d.title, searchQuery);
-            const highlightedSummary = highlightText(d.summary, searchQuery);
+            const capitalizedTitle = smartCapitalize(d.title);
+            const highlightedTitle = highlightText(capitalizedTitle, searchQuery, d.acronyms);
+            const highlightedSummary = highlightText(d.summary, searchQuery, d.acronyms);
             const highlightedTag = highlightText(d.topic_tag || 'DÉLIBÉRATION', searchQuery);
 
-            // Construct Éclairage HTML (shown whenever analysis_data has content)
             let analysisHTML = '';
             if (d.analysis_data) {
-                const sections = [
-                    { label: 'Contexte', content: d.analysis_data.contexte },
-                    { label: 'Décision prise', content: d.analysis_data.decision },
-                    { label: 'Impacts concrets', content: d.analysis_data.impacts },
-                    { label: 'Points de controverse', content: d.analysis_data.points_debattus }
-                ];
-
-                const content = sections
-                    .filter(s => s.content)
-                    .map(s => `
-                        <div class="mb-5">
-                            <p class="text-[10px] font-bold text-brand-600 uppercase tracking-widest mb-1">${s.label}</p>
-                            <p class="text-[14px] text-slate-600 leading-relaxed">${highlightText(s.content, searchQuery)}</p>
-                        </div>`)
-                    .join('');
-
+                const sections = [{ label: 'Contexte', content: d.analysis_data.contexte }, { label: 'Décision prise', content: d.analysis_data.decision }, { label: 'Impacts concrets', content: d.analysis_data.impacts }, { label: 'Points de controverse', content: d.analysis_data.points_debattus }];
+                const content = sections.filter(s => s.content).map(s => `<div class="mb-5"><p class="text-[10px] font-bold text-brand-600 uppercase tracking-widest mb-1">${escapeHTML(s.label)}</p><p class="text-[14px] text-slate-600 leading-relaxed">${highlightText(s.content, searchQuery, d.acronyms)}</p></div>`).join('');
                 if (content) {
-                    analysisHTML = `
-                        <div class="bg-brand-50 rounded-2xl p-6 border border-brand-100 mb-8">
-                            <h5 class="text-[10px] font-bold text-brand-700 uppercase tracking-widest mb-5 flex items-center gap-2">
-                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path></svg>
-                                Éclairage
-                            </h5>
-                            ${content}
-                        </div>
-                    `;
+                    analysisHTML = `<div class="bg-brand-50 rounded-2xl p-6 border border-brand-100 mb-8"><h5 class="text-[10px] font-bold text-brand-700 uppercase tracking-widest mb-5 flex items-center gap-2"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path></svg>Éclairage</h5>${content}</div>`;
                 }
             }
 
-            return `
-                <div class="group/item">
-                    <button 
-                        onclick="toggleDelib('${delibId}')" 
-                        id="btn-${delibId}"
-                        aria-expanded="false"
-                        aria-controls="content-${delibId}"
-                        class="w-full text-left p-6 md:p-8 hover:bg-slate-50/50 transition-all flex items-center justify-between gap-6">
-                        <div class="flex-1 min-w-0">
-                            <div class="flex items-center gap-3 mb-2">
-                                <span class="w-2 h-2 rounded-full ${pourPct > 50 ? 'bg-emerald-500' : 'bg-amber-500'}"></span>
-                                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">${highlightedTag}</span>
-                            </div>
-                            <h4 class="text-lg font-bold text-slate-900 group-hover/item:text-brand-600 transition-colors truncate">${highlightedTitle}</h4>
-                        </div>
-                        <div class="w-10 h-10 rounded-full border border-slate-100 flex items-center justify-center text-slate-400 group-hover/item:text-brand-600 transition-all">
-                            <svg id="icon-${delibId}" class="w-5 h-5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-                        </div>
-                    </button>
-                    <div id="content-${delibId}" class="hidden border-t border-slate-50 bg-slate-50/20" role="region" aria-labelledby="btn-${delibId}">
-                        <div class="px-6 md:px-12 py-10">
-                            <div class="grid grid-cols-1 lg:grid-cols-12 gap-10">
-                                <div class="lg:col-span-7">
-                                    <p class="text-slate-600 leading-relaxed text-[16px] mb-8">${highlightedSummary}</p>
-                                    ${analysisHTML}
-                                    ${d.disagreements ? `<div class="border-l-4 border-slate-200 pl-6 py-1 mb-8"><h5 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Opposition</h5><p class="text-[14px] text-slate-500 italic leading-relaxed">${highlightText(d.disagreements, searchQuery)}</p></div>` : ''}
-                                    
-                                    <!-- Source Link -->
-                                    <div class="pt-6 border-t border-slate-100">
-                                        <a href="${d.pdf_url}" target="_blank" class="inline-flex items-center gap-2 text-xs font-bold text-slate-400 hover:text-brand-600 transition-colors uppercase tracking-widest">
-                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                                            Document source (PDF)
-                                        </a>
-                                    </div>
-                                </div>
-                                <div class="lg:col-span-5">
-                                    <div class="bg-white rounded-3xl p-8 border border-slate-100 shadow-sm ${!hasVote ? 'opacity-50 grayscale' : ''}">
-                                        <h5 class="text-xs font-bold text-slate-900 uppercase tracking-widest mb-8 text-center">
-                                            ${hasVote ? 'Résultats du vote' : 'Pas de vote enregistré'}
-                                        </h5>
-                                        <div class="space-y-6">
-                                            ${renderVoteBar('Pour', d.vote.pour, total, 'bg-emerald-500')}
-                                            ${renderVoteBar('Contre', d.vote.contre, total, 'bg-rose-500')}
-                                            ${renderVoteBar('Abstention', d.vote.abstention, total, 'bg-slate-300')}
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            `;
+            return `<div class="group/item"><button onclick="toggleDelib('${delibId}')" id="btn-${delibId}" aria-expanded="false" aria-controls="content-${delibId}" class="w-full text-left p-6 md:p-8 hover:bg-slate-50/50 transition-all flex items-center justify-between gap-6"><div class="flex-1 min-w-0"><div class="flex items-center gap-3 mb-2"><span class="w-2 h-2 rounded-full ${pourPct > 50 ? 'bg-emerald-500' : 'bg-amber-500'}"></span><span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">${highlightedTag}</span></div><h4 class="text-lg font-bold text-slate-900 group-hover/item:text-brand-600 transition-colors leading-tight mb-1">${highlightedTitle}</h4></div><div class="w-10 h-10 rounded-full border border-slate-100 flex items-center justify-center text-slate-400 group-hover/item:text-brand-600 transition-all"><svg id="icon-${delibId}" class="w-5 h-5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg></div></button><div id="content-${delibId}" class="hidden border-t border-slate-50 bg-slate-50/20" role="region" aria-labelledby="btn-${delibId}"><div class="px-6 md:px-12 py-10"><div class="grid grid-cols-1 lg:grid-cols-12 gap-10"><div class="lg:col-span-7"><p class="text-slate-600 leading-relaxed text-[16px] mb-8">${highlightedSummary}</p>${analysisHTML}${d.disagreements ? `<div class="border-l-4 border-slate-200 pl-6 py-1 mb-8"><h5 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Opposition</h5><p class="text-[14px] text-slate-500 italic leading-relaxed">${highlightText(d.disagreements, searchQuery, d.acronyms)}</p></div>` : ''}<div class="pt-6 border-t border-slate-100"><a href="${escapeHTML(d.pdf_url)}" target="_blank" class="inline-flex items-center gap-2 text-xs font-bold text-slate-400 hover:text-brand-600 transition-colors uppercase tracking-widest"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>Document source (PDF)</a></div></div><div class="lg:col-span-5"><div class="bg-white rounded-3xl p-8 border border-slate-100 shadow-sm ${!hasVote ? 'opacity-50 grayscale' : ''}"><h5 class="text-xs font-bold text-slate-900 uppercase tracking-widest mb-8 text-center">${hasVote ? 'Résultats du vote' : 'Pas de vote enregistré'}</h5><div class="space-y-6">${renderVoteBar('Pour', d.vote.pour, total, 'bg-emerald-500')}${renderVoteBar('Contre', d.vote.contre, total, 'bg-rose-500')}${renderVoteBar('Abstention', d.vote.abstention, total, 'bg-slate-300')}</div></div></div></div></div></div></div>`;
         }
 
         function renderVoteBar(l, v, t, c) {
@@ -773,22 +625,11 @@
             const content = document.getElementById(`content-${id}`);
             const icon = document.getElementById(`icon-${id}`);
             const btn = document.getElementById(`btn-${id}`);
+            if (!content || !icon || !btn) return;
             const isHidden = content.classList.contains('hidden');
-
             content.classList.toggle('hidden');
             icon.classList.toggle('rotate-180');
             btn.setAttribute('aria-expanded', isHidden ? 'true' : 'false');
-        }
-
-        function expandAnalysis(id) {
-            const text = document.getElementById(`analysis-text-${id}`);
-            const btn = document.getElementById(`analysis-btn-${id}`);
-            text.classList.remove('line-clamp-6');
-            btn.classList.add('hidden');
-        }
-
-        function formatDate(iso) {
-            return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
         }
 
         init();

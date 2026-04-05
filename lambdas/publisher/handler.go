@@ -12,6 +12,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
+	"github.com/aws/aws-sdk-go-v2/service/cloudfront"
+	cftypes "github.com/aws/aws-sdk-go-v2/service/cloudfront/types"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -182,6 +184,27 @@ func HandleRequest(ctx context.Context, event PublisherEvent) error {
 		return fmt.Errorf("upload data.json: %w", err)
 	}
 	log.Printf("data.json uploaded (%d bytes)", len(jsonBytes))
+
+	// CloudFront Invalidation
+	distID := os.Getenv("CLOUDFRONT_DISTRIBUTION_ID")
+	if distID != "" {
+		cfClient := cloudfront.NewFromConfig(cfg)
+		_, err := cfClient.CreateInvalidation(ctx, &cloudfront.CreateInvalidationInput{
+			DistributionId: aws.String(distID),
+			InvalidationBatch: &cftypes.InvalidationBatch{
+				CallerReference: aws.String(fmt.Sprintf("watchdog-%d", time.Now().Unix())),
+				Paths: &cftypes.Paths{
+					Quantity: aws.Int32(1),
+					Items:    []string{aws.String("/data.json")},
+				},
+			},
+		})
+		if err != nil {
+			log.Printf("warn: could not invalidate CloudFront cache: %v", err)
+		} else {
+			log.Printf("CloudFront cache invalidated for /data.json")
+		}
+	}
 
 	return nil
 }

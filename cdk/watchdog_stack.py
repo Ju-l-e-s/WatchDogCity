@@ -148,6 +148,7 @@ class WatchdogStack(Stack):
                 **common_env,
                 "FROM_EMAIL": "watchdog@begles.citoyen",
                 "SITE_URL": f"https://{distribution.distribution_domain_name}",
+                "CLOUDFRONT_DISTRIBUTION_ID": distribution.distribution_id,
             },
         )
         councils_table.grant_read_write_data(publisher)
@@ -155,7 +156,7 @@ class WatchdogStack(Stack):
         subscribers_table.grant_read_data(publisher)
         website_bucket.grant_put(publisher)
         publisher.add_to_role_policy(iam.PolicyStatement(
-            actions=["ses:SendEmail"],
+            actions=["ses:SendEmail", "cloudfront:CreateInvalidation"],
             resources=["*"],
         ))
 

@@ -21,10 +21,10 @@ Retourne UNIQUEMENT un objet JSON valide avec cette structure exacte :
   "topic_tag": "Un seul mot parmi cette liste stricte: Budget, Urbanisme, Social, Culture, Environnement, Éducation, Sport, Sécurité, Mobilité, Administration",
   "is_substantial": true/false,
   "analysis_data": {
-    "contexte": "explication de l'origine du projet (ou null si is_substantial est false)",
-    "decision": "ce qui a été concrètement acté (ou null)",
-    "impacts": "conséquences directes pour Bègles (ou null)",
-    "points_debattus": "les éléments qui ont fait débat (ou null)"
+    "contexte": "en 1 à 2 phrases : pourquoi ce point est à l'ordre du jour, son origine",
+    "decision": "en 1 phrase : ce qui a été concrètement acté ou voté",
+    "impacts": "en 1 à 2 phrases : conséquences directes pour les Béglaises et Béglais (ou null si aucun impact identifiable)",
+    "points_debattus": "en 1 phrase : s'il y a eu débat ou opposition, résumer le désaccord (ou null si vote unanime sans discussion)"
   },
   "key_points": [
     "point clé 1 (style télégraphique, très concis)",

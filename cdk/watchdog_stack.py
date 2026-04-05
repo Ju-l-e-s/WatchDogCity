@@ -13,6 +13,7 @@ from aws_cdk import (
     aws_cloudfront as cloudfront,
     aws_cloudfront_origins as origins,
     aws_cloudwatch as cloudwatch,
+    aws_s3_deployment as s3_deploy,
 )
 from constructs import Construct
 
@@ -54,7 +55,7 @@ class WatchdogStack(Stack):
             partition_key=dynamodb.Attribute(name="token", type=dynamodb.AttributeType.STRING),
         )
 
-        # ── S3 Static Website (EXISTING BUCKET in eu-west-3) ────────────────
+        # ── S3 Website Bucket (EXISTING) ──────────────────────────────────
         historical_bucket_name = "watchdogstack-websitebucket75c24d94-clsmaf2ocvxq"
         website_bucket = s3.Bucket.from_bucket_name(
             self, "WebsiteBucket",
@@ -92,7 +93,7 @@ class WatchdogStack(Stack):
         gemini_secret = secretsmanager.Secret(
             self, "GeminiSecret",
             secret_name="watchdog/gemini-api-key",
-            description="Gemini 3.1 Pro API key",
+            description="Clé API pour le moteur d'analyse IA Watchdog",
         )
 
         # ── Lambda common config ──────────────────────────────────────────
@@ -197,6 +198,15 @@ class WatchdogStack(Stack):
         subscriber_integration = apigw.LambdaIntegration(subscriber)
         api.root.add_resource("subscribe").add_method("POST", subscriber_integration)
         api.root.add_resource("confirm").add_method("GET", subscriber_integration)
+
+        # ── Website Deployment ───────────────────────────────────────────
+        s3_deploy.BucketDeployment(
+            self, "DeployWebsite",
+            sources=[s3_deploy.Source.asset("../frontend")],
+            destination_bucket=website_bucket,
+            distribution=distribution,
+            distribution_paths=["/*"],
+        )
 
         # ── Monitoring & Dashboard ────────────────────────────────────────
         dashboard = cloudwatch.Dashboard(self, "WatchdogDashboard", dashboard_name="Watchdog-Begles-Health")

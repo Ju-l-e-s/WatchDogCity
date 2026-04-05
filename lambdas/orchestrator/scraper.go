@@ -15,6 +15,7 @@ type CouncilListing struct {
 	Category  string
 	Date      string
 	URL       string
+	Summary   string
 }
 
 type PDFItem struct {
@@ -44,6 +45,15 @@ func (sc *Scraper) ScrapeCouncilList() ([]CouncilListing, error) {
 			return
 		}
 		title := strings.TrimSpace(link.Text())
+		
+		// Tentative d'extraction du résumé avec plusieurs sélecteurs possibles
+		summary := strings.TrimSpace(s.Find(".publications-list-item__excerpt").Text())
+		if summary == "" {
+			summary = strings.TrimSpace(s.Find(".publications-list-item__text").Text())
+		}
+		if summary == "" {
+			summary = strings.TrimSpace(s.Find(".publications-list-item__content").Text())
+		}
 
 		category := strings.TrimSpace(s.Find("span.theme").Text())
 		if category == "" {
@@ -60,6 +70,7 @@ func (sc *Scraper) ScrapeCouncilList() ([]CouncilListing, error) {
 			Category:  normalizeCategory(category),
 			Date:      pubDate,
 			URL:       url,
+			Summary:   summary,
 		})
 	})
 	return listings, nil

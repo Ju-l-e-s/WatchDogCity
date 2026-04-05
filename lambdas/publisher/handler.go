@@ -28,6 +28,7 @@ type CouncilRecord struct {
 	Category  string `dynamodbav:"category"`
 	Date      string `dynamodbav:"date"`
 	Title     string `dynamodbav:"title"`
+	Summary   string `dynamodbav:"summary"`
 	SourceURL string `dynamodbav:"source_url"`
 	TotalPDFs int    `dynamodbav:"total_pdfs"`
 	Processed int    `dynamodbav:"processed_pdfs"`
@@ -64,6 +65,7 @@ type CouncilOutput struct {
 	Category      string               `json:"category"`
 	Date          string               `json:"date"`
 	Title         string               `json:"title"`
+	Summary       string               `json:"summary"`
 	SourceURL     string               `json:"source_url"`
 	Deliberations []DeliberationOutput `json:"deliberations"`
 }
@@ -108,6 +110,7 @@ func buildDataJSON(ctx context.Context, ddb *dynamodb.Client, councils []Council
 			Category:  c.Category,
 			Date:      c.Date,
 			Title:     c.Title,
+			Summary:   c.Summary,
 			SourceURL: c.SourceURL,
 		}
 		for _, d := range delibs[c.CouncilID] {

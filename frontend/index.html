@@ -566,7 +566,15 @@
                 const dateStr = formatDate(council.date);
                 const delibsCount = council.deliberations?.length || 0;
                 const escapedTitle = escapeHTML(council.title);
-                const escapedSummary = council.summary ? escapeHTML(council.summary) : `Ce conseil a traité ${delibsCount} délibérations.`;
+                
+                // Nettoyage du résumé
+                let rawSummary = (council.summary || "").replace(/\s+/g, ' ').trim();
+                // Si le résumé est identique au titre ou trop court, on met une phrase par défaut
+                let displaySummary = rawSummary;
+                if (!rawSummary || rawSummary === council.title || rawSummary.length < 10) {
+                    displaySummary = `Ce conseil a traité ${delibsCount} délibérations.`;
+                }
+                const escapedSummary = escapeHTML(displaySummary);
 
                 councilSection.innerHTML = `
                     <div class="flex items-center gap-6 mb-8">

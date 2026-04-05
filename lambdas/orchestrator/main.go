@@ -71,7 +71,17 @@ func handler(ctx context.Context, event OrchestratorEvent) error {
 			return fmt.Errorf("get item %s: %w", council.CouncilID, err)
 		}
 		if existing.Item != nil {
-			log.Printf("council %s already processed, skipping", council.CouncilID)
+			log.Printf("council %s already processed, updating summary only", council.CouncilID)
+			_, _ = ddb.UpdateItem(ctx, &dynamodb.UpdateItemInput{
+				TableName: aws.String(os.Getenv("COUNCILS_TABLE")),
+				Key: map[string]types.AttributeValue{
+					"council_id": &types.AttributeValueMemberS{Value: council.CouncilID},
+				},
+				UpdateExpression: aws.String("SET summary = :s"),
+				ExpressionAttributeValues: map[string]types.AttributeValue{
+					":s": &types.AttributeValueMemberS{Value: council.Summary},
+				},
+			})
 			continue
 		}
 
@@ -92,6 +102,7 @@ func handler(ctx context.Context, event OrchestratorEvent) error {
 			"category":       council.Category,
 			"date":           council.Date,
 			"title":          council.Title,
+			"summary":        council.Summary,
 			"source_url":     council.URL,
 			"total_pdfs":     len(pdfs),
 			"processed_pdfs": 0,

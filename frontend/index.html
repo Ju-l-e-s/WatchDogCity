@@ -11,7 +11,7 @@
     <meta property="og:url" content="https://d1lrclzu1l51ys.cloudfront.net/">
     <meta property="og:title" content="Observatoire Citoyen de Bègles">
     <meta property="og:description" content="La vie municipale de Bègles déchiffrée par l'IA. Accédez aux résumés clairs des délibérations et aux résultats des votes.">
-    <meta property="og:image" content="https://d1lrclzu1l51ys.cloudfront.net/maire.png">
+    <meta property="og:image" content="https://d1lrclzu1l51ys.cloudfront.net/logo-begles.png">
 
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔭</text></svg>">
     
@@ -359,7 +359,7 @@
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                 </button>
             </div>
-            <div class="p-8 overflow-y-auto">
+            <div class="p-8 overflow-y-auto" id="team-modal-body">
                 <div class="mb-12 bg-slate-50 rounded-[2rem] p-8 border border-slate-100 flex flex-col md:flex-row items-center gap-8">
                     <div class="w-32 h-32 md:w-40 md:h-40 shrink-0 rounded-full overflow-hidden border-4 border-white shadow-xl">
                         <img src="maire.png" alt="Christian BAGATE" class="w-full h-full object-cover">
@@ -457,6 +457,11 @@
                     <div class="p-4 bg-rose-50/30 rounded-2xl border border-rose-100/50"><p class="font-bold text-slate-900 text-sm">Aurélie BOUSQUET</p></div>
                 </div>
             </div>
+            <!-- Scroll Indicator -->
+            <div id="team-scroll-indicator" class="absolute bottom-6 left-1/2 -translate-x-1/2 pointer-events-none animate-bounce flex flex-col items-center gap-1 z-20 transition-opacity duration-300">
+                <span class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] bg-white/90 backdrop-blur px-3 py-1 rounded-full shadow-sm border border-slate-100">Scrollez pour découvrir</span>
+                <svg class="w-5 h-5 text-brand-600 drop-shadow-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+            </div>
         </div>
     </div>
 
@@ -502,8 +507,27 @@
 
         function toggleTeamModal(show) {
             const modal = document.getElementById('team-modal');
+            const body = document.getElementById('team-modal-body');
+            const indicator = document.getElementById('team-scroll-indicator');
+            
             modal.classList.toggle('hidden', !show);
             document.body.classList.toggle('modal-open', show);
+            
+            if (show && body && indicator) {
+                body.scrollTop = 0;
+                indicator.style.opacity = '1';
+                
+                if (!body.dataset.hasScrollListener) {
+                    body.addEventListener('scroll', () => {
+                        if (body.scrollTop > 50) {
+                            indicator.style.opacity = '0';
+                        } else {
+                            indicator.style.opacity = '1';
+                        }
+                    });
+                    body.dataset.hasScrollListener = 'true';
+                }
+            }
         }
 
         function toggleContactModal(show) {

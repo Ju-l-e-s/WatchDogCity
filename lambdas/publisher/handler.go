@@ -118,7 +118,7 @@ func buildDataJSON(ctx context.Context, ddb *dynamodb.Client, councils []Council
 				IsSubstantial: d.IsSubstantial,
 				AnalysisData:  d.AnalysisData,
 				Vote: VoteCount{
-					HasVote:    d.HasVote,
+					HasVote:    d.HasVote || d.VotePour != nil || d.VoteContre != nil || d.VoteAbstention != nil,
 					Pour:       d.VotePour,
 					Contre:     d.VoteContre,
 					Abstention: d.VoteAbstention,

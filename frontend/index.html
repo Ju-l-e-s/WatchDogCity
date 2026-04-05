@@ -668,7 +668,7 @@
 
         function renderDeliberationRow(d) {
             const delibId = `delib-${Math.random().toString(36).substr(2, 9)}`;
-            const hasVote = d.vote && d.vote.has_vote;
+            const hasVote = d.vote && (d.vote.has_vote || d.vote.pour != null || d.vote.contre != null || d.vote.abstention != null);
             const total = hasVote ? ((d.vote.pour || 0) + (d.vote.contre || 0) + (d.vote.abstention || 0)) : 0;
             const pourPct = (hasVote && total > 0) ? (d.vote.pour / total * 100) : 0;
 
@@ -677,31 +677,33 @@
             const highlightedSummary = highlightText(d.summary, searchQuery);
             const highlightedTag = highlightText(d.topic_tag || 'DÉLIBÉRATION', searchQuery);
 
-            // Construct Structured Analysis HTML
+            // Construct Éclairage HTML (shown whenever analysis_data has content)
             let analysisHTML = '';
-            if (d.is_substantial && d.analysis_data) {
+            if (d.analysis_data) {
                 const sections = [
                     { label: 'Contexte', content: d.analysis_data.contexte },
                     { label: 'Décision prise', content: d.analysis_data.decision },
                     { label: 'Impacts concrets', content: d.analysis_data.impacts },
                     { label: 'Points de controverse', content: d.analysis_data.points_debattus }
                 ];
-                
+
                 const content = sections
                     .filter(s => s.content)
-                    .map(s => `<h4>${s.label}</h4><p>${highlightText(s.content, searchQuery)}</p>`)
+                    .map(s => `
+                        <div class="mb-5">
+                            <p class="text-[10px] font-bold text-brand-600 uppercase tracking-widest mb-1">${s.label}</p>
+                            <p class="text-[14px] text-slate-600 leading-relaxed">${highlightText(s.content, searchQuery)}</p>
+                        </div>`)
                     .join('');
 
                 if (content) {
                     analysisHTML = `
-                        <div class="bg-brand-50 rounded-3xl p-8 border border-brand-100 mb-8 overflow-hidden">
-                            <h5 class="text-xs font-bold text-brand-700 uppercase tracking-widest mb-4 flex items-center gap-2">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path></svg>
-                                Analyse Détaillée
+                        <div class="bg-brand-50 rounded-2xl p-6 border border-brand-100 mb-8">
+                            <h5 class="text-[10px] font-bold text-brand-700 uppercase tracking-widest mb-5 flex items-center gap-2">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path></svg>
+                                Éclairage
                             </h5>
-                            <div class="prose prose-slate prose-sm max-w-none text-slate-600 leading-relaxed">
-                                ${content}
-                            </div>
+                            ${content}
                         </div>
                     `;
                 }

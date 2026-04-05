@@ -1,0 +1,143 @@
+package main
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"strings"
+
+	"google.golang.org/genai"
+)
+
+const geminiModel = "gemini-3.1-pro"
+
+const deliberationPrompt = `Tu es un analyste de données factuel et neutre spécialisé dans les affaires publiques locales. 
+Analyse ce document PDF de délibération du conseil municipal de Bègles.
+
+Retourne UNIQUEMENT un objet JSON valide avec cette structure exacte :
+{
+  "title": "titre exact de la délibération",
+  "summary": "résumé factuel en 2 à 3 phrases maximum, vulgarisé pour un citoyen",
+  "topic_tag": "Un seul mot parmi cette liste stricte: Budget, Urbanisme, Social, Culture, Environnement, Éducation, Sport, Sécurité, Mobilité, Administration",
+  "is_substantial": true/false,
+  "analysis_data": {
+    "contexte": "explication de l'origine du projet (ou null si is_substantial est false)",
+    "decision": "ce qui a été concrètement acté (ou null)",
+    "impacts": "conséquences directes pour Bègles (ou null)",
+    "points_debattus": "les éléments qui ont fait débat (ou null)"
+  },
+  "key_points": [
+    "point clé 1 (style télégraphique, très concis)",
+    "point clé 2",
+    "point clé 3"
+  ],
+  "vote": {
+    "has_vote": true/false,
+    "pour": entier ou null,
+    "contre": entier ou null,
+    "abstention": entier ou null
+  },
+  "disagreements": "description factuelle des désaccords (ou null si vote unanime ou sans objet)"
+}
+
+Règles d'exécution strictes :
+- Le champ "is_substantial" doit être "true" uniquement si le document est dense (budget, DSP, projet structurant).
+- Séparation des préoccupations : Ne génère JAMAIS de balises HTML. Retourne uniquement du texte brut dans les champs.
+- Si le document ne mentionne pas de vote, "has_vote" doit être "false" et les compteurs à "null".
+- Ne génère absolument aucun texte en dehors de l'objet JSON.
+- Assure-toi que le JSON est valide et ne contient pas de caractères d'échappement incorrects.`
+
+type GeminiResult struct {
+	Title         string   `json:"title"`
+	Summary       string   `json:"summary"`
+	TopicTag      string   `json:"topic_tag"`
+	IsSubstantial bool     `json:"is_substantial"`
+	AnalysisData  struct {
+		Contexte       *string `json:"contexte"`
+		Decision       *string `json:"decision"`
+		Impacts        *string `json:"impacts"`
+		PointsDebattus *string `json:"points_debattus"`
+	} `json:"analysis_data"`
+	KeyPoints []string `json:"key_points"`
+	Vote      struct {
+		HasVote    bool `json:"has_vote"`
+		Pour       *int `json:"pour"`
+		Contre     *int `json:"contre"`
+		Abstention *int `json:"abstention"`
+	} `json:"vote"`
+	Disagreements *string `json:"disagreements"`
+	
+	// Métadonnées de consommation (ajoutées)
+	InputTokens  int32 `json:"input_tokens"`
+	OutputTokens int32 `json:"output_tokens"`
+}
+
+func analyzeWithGemini(ctx context.Context, apiKey string, pdfBytes []byte) (*GeminiResult, error) {
+	client, err := genai.NewClient(ctx, &genai.ClientConfig{
+		APIKey: apiKey,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("create gemini client: %w", err)
+	}
+
+	contents := []*genai.Content{
+		{
+			Role: "user",
+			Parts: []*genai.Part{
+				{
+					InlineData: &genai.Blob{
+						MIMEType: "application/pdf",
+						Data:     pdfBytes,
+					},
+				},
+				{
+					Text: deliberationPrompt,
+				},
+			},
+		},
+	}
+
+	resp, err := client.Models.GenerateContent(
+		ctx,
+		geminiModel,
+		contents,
+		&genai.GenerateContentConfig{
+			ResponseMIMEType: "application/json",
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("gemini generate: %w", err)
+	}
+
+	if len(resp.Candidates) == 0 || resp.Candidates[0].Content == nil || len(resp.Candidates[0].Content.Parts) == 0 {
+		return nil, fmt.Errorf("gemini returned empty response")
+	}
+
+	raw := resp.Candidates[0].Content.Parts[0].Text
+	result, err := parseGeminiResponse(raw)
+	if err != nil {
+		return nil, err
+	}
+
+	// Récupération de l'usage des tokens
+	if resp.UsageMetadata != nil {
+		result.InputTokens = resp.UsageMetadata.PromptTokenCount
+		result.OutputTokens = resp.UsageMetadata.CandidatesTokenCount
+	}
+
+	return result, nil
+}
+
+func parseGeminiResponse(raw string) (*GeminiResult, error) {
+	raw = strings.TrimSpace(raw)
+	raw = strings.TrimPrefix(raw, "```json")
+	raw = strings.TrimPrefix(raw, "```")
+	raw = strings.TrimSuffix(raw, "```")
+	raw = strings.TrimSpace(raw)
+
+	var res GeminiResult
+	if err := json.Unmarshal([]byte(raw), &res); err != nil {
+		return nil, fmt.Errorf("unmarshal gemini json: %w (raw: %s)", err, raw)
+	}
+	return &res, nil
+}

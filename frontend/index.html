@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="fr" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Observatoire Citoyen de Bègles — La vie municipale déchiffrée</title>
+    <meta name="description" content="Suivi indépendant et analyse par IA des délibérations municipales de Bègles. Transparence, résumés et résultats de votes.">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔭</text></svg>">
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+    
+    <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        outfit: ['Outfit', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#f0f4ff',
+                            100: '#e0e9ff',
+                            600: '#3b82f6',
+                            700: '#2563eb',
+                            800: '#1d4ed8',
+                            900: '#1e3a8a',
+                        }
+                    },
+                    animation: {
+                        'fade-in': 'fadeIn 0.5s ease-out forwards',
+                        'slide-up': 'slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+                    },
+                    keyframes: {
+                        fadeIn: {
+                            '0%': { opacity: '0' },
+                            '100%': { opacity: '1' },
+                        },
+                        slideUp: {
+                            '0%': { transform: 'translateY(20px)', opacity: '0' },
+                            '100%': { transform: 'translateY(0)', opacity: '1' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        h1, h2, h3, .font-outfit { font-family: 'Outfit', sans-serif; }
+        
+        .glass {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .gradient-text {
+            background: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .category-dot {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .council-card {
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .council-card:hover {
+            transform: translateY(-4px) scale(1.01);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 10px 10px -5px rgba(0, 0, 0, 0.02);
+        }
+
+        /* Modal styles */
+        .modal-open { overflow: hidden; }
+        .modal-overlay {
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(4px);
+        }
+        
+        .pagination-btn {
+            @apply w-10 h-10 flex items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 font-bold transition-all hover:border-brand-300 hover:text-brand-600;
+        }
+        .pagination-btn.active {
+            @apply bg-brand-600 border-brand-600 text-white shadow-lg shadow-brand-600/30;
+        }
+        .pagination-btn:disabled {
+            @apply opacity-30 cursor-not-allowed hover:border-slate-200 hover:text-slate-600;
+        }
+
+        @keyframes shimmer {
+            0% { background-position: -1000px 0; }
+            100% { background-position: 1000px 0; }
+        }
+        .skeleton {
+            background: linear-gradient(90deg, #f3f4f6 25%, #e5e7eb 50%, #f3f4f6 75%);
+            background-size: 1000px 100%;
+            animation: shimmer 2s infinite linear;
+        }
+    </style>
+</head>
+<body class="bg-[#F8FAFC] text-slate-900 min-h-screen">
+
+    <!-- Navbar -->
+    <nav class="glass sticky top-0 z-50 transition-all duration-300">
+        <div class="max-w-5xl mx-auto px-6 h-20 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-brand-600 rounded-xl flex items-center justify-center shadow-lg shadow-brand-600/30">
+                    <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
+                    </svg>
+                </div>
+                <div class="cursor-pointer" onclick="window.scrollTo({top: 0, behavior: 'smooth'})">
+                    <span class="block text-xl font-bold tracking-tight text-slate-900 leading-none">Observatoire</span>
+                    <span class="text-[10px] uppercase tracking-[0.2em] font-bold text-brand-600">Bègles • Citoyen</span>
+                </div>
+            </div>
+
+            <!-- Search Bar (Navbar) -->
+            <div class="hidden md:flex flex-1 max-w-xs mx-4 lg:mx-8 relative group">
+                <div class="absolute inset-y-0 left-4 flex items-center pointer-events-none text-slate-400 group-focus-within:text-brand-600 transition-colors">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                </div>
+                <input type="search" id="nav-search-input" 
+                       class="w-full bg-slate-50 border border-slate-100 rounded-xl py-2 pl-10 pr-4 text-sm outline-none focus:bg-white focus:border-brand-500 transition-all placeholder:text-slate-400"
+                       placeholder="Rechercher..."
+                       oninput="handleSearch(this.value)">
+            </div>
+            
+            <!-- Desktop Menu -->
+            <div class="hidden md:flex items-center gap-8">
+                <button onclick="toggleAboutModal(true)" class="text-sm font-bold text-slate-500 hover:text-brand-600 transition-colors uppercase tracking-widest">Le Projet</button>
+                <button onclick="toggleTeamModal(true)" class="text-sm font-bold text-slate-500 hover:text-brand-600 transition-colors uppercase tracking-widest">Les Élus</button>
+                <button onclick="toggleContactModal(true)" class="text-sm font-bold text-slate-500 hover:text-brand-600 transition-colors uppercase tracking-widest">Contact</button>
+                <button onclick="document.getElementById('newsletter').scrollIntoView({behavior:'smooth'})"
+                        class="bg-slate-900 text-white text-xs font-bold px-6 py-3 rounded-xl hover:bg-slate-800 transition-all active:scale-95 shadow-md uppercase tracking-wider">
+                    Newsletter
+                </button>
+            </div>
+
+            <!-- Mobile Burger -->
+            <button onclick="toggleMobileMenu(true)" class="md:hidden w-10 h-10 flex items-center justify-center text-slate-900">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"></path></svg>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Mobile Menu Overlay -->
+    <div id="mobile-menu" class="hidden fixed inset-0 z-[100] bg-slate-900/95 backdrop-blur-xl transition-all duration-300">
+        <div class="flex flex-col h-full p-8">
+            <div class="flex justify-end mb-8">
+                <button onclick="toggleMobileMenu(false)" class="w-12 h-12 flex items-center justify-center text-white/50 hover:text-white transition-colors">
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            
+            <!-- Mobile Search -->
+            <div class="mb-10">
+                <div class="relative">
+                    <div class="absolute inset-y-0 left-6 flex items-center pointer-events-none text-white/30">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                    </div>
+                    <input type="search" id="mobile-search-input" 
+                           class="w-full bg-white/10 border border-white/20 rounded-2xl py-5 pl-14 pr-6 text-white text-lg outline-none focus:bg-white/20 focus:border-white transition-all placeholder:text-white/40"
+                           placeholder="Rechercher..."
+                           enterkeyhint="search"
+                           oninput="handleSearch(this.value)"
+                           onsearch="toggleMobileMenu(false)">
+                </div>
+            </div>
+
+            <div class="flex flex-col gap-8 items-center justify-center flex-1">
+                <button onclick="toggleAboutModal(true); toggleMobileMenu(false)" class="text-2xl font-bold text-white uppercase tracking-[0.2em]">Le Projet</button>
+                <button onclick="toggleTeamModal(true); toggleMobileMenu(false)" class="text-2xl font-bold text-white uppercase tracking-[0.2em]">Les Élus</button>
+                <button onclick="toggleContactModal(true); toggleMobileMenu(false)" class="text-2xl font-bold text-white uppercase tracking-[0.2em]">Contact</button>
+                <button onclick="document.getElementById('newsletter').scrollIntoView({behavior:'smooth'}); toggleMobileMenu(false)" 
+                        class="bg-brand-600 text-white text-lg font-bold px-10 py-5 rounded-2xl shadow-xl shadow-brand-600/20 uppercase tracking-widest mt-4">
+                    Newsletter
+                </button>
+            </div>
+            <div class="text-center pb-8">
+                <span class="text-[10px] text-white/30 uppercase tracking-[0.3em]">Observatoire Citoyen Bègles</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- About Modal -->
+    <div id="about-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center p-4">
+        <div class="modal-overlay absolute inset-0" onclick="toggleAboutModal(false)"></div>
+        <div class="bg-white w-full max-w-2xl max-h-[90vh] rounded-[2.5rem] shadow-2xl relative z-10 overflow-hidden flex flex-col animate-slide-up">
+            <div class="absolute top-8 right-8 z-20">
+                <button onclick="toggleAboutModal(false)" class="w-10 h-10 flex items-center justify-center rounded-full bg-white/80 backdrop-blur shadow-sm border border-slate-100 hover:bg-slate-100 transition-colors text-slate-400">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            
+            <div class="overflow-y-auto p-10 md:p-12">
+                <div class="w-16 h-16 bg-brand-50 rounded-2xl flex items-center justify-center text-brand-600 mb-8">
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                </div>
+                <h3 class="text-3xl font-bold text-slate-900 mb-8">La démarche de l'Observatoire</h3>
+                <div class="prose prose-slate text-[16px] leading-relaxed text-slate-600 space-y-8">
+                    <section>
+                        <h4 class="text-slate-900 font-bold text-lg mb-2">Pourquoi ce projet ?</h4>
+                        <p>L’Observatoire Citoyen est une initiative indépendante née d’un constat simple : la complexité des rapports officiels ne doit pas être un frein à la compréhension de la vie publique. Mon objectif est de rendre la politique locale accessible à tous les Béglais, sans filtre et sans jargon.</p>
+                    </section>
+
+                    <section>
+                        <h4 class="text-slate-900 font-bold text-lg mb-2">L'IA comme "paire de lunettes"</h4>
+                        <p>Chaque conseil municipal produit des documents techniques de plusieurs dizaines de pages. J'utilise l'intelligence artificielle pour déchiffrer ce jargon : l'IA parcourt chaque ligne du PDF officiel, extrait les décisions concrètes et les résume fidèlement, sans rien inventer ni interpréter.</p>
+                    </section>
+
+                    <section>
+                        <h4 class="text-slate-900 font-bold text-lg mb-2">Qui suis-je ?</h4>
+                        <div class="flex items-start gap-4 bg-slate-50 p-6 rounded-2xl border border-slate-100">
+                            <div class="flex-1 text-sm italic">
+                                "Béglais de naissance, j'ai 29 ans et je débute ma carrière dans la tech en tant que Développeur et Cloud Architect. <br><br>
+                                Convaincu que la technologie peut et doit être un outil d’émancipation citoyenne, j'ai développé cet Observatoire bénévolement pour offrir aux habitants une source d'information moderne, neutre et accessible. Mon objectif : utiliser mes compétences pour encourager chacun à s'intéresser et à s'impliquer dans la vie de notre commune."
+                            </div>
+                        </div>
+                    </section>
+                </div>
+                <button onclick="toggleAboutModal(false)" class="mt-10 mb-4 w-full bg-slate-900 text-white font-bold py-4 rounded-2xl hover:bg-slate-800 transition-all">
+                    J'AI COMPRIS
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Contact Modal -->
+    <div id="contact-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center p-4">
+        <div class="modal-overlay absolute inset-0" onclick="toggleContactModal(false)"></div>
+        <div class="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl relative z-10 overflow-hidden animate-slide-up">
+            <div class="absolute top-8 right-8">
+                <button onclick="toggleContactModal(false)" class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-slate-100 transition-colors text-slate-400">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <div class="p-10">
+                <h3 class="text-3xl font-bold text-slate-900 mb-2">Contact</h3>
+                <p class="text-slate-500 mb-8">Une question ou une suggestion ? Envoyez-moi un message.</p>
+                
+                <form id="contact-form" class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Votre Email</label>
+                        <input type="email" required class="w-full bg-slate-50 border border-slate-100 rounded-2xl px-6 py-4 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all" placeholder="votre@email.com">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Message</label>
+                        <textarea required rows="4" class="w-full bg-slate-50 border border-slate-100 rounded-2xl px-6 py-4 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all resize-none" placeholder="Votre message..."></textarea>
+                    </div>
+                    
+                    <!-- Turnstile Widget (Test Key) -->
+                    <div class="cf-turnstile" data-sitekey="1x00000000000000000000AA"></div>
+                    
+                    <button type="submit" class="w-full bg-slate-900 text-white font-bold py-4 rounded-2xl hover:bg-slate-800 transition-all shadow-xl shadow-slate-900/10">
+                        ENVOYER LE MESSAGE
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hero Section -->
+    <header class="max-w-4xl mx-auto px-6 py-16 md:py-24 animate-fade-in text-center">
+        <h1 class="text-5xl md:text-7xl font-bold text-slate-900 mb-8 tracking-tight leading-[1.1]">
+            La vie municipale <br class="hidden md:block">
+            <span class="gradient-text">déchiffrée.</span>
+        </h1>
+        <div class="max-w-3xl mx-auto mb-12">
+            <p class="text-xl md:text-2xl font-bold text-brand-600 mb-4">L'IA au service du citoyen.</p>
+            <p class="text-lg md:text-xl text-slate-500 leading-relaxed">
+                Ce service décode les rapports municipaux complexes en résumés clairs et fidèles aux sources officielles. Un accès direct à l'information pour comprendre et suivre la vie de Bègles.
+            </p>
+        </div>
+
+        <!-- Prochain Conseil (Mini-badge) -->
+        <div id="next-council-block" class="hidden inline-flex items-center gap-3 bg-orange-50 border border-orange-100 px-4 py-2 rounded-xl">
+            <span class="w-2 h-2 rounded-full bg-orange-500 animate-pulse"></span>
+            <span class="text-xs font-bold text-orange-700 uppercase tracking-widest">Prochain Conseil</span>
+            <span id="next-council-date" class="text-xs text-orange-600 font-medium tracking-tight">--</span>
+        </div>
+    </header>
+
+    <!-- Content Area -->
+    <main class="max-w-5xl mx-auto px-6 pb-24">
+        <div id="timeline" class="space-y-16 min-h-[400px]">
+            <!-- Skeleton items -->
+            <div class="animate-pulse space-y-12">
+                <div class="h-10 w-48 bg-slate-200 rounded-2xl mx-auto"></div>
+                <div class="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden">
+                    <div class="p-8 md:p-12 space-y-4">
+                        <div class="h-8 w-2/3 bg-slate-200 rounded-xl"></div>
+                        <div class="h-4 w-full bg-slate-100 rounded-lg"></div>
+                        <div class="h-4 w-5/6 bg-slate-100 rounded-lg"></div>
+                    </div>
+                    <div class="divide-y divide-slate-50">
+                        <div class="p-8 h-20 bg-slate-50/50"></div>
+                        <div class="p-8 h-20 bg-white"></div>
+                        <div class="p-8 h-20 bg-slate-50/50"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Newsletters -->
+    <section id="newsletter" class="bg-slate-900 text-white py-24 mb-10 overflow-hidden relative">
+        <div class="absolute top-0 right-0 w-96 h-96 bg-brand-600 rounded-full blur-[160px] opacity-20 -translate-y-1/2 translate-x-1/2"></div>
+        <div class="max-w-3xl mx-auto px-6 relative z-10 text-center">
+            <div class="inline-flex items-center gap-2 bg-brand-600/20 border border-brand-600/30 px-4 py-2 rounded-full text-brand-400 text-xs font-bold uppercase tracking-widest mb-8">
+                🚀 Arrive bientôt
+            </div>
+            <h2 class="text-4xl font-bold mb-6 tracking-tight">Le résumé dans votre poche.</h2>
+            <p class="text-slate-400 text-lg mb-10 max-w-xl mx-auto">Recevez les points clés du conseil directement par email après chaque séance. Nous finalisons le service pour vous offrir une expérience optimale.</p>
+            
+            <div class="flex flex-col md:flex-row gap-3 max-w-md mx-auto opacity-50 grayscale pointer-events-none">
+                <input type="email" disabled placeholder="votre@email.com" class="flex-1 bg-white/10 border border-white/20 px-6 py-4 rounded-2xl text-white font-medium">
+                <button disabled class="bg-brand-600 text-white font-bold px-8 py-4 rounded-2xl">
+                    S'inscrire
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <footer class="max-w-5xl mx-auto px-6 pb-12">
+        <div class="flex flex-wrap justify-center md:justify-start gap-8 mb-8 border-b border-slate-100 pb-8">
+            <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                </div>
+                <div>
+                    <span class="block text-sm font-bold text-slate-900 leading-none mb-1" id="stat-councils">--</span>
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Conseils analysés</span>
+                </div>
+            </div>
+            <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
+                </div>
+                <div>
+                    <span class="block text-sm font-bold text-slate-900 leading-none mb-1" id="stat-deliberations">--</span>
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Décryptages IA</span>
+                </div>
+            </div>
+        </div>
+        <div class="flex flex-col md:flex-row justify-between items-center gap-4 text-slate-400 text-[13px]">
+            <p>© 2026 Observatoire Bègles • Données publiques gratuites</p>
+            <p>Source officielle : <a href="https://www.mairie-begles.fr/" class="text-slate-900 font-medium hover:underline" target="_blank">mairie-begles.fr</a></p>
+        </div>
+    </footer>
+
+    <!-- Team Modal -->
+    <div id="team-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center p-4">
+        <div class="modal-overlay absolute inset-0" onclick="toggleTeamModal(false)"></div>
+        <div class="bg-white w-full max-w-4xl max-h-[85vh] rounded-[2rem] shadow-2xl relative z-10 overflow-hidden flex flex-col animate-slide-up">
+            <div class="p-8 border-b border-slate-100 flex items-center justify-between shrink-0">
+                <div>
+                    <h3 class="text-2xl font-bold text-slate-900">Équipe Municipale</h3>
+                    <p class="text-sm text-brand-600 font-bold uppercase tracking-wider">Majorité « Espoir Béglais »</p>
+                </div>
+                <button onclick="toggleTeamModal(false)" class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-slate-100 transition-colors text-slate-400">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <div class="p-8 overflow-y-auto">
+                <!-- Fiche du Maire -->
+                <div class="mb-12 bg-slate-50 rounded-[2rem] p-8 border border-slate-100 flex flex-col md:flex-row items-center gap-8">
+                    <div class="w-32 h-32 md:w-40 md:h-40 shrink-0 rounded-full overflow-hidden border-4 border-white shadow-xl">
+                        <img src="maire.png" alt="Christian BAGATE" class="w-full h-full object-cover">
+                    </div>
+                    <div class="text-center md:text-left">
+                        <span class="inline-block bg-brand-600 text-white text-[10px] font-black uppercase tracking-[0.2em] px-4 py-1.5 rounded-full mb-4">Maire de Bègles</span>
+                        <h2 class="text-3xl font-bold text-slate-900 mb-2">Christian BAGATE</h2>
+                        <p class="text-slate-500 font-medium italic">Liste « Espoir Béglais »</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-6">
+                    <div class="col-span-full mb-2"><h4 class="text-xs font-black text-slate-400 uppercase tracking-[0.2em]">Adjoints au Maire (Majorité)</h4></div>
+                    
+                    <div class="p-4 bg-brand-50 rounded-2xl border border-brand-100">
+                        <p class="font-bold text-slate-900">Isabelle BERRIÉ</p>
+                        <p class="text-[11px] text-brand-600 font-bold uppercase">1ère adjointe</p>
+                    </div>
+                    <div class="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                        <p class="font-bold text-slate-900">Mohammed MICHRAFY</p>
+                        <p class="text-[11px] text-slate-500 font-bold uppercase">2ème adjoint</p>
+                    </div>
+                    <div class="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                        <p class="font-bold text-slate-900">Cécile MAFFRE CORDON</p>
+                        <p class="text-[11px] text-slate-500 font-bold uppercase">3ème adjointe</p>
+                    </div>
+                    <div class="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                        <p class="font-bold text-slate-900">Christophe DUMONTIER</p>
+                        <p class="text-[11px] text-slate-500 font-bold uppercase">4ème adjoint</p>
+                    </div>
+                    <div class="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                        <p class="font-bold text-slate-900">Carole LAGRILLÈRE</p>
+                        <p class="text-[11px] text-slate-500 font-bold uppercase">5ème adjointe</p>
+                    </div>
+                    <div class="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                        <p class="font-bold text-slate-900">Quentin BELAUBRE</p>
+                        <p class="text-[11px] text-slate-500 font-bold uppercase">6ème adjoint</p>
+                    </div>
+                    <div class="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                        <p class="font-bold text-slate-900">Aïcha SANGARÉ</p>
+                        <p class="text-[11px] text-slate-500 font-bold uppercase">7ème adjointe</p>
+                    </div>
+                    <div class="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                        <p class="font-bold text-slate-900">Éric TRÉVISE</p>
+                        <p class="text-[11px] text-slate-500 font-bold uppercase">8ème adjoint</p>
+                    </div>
+                    <div class="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                        <p class="font-bold text-slate-900">Bérengère BRUN</p>
+                        <p class="text-[11px] text-slate-500 font-bold uppercase">9ème adjointe</p>
+                    </div>
+                    <div class="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                        <p class="font-bold text-slate-900">Fabrice DELAVOYE</p>
+                        <p class="text-[11px] text-slate-500 font-bold uppercase">10ème adjoint</p>
+                    </div>
+                    <div class="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                        <p class="font-bold text-slate-900">Cécile BÉZIAT LAURAY</p>
+                        <p class="text-[11px] text-slate-500 font-bold uppercase">11ème adjointe</p>
+                    </div>
+                    <div class="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                        <p class="font-bold text-slate-900">Arthur CHOLLON</p>
+                        <p class="text-[11px] text-slate-500 font-bold uppercase">12ème adjoint</p>
+                    </div>
+
+                    <div class="col-span-full mt-8 mb-2"><h4 class="text-xs font-black text-slate-400 uppercase tracking-[0.2em]">Conseillers de la Majorité (Espoir Béglais)</h4></div>
+                    
+                    <div class="p-4 bg-slate-50/50 rounded-2xl border border-slate-100"><p class="font-bold text-slate-900 text-sm">Alain NAU <span class="text-[10px] text-slate-400 font-normal ml-1">(Doyen)</span></p></div>
+                    <div class="p-4 bg-slate-50/50 rounded-2xl border border-slate-100"><p class="font-bold text-slate-900 text-sm">Patrick LAFON</p></div>
+                    <div class="p-4 bg-slate-50/50 rounded-2xl border border-slate-100"><p class="font-bold text-slate-900 text-sm">Catherine PARNAUT</p></div>
+                    <div class="p-4 bg-slate-50/50 rounded-2xl border border-slate-100"><p class="font-bold text-slate-900 text-sm">Règis CHOFFAT</p></div>
+                    <div class="p-4 bg-slate-50/50 rounded-2xl border border-slate-100"><p class="font-bold text-slate-900 text-sm">Céline LOPEZ</p></div>
+                    <div class="p-4 bg-slate-50/50 rounded-2xl border border-slate-100"><p class="font-bold text-slate-900 text-sm">Caroll FONS</p></div>
+                    <div class="p-4 bg-slate-50/50 rounded-2xl border border-slate-100"><p class="font-bold text-slate-900 text-sm">Maurice JULIEN</p></div>
+                    <div class="p-4 bg-slate-50/50 rounded-2xl border border-slate-100"><p class="font-bold text-slate-900 text-sm">Caroline AGUILA</p></div>
+                    <div class="p-4 bg-slate-50/50 rounded-2xl border border-slate-100"><p class="font-bold text-slate-900 text-sm">Malika STIBI</p></div>
+                    <div class="p-4 bg-slate-50/50 rounded-2xl border border-slate-100"><p class="font-bold text-slate-900 text-sm">Charlotte AMAR DUPART</p></div>
+                    <div class="p-4 bg-slate-50/50 rounded-2xl border border-slate-100"><p class="font-bold text-slate-900 text-sm">Virginie MOURATO</p></div>
+                    <div class="p-4 bg-slate-50/50 rounded-2xl border border-slate-100"><p class="font-bold text-slate-900 text-sm">Amélie PIERSON</p></div>
+                    <div class="p-4 bg-slate-50/50 rounded-2xl border border-slate-100"><p class="font-bold text-slate-900 text-sm">Florian MINJOT</p></div>
+                    <div class="p-4 bg-slate-50/50 rounded-2xl border border-slate-100"><p class="font-bold text-slate-900 text-sm">Laure-Anne BESSAGNET</p></div>
+                    <div class="p-4 bg-slate-50/50 rounded-2xl border border-slate-100"><p class="font-bold text-slate-900 text-sm">Jonathan MOTHE</p></div>
+                    <div class="p-4 bg-slate-50/50 rounded-2xl border border-slate-100"><p class="font-bold text-slate-900 text-sm">Ali LAZREK</p></div>
+                    <div class="p-4 bg-slate-50/50 rounded-2xl border border-slate-100"><p class="font-bold text-slate-900 text-sm">Paul-Armand FRÉZOULS</p></div>
+
+                    <div class="col-span-full mt-10 mb-2 border-t border-slate-100 pt-8">
+                        <h4 class="text-xs font-black text-slate-400 uppercase tracking-[0.2em]">Opposition Municipale</h4>
+                    </div>
+
+                    <!-- Groupe Opposition -->
+                    <div class="col-span-full mb-1">
+                        <p class="text-[10px] font-bold text-rose-600 uppercase tracking-widest">Groupe « Vivons Bègles Ensemble »</p>
+                    </div>
+                    <div class="p-4 bg-rose-50/30 rounded-2xl border border-rose-100/50"><p class="font-bold text-slate-900 text-sm">Clément ROSSIGNOL PUECH</p></div>
+                    <div class="p-4 bg-rose-50/30 rounded-2xl border border-rose-100/50"><p class="font-bold text-slate-900 text-sm">Edwige LUCBERNET</p></div>
+                    <div class="p-4 bg-rose-50/30 rounded-2xl border border-rose-100/50"><p class="font-bold text-slate-900 text-sm">Rémi JOUSSIAUME</p></div>
+                    <div class="p-4 bg-rose-50/30 rounded-2xl border border-rose-100/50"><p class="font-bold text-slate-900 text-sm">Marie-Laure PIROTH</p></div>
+                    <div class="p-4 bg-rose-50/30 rounded-2xl border border-rose-100/50"><p class="font-bold text-slate-900 text-sm">Vincent BOIVINET</p></div>
+                    <div class="p-4 bg-rose-50/30 rounded-2xl border border-rose-100/50"><p class="font-bold text-slate-900 text-sm">Marie JANVIER</p></div>
+                    <div class="p-4 bg-rose-50/30 rounded-2xl border border-rose-100/50"><p class="font-bold text-slate-900 text-sm">Pierre OUALLET</p></div>
+                    <div class="p-4 bg-rose-50/30 rounded-2xl border border-rose-100/50"><p class="font-bold text-slate-900 text-sm">Julien LEFEBVRE</p></div>
+                    <div class="p-4 bg-rose-50/30 rounded-2xl border border-rose-100/50"><p class="font-bold text-slate-900 text-sm">Aurélie BOUSQUET</p></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'https://zq7qfmhra1.execute-api.eu-west-3.amazonaws.com/prod/';
+        let allCouncils = [];
+
+        function toggleAboutModal(show) {
+            const modal = document.getElementById('about-modal');
+            modal.classList.toggle('hidden', !show);
+            document.body.classList.toggle('modal-open', show);
+        }
+
+        function toggleTeamModal(show) {
+            const modal = document.getElementById('team-modal');
+            modal.classList.toggle('hidden', !show);
+            document.body.classList.toggle('modal-open', show);
+        }
+
+        function toggleContactModal(show) {
+            const modal = document.getElementById('contact-modal');
+            modal.classList.toggle('hidden', !show);
+            document.body.classList.toggle('modal-open', show);
+        }
+
+        document.getElementById('contact-form')?.addEventListener('submit', function(e) {
+            e.preventDefault();
+            // Placeholder: L'envoi sera branché au backend plus tard
+            alert('Merci pour votre message ! (Le service sera activé avec le nom de domaine)');
+            toggleContactModal(false);
+            this.reset();
+        });
+
+        function toggleMobileMenu(show) {
+            const menu = document.getElementById('mobile-menu');
+            menu.classList.toggle('hidden', !show);
+            document.body.classList.toggle('modal-open', show);
+            
+            // Si on ferme, on enlève le focus de l'input pour ranger le clavier mobile
+            if (!show) {
+                document.getElementById('mobile-search-input')?.blur();
+            }
+        }
+
+        async function init() {
+            try {
+                const resp = await fetch('./data.json');
+                if (!resp.ok) throw new Error('Not found');
+                const data = await resp.json();
+                
+                if (data.next_council_date) {
+                    document.getElementById('next-council-date').textContent = data.next_council_date;
+                    document.getElementById('next-council-block').classList.remove('hidden');
+                }
+
+                allCouncils = (data.councils || []).sort((a, b) => b.date.localeCompare(a.date));
+                updateStats();
+                render();
+            } catch (e) {
+                console.error(e);
+                document.getElementById('timeline').innerHTML = `<p class="text-center text-red-500 py-20 font-medium">Erreur lors du chargement des données. Veuillez réessayer plus tard.</p>`;
+            }
+        }
+
+        let searchQuery = '';
+        function handleSearch(val) {
+            searchQuery = val.toLowerCase().trim();
+            
+            // Sync both inputs
+            const navSearch = document.getElementById('nav-search-input');
+            const mobileSearch = document.getElementById('mobile-search-input');
+            if (navSearch && navSearch.value !== val) navSearch.value = val;
+            if (mobileSearch && mobileSearch.value !== val) mobileSearch.value = val;
+            
+            render();
+        }
+
+        function highlightText(text, query) {
+            if (!query) return text;
+            const parts = text.split(new RegExp(`(${query})`, 'gi'));
+            return parts.map(part => 
+                part.toLowerCase() === query.toLowerCase() 
+                    ? `<mark class="bg-brand-100 text-brand-700 font-bold px-0.5 rounded">${part}</mark>` 
+                    : part
+            ).join('');
+        }
+
+        function updateStats() {
+            document.getElementById('stat-councils').textContent = allCouncils.length;
+            document.getElementById('stat-deliberations').textContent = allCouncils.reduce((sum, c) => sum + (c.deliberations?.length || 0), 0);
+        }
+
+        function render() {
+            const container = document.getElementById('timeline');
+            
+            // Filter data based on search
+            let totalResults = 0;
+            const filtered = allCouncils.map(council => {
+                const filteredDelibs = (council.deliberations || []).filter(d => 
+                    d.title.toLowerCase().includes(searchQuery) || 
+                    d.summary.toLowerCase().includes(searchQuery) ||
+                    (d.topic_tag && d.topic_tag.toLowerCase().includes(searchQuery))
+                );
+                totalResults += filteredDelibs.length;
+                return filteredDelibs.length > 0 ? { ...council, deliberations: filteredDelibs } : null;
+            }).filter(c => c !== null);
+
+            container.innerHTML = '';
+
+            // Search Results Header
+            if (searchQuery) {
+                const searchHeader = document.createElement('div');
+                searchHeader.className = 'mb-12 animate-fade-in flex items-center justify-between bg-white px-8 py-5 rounded-3xl border border-slate-100 shadow-sm';
+                searchHeader.innerHTML = `
+                    <div class="flex items-center gap-4">
+                        <div class="w-10 h-10 bg-brand-50 rounded-xl flex items-center justify-center text-brand-600">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                        </div>
+                        <p class="text-slate-600">
+                            <span class="font-bold text-slate-900">${totalResults}</span> résultat${totalResults > 1 ? 's' : ''} pour <span class="text-brand-600 font-bold">"${searchQuery}"</span>
+                        </p>
+                    </div>
+                    <button onclick="handleSearch(''); document.getElementById('nav-search-input').value=''; document.getElementById('mobile-search-input').value='';" 
+                            class="text-xs font-bold text-slate-400 hover:text-rose-500 uppercase tracking-widest transition-colors">
+                        Effacer
+                    </button>
+                `;
+                container.appendChild(searchHeader);
+            }
+
+            if (filtered.length === 0) {
+                container.innerHTML += `
+                    <div class="text-center py-24 animate-fade-in">
+                        <div class="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-6 text-slate-400">
+                            <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                        </div>
+                        <h3 class="text-xl font-bold text-slate-900 mb-2">Aucun résultat</h3>
+                        <p class="text-slate-500">Aucune délibération ne correspond à votre recherche "${searchQuery}".</p>
+                    </div>
+                `;
+                return;
+            }
+
+            filtered.forEach(council => {
+                const councilSection = document.createElement('section');
+                councilSection.className = 'council-group animate-slide-up mb-20';
+                const dateStr = formatDate(council.date);
+                const delibsCount = council.deliberations?.length || 0;
+
+                councilSection.innerHTML = `
+                    <div class="flex items-center gap-6 mb-8">
+                        <div class="h-1 flex-1 bg-slate-100 rounded-full"></div>
+                        <h2 class="text-base font-black text-slate-800 uppercase tracking-widest bg-white px-8 py-3 rounded-2xl border-2 border-slate-200 shadow-lg">
+                            ${dateStr}
+                        </h2>
+                        <div class="h-1 flex-1 bg-slate-100 rounded-full"></div>
+                    </div>
+                    <div class="bg-white rounded-[2.5rem] border border-slate-100 shadow-xl overflow-hidden">
+                        <div class="p-8 md:p-12 border-b border-slate-50 bg-slate-50/30">
+                            <h3 class="text-2xl md:text-3xl font-bold text-slate-900 mb-4">${council.title}</h3>
+                            <p class="text-slate-500 leading-relaxed max-w-3xl text-[16px]">
+                                ${council.summary || `Ce conseil a traité ${delibsCount} délibérations.`}
+                                <br><span class="text-xs font-bold text-slate-400 uppercase tracking-widest mt-4 block">Cliquez sur un sujet pour voir le détail</span>
+                            </p>
+                        </div>
+                        <div class="divide-y divide-slate-50">
+                            ${council.deliberations.map(d => renderDeliberationRow(d)).join('')}
+                        </div>
+                    </div>
+                `;
+                container.appendChild(councilSection);
+            });
+        }
+
+        function renderDeliberationRow(d) {
+            const delibId = `delib-${Math.random().toString(36).substr(2, 9)}`;
+            const hasVote = d.vote && d.vote.has_vote;
+            const total = hasVote ? ((d.vote.pour || 0) + (d.vote.contre || 0) + (d.vote.abstention || 0)) : 0;
+            const pourPct = (hasVote && total > 0) ? (d.vote.pour / total * 100) : 0;
+
+            // Highlight matches
+            const highlightedTitle = highlightText(d.title, searchQuery);
+            const highlightedSummary = highlightText(d.summary, searchQuery);
+            const highlightedTag = highlightText(d.topic_tag || 'DÉLIBÉRATION', searchQuery);
+
+            // Construct Structured Analysis HTML
+            let analysisHTML = '';
+            if (d.is_substantial && d.analysis_data) {
+                const sections = [
+                    { label: 'Contexte', content: d.analysis_data.contexte },
+                    { label: 'Décision prise', content: d.analysis_data.decision },
+                    { label: 'Impacts concrets', content: d.analysis_data.impacts },
+                    { label: 'Points de controverse', content: d.analysis_data.points_debattus }
+                ];
+                
+                const content = sections
+                    .filter(s => s.content)
+                    .map(s => `<h4>${s.label}</h4><p>${highlightText(s.content, searchQuery)}</p>`)
+                    .join('');
+
+                if (content) {
+                    analysisHTML = `
+                        <div class="bg-brand-50 rounded-3xl p-8 border border-brand-100 mb-8 overflow-hidden">
+                            <h5 class="text-xs font-bold text-brand-700 uppercase tracking-widest mb-4 flex items-center gap-2">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path></svg>
+                                Analyse Détaillée
+                            </h5>
+                            <div class="prose prose-slate prose-sm max-w-none text-slate-600 leading-relaxed">
+                                ${content}
+                            </div>
+                        </div>
+                    `;
+                }
+            }
+
+            return `
+                <div class="group/item">
+                    <button 
+                        onclick="toggleDelib('${delibId}')" 
+                        id="btn-${delibId}"
+                        aria-expanded="false"
+                        aria-controls="content-${delibId}"
+                        class="w-full text-left p-6 md:p-8 hover:bg-slate-50/50 transition-all flex items-center justify-between gap-6">
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-3 mb-2">
+                                <span class="w-2 h-2 rounded-full ${pourPct > 50 ? 'bg-emerald-500' : 'bg-amber-500'}"></span>
+                                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">${highlightedTag}</span>
+                            </div>
+                            <h4 class="text-lg font-bold text-slate-900 group-hover/item:text-brand-600 transition-colors truncate">${highlightedTitle}</h4>
+                        </div>
+                        <div class="w-10 h-10 rounded-full border border-slate-100 flex items-center justify-center text-slate-400 group-hover/item:text-brand-600 transition-all">
+                            <svg id="icon-${delibId}" class="w-5 h-5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                        </div>
+                    </button>
+                    <div id="content-${delibId}" class="hidden border-t border-slate-50 bg-slate-50/20" role="region" aria-labelledby="btn-${delibId}">
+                        <div class="px-6 md:px-12 py-10">
+                            <div class="grid grid-cols-1 lg:grid-cols-12 gap-10">
+                                <div class="lg:col-span-7">
+                                    <p class="text-slate-600 leading-relaxed text-[16px] mb-8">${highlightedSummary}</p>
+                                    ${analysisHTML}
+                                    ${d.disagreements ? `<div class="border-l-4 border-slate-200 pl-6 py-1 mb-8"><h5 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Opposition</h5><p class="text-[14px] text-slate-500 italic leading-relaxed">${highlightText(d.disagreements, searchQuery)}</p></div>` : ''}
+                                    
+                                    <!-- Source Link -->
+                                    <div class="pt-6 border-t border-slate-100">
+                                        <a href="${d.pdf_url}" target="_blank" class="inline-flex items-center gap-2 text-xs font-bold text-slate-400 hover:text-brand-600 transition-colors uppercase tracking-widest">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                                            Document source (PDF)
+                                        </a>
+                                    </div>
+                                </div>
+                                <div class="lg:col-span-5">
+                                    <div class="bg-white rounded-3xl p-8 border border-slate-100 shadow-sm ${!hasVote ? 'opacity-50 grayscale' : ''}">
+                                        <h5 class="text-xs font-bold text-slate-900 uppercase tracking-widest mb-8 text-center">
+                                            ${hasVote ? 'Résultats du vote' : 'Pas de vote enregistré'}
+                                        </h5>
+                                        <div class="space-y-6">
+                                            ${renderVoteBar('Pour', d.vote.pour, total, 'bg-emerald-500')}
+                                            ${renderVoteBar('Contre', d.vote.contre, total, 'bg-rose-500')}
+                                            ${renderVoteBar('Abstention', d.vote.abstention, total, 'bg-slate-300')}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderVoteBar(l, v, t, c) {
+            if (v === null || v === undefined) return `<div class="flex justify-between text-[11px] font-medium text-slate-400 uppercase tracking-wider"><span>${l}</span><span>Non mentionné</span></div>`;
+            const p = t > 0 ? (v / t * 100) : 0;
+            return `<div class="space-y-2"><div class="flex justify-between text-[12px] font-bold"><span class="text-slate-500 uppercase">${l}</span><span>${v}</span></div><div class="h-2 bg-slate-100 rounded-full overflow-hidden"><div class="${c} h-full transition-all" style="width:${p}%"></div></div></div>`;
+        }
+
+        function toggleDelib(id) {
+            const content = document.getElementById(`content-${id}`);
+            const icon = document.getElementById(`icon-${id}`);
+            const btn = document.getElementById(`btn-${id}`);
+            const isHidden = content.classList.contains('hidden');
+
+            content.classList.toggle('hidden');
+            icon.classList.toggle('rotate-180');
+            btn.setAttribute('aria-expanded', isHidden ? 'true' : 'false');
+        }
+
+        function expandAnalysis(id) {
+            const text = document.getElementById(`analysis-text-${id}`);
+            const btn = document.getElementById(`analysis-btn-${id}`);
+            text.classList.remove('line-clamp-6');
+            btn.classList.add('hidden');
+        }
+
+        function formatDate(iso) {
+            return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+        }
+
+        init();
+    </script>
+</body>
+</html>

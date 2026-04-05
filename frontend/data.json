@@ -1,0 +1,64 @@
+{
+  "generated_at": "2026-04-04T19:49:48Z",
+  "next_council_date": "Mardi 21 avril 2026, à 18h30",
+  "councils": [
+    {
+      "id": "conseil_municipal#2026-03-28",
+      "category": "conseil_municipal",
+      "date": "2026-03-28",
+      "title": "Installation de la nouvelle municipalité",
+      "summary": "Ce conseil historique marque le début du nouveau mandat 2026-2032. L'ordre du jour était exclusivement consacré à l'élection du Maire, à la désignation des adjoints et à la mise en place du cadre éthique pour les six prochaines années.",
+      "source_url": "https://www.mairie-begles.fr/deliberations/",
+      "deliberations": [
+        {
+          "id": "election_maire",
+          "topic_tag": "GOUVERNANCE",
+          "title": "Élection du Maire : Christian Bagate prend ses fonctions",
+          "pdf_url": "#",
+          "summary": "Installation officielle du nouveau maire de Bègles. Christian Bagate a été élu à la majorité absolue, ouvrant une nouvelle ère politique pour la commune après une campagne axée sur la proximité et le renouveau citoyen.",
+          "analysis": "Cette élection s'est déroulée dans un climat de transition ordonnée. \n\nLes points clés à retenir :\n- 30 voix sur 39 ont confirmé le choix de la majorité.\n- L'opposition a choisi le 'Non Participation au Vote' (NPPV), une stratégie classique pour marquer une distance sans s'opposer frontalement à la légitimité du scrutin.\n- Le discours d'investiture a souligné trois priorités : la transition écologique, la sécurité de proximité et la solidarité intergénérationnelle.",
+          "vote": { "pour": 30, "contre": 0, "abstention": 9 },
+          "disagreements": "L'opposition (9 membres) n'a pas participé au vote, marquant ainsi une réserve sur la gouvernance proposée sans pour autant proposer de candidat alternatif."
+        },
+        {
+          "id": "charte_elus",
+          "topic_tag": "ÉTHIQUE",
+          "title": "Adoption de la Charte de l'Élu Local",
+          "pdf_url": "#",
+          "summary": "Lecture et signature des engagements déontologiques par l'ensemble des conseillers municipaux pour garantir la transparence et l'intégrité du mandat.",
+          "vote": { "pour": 39, "contre": 0, "abstention": 0 },
+          "disagreements": ""
+        }
+      ]
+    },
+    {
+      "id": "conseil_municipal#2026-02-24",
+      "category": "conseil_municipal",
+      "date": "2026-02-24",
+      "title": "Budget et Aménagements Urbains",
+      "summary": "Une séance dense consacrée aux derniers arbitrages budgétaires du mandat précédent et à la validation de projets d'infrastructure majeurs, notamment le nouveau complexe sportif Alice Milliat.",
+      "source_url": "https://www.mairie-begles.fr/deliberations/",
+      "deliberations": [
+        {
+          "id": "sport_milliat",
+          "topic_tag": "SPORT & URBANISME",
+          "title": "Complexe Sportif Alice Milliat : validation du nom et du projet final",
+          "pdf_url": "#",
+          "summary": "La Ville confirme la dénomination du futur complexe sportif en hommage à Alice Milliat, pionnière du sport féminin. Ce projet de 4,2M€ prévoit un gymnase multisports et des salles associatives.",
+          "analysis": "Le choix du nom 'Alice Milliat' est un signal fort de la politique de féminisation de l'espace public engagée par la ville.\n\nSur le plan technique :\n- Le bâtiment respecte les normes RE2020 avec une structure bois.\n- L'opposition a critiqué le coût final, en hausse de 12% par rapport à l'estimation initiale de 2024, en raison de l'inflation des matériaux.",
+          "vote": { "pour": 26, "contre": 7, "abstention": 0 },
+          "disagreements": "Les 7 élus d'opposition ont voté contre, arguant d'un manque de concertation sur le choix architectural final et un dépassement budgétaire non maîtrisé."
+        },
+        {
+          "id": "alarme_secu",
+          "topic_tag": "SÉCURITÉ",
+          "title": "Aide à l'achat d'un système d'alarme : extension du dispositif",
+          "pdf_url": "#",
+          "summary": "Reconduction de la subvention de 100€ pour l'installation d'alarmes chez les particuliers, désormais étendue aux petits commerçants du centre-ville.",
+          "vote": { "pour": 26, "contre": 7, "abstention": 0 },
+          "disagreements": "L'opposition considère cette mesure comme un 'pansement' inefficace face aux causes réelles de l'insécurité."
+        }
+      ]
+    }
+  ]
+}

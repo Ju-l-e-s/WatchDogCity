@@ -1,0 +1,25 @@
+# Go
+lambdas/orchestrator/orchestrator
+lambdas/worker/worker
+lambdas/publisher/publisher
+lambdas/subscriber/subscriber
+response.json
+
+# AWS CDK
+cdk.out/
+.venv/
+__pycache__/
+*.pyc
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project specifics
+dist/
+node_modules/

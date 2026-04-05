@@ -195,7 +195,7 @@ func HandleRequest(ctx context.Context, event PublisherEvent) error {
 				CallerReference: aws.String(fmt.Sprintf("watchdog-%d", time.Now().Unix())),
 				Paths: &cftypes.Paths{
 					Quantity: aws.Int32(1),
-					Items:    []string{aws.String("/data.json")},
+					Items:    []string{"/data.json"},
 				},
 			},
 		})

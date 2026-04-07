@@ -212,11 +212,21 @@ class WatchdogStack(Stack):
 
         s3_deploy.BucketDeployment(
             self, "DeployWebsiteConfig",
-            sources=[s3_deploy.Source.asset("../frontend", exclude=["*.png", "*.svg", "node_modules/*"])],
+            sources=[s3_deploy.Source.asset("../frontend", exclude=["*.png", "*.svg", "node_modules/*", "data.json"])],
             destination_bucket=website_bucket,
             distribution=distribution,
-            distribution_paths=["/index.html", "/data.json", "/style.css", "/app.js"],
-            cache_control=[s3_deploy.CacheControl.set_no_cache()],
+            distribution_paths=["/index.html", "/style.css", "/app.js", "/fonts/*"],
+            cache_control=[s3_deploy.CacheControl.no_cache()],
+            prune=False,
+        )
+
+        s3_deploy.BucketDeployment(
+            self, "DeployDataJson",
+            sources=[s3_deploy.Source.asset("../frontend", exclude=["*", "!data.json"])],
+            destination_bucket=website_bucket,
+            distribution=distribution,
+            distribution_paths=["/data.json"],
+            cache_control=[s3_deploy.CacheControl.max_age(Duration.days(365))],
             prune=False,
         )
 

@@ -36,7 +36,16 @@ jobs:
       - name: Build Frontend
         run: |
           cd frontend
+          # 1. Build CSS
           ./node_modules/.bin/tailwindcss -i input.css -o style.css -m
+          
+          # 2. Minify HTML
+          ./node_modules/.bin/html-minifier-terser index.html --collapse-whitespace --remove-comments --minify-js true --output index.html
+          
+          # 3. Optimize Images (Convert PNG to WebP if missing or old)
+          if [ -f "maire.png" ]; then
+            convert maire.png -resize 400x400 -quality 80 maire.webp
+          fi
 
       - name: Build Lambdas
         run: make build

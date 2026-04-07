@@ -232,9 +232,12 @@ class WatchdogStack(Stack):
         # 3. Déploiement des Données (data.json) : Cache Long SANS Invalidation
         deploy_data = s3_deploy.BucketDeployment(
             self, "DeployDataJson",
+            # Correction du motif pour forcer l'inclusion du fichier data.json
             sources=[s3_deploy.Source.asset("../frontend", exclude=["*", "!data.json"])],
             destination_bucket=website_bucket,
-            # Pas d'invalidation, le Publisher Go s'en charge
+            # Temporaire : on invalide une fois pour nettoyer l'erreur 404
+            distribution=distribution,
+            distribution_paths=["/data.json"],
             cache_control=[s3_deploy.CacheControl.from_string("public, max-age=31536000, immutable")],
             prune=False,
         )

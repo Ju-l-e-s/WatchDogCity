@@ -1,3 +1,4 @@
+import os
 from aws_cdk import (
     Stack, Duration, RemovalPolicy, CfnOutput,
     aws_dynamodb as dynamodb,
@@ -9,7 +10,6 @@ from aws_cdk import (
     aws_events_targets as targets,
     aws_apigateway as apigw,
     aws_iam as iam,
-    aws_secretsmanager as secretsmanager,
     aws_cloudfront as cloudfront,
     aws_cloudfront_origins as origins,
     aws_cloudwatch as cloudwatch,
@@ -21,6 +21,8 @@ from constructs import Construct
 class WatchdogStack(Stack):
     def __init__(self, scope: Construct, id: str, **kwargs):
         super().__init__(scope, id, **kwargs)
+
+        gemini_api_key = os.environ.get("GEMINI_API_KEY", "dummy-key-for-synth")
 
         # ── DynamoDB Tables ──────────────────────────────────────────────
         councils_table = dynamodb.Table(
@@ -90,13 +92,6 @@ class WatchdogStack(Stack):
             ),
         )
 
-        # ── Secrets ───────────────────────────────────────────────────────
-        gemini_secret = secretsmanager.Secret(
-            self, "GeminiSecret",
-            secret_name="watchdog/gemini-api-key",
-            description="Clé API pour le moteur d'analyse IA Watchdog",
-        )
-
         # ── Lambda common config ──────────────────────────────────────────
         common_env = {
             "COUNCILS_TABLE": councils_table.table_name,
@@ -104,7 +99,7 @@ class WatchdogStack(Stack):
             "SUBSCRIBERS_TABLE": subscribers_table.table_name,
             "PDF_QUEUE_URL": pdf_queue.queue_url,
             "WEBSITE_BUCKET": website_bucket.bucket_name,
-            "GEMINI_SECRET_ARN": gemini_secret.secret_arn,
+            "GEMINI_API_KEY": gemini_api_key,
         }
 
         # ── Lambda: Orchestrator ──────────────────────────────────────────
@@ -136,7 +131,6 @@ class WatchdogStack(Stack):
         ))
         councils_table.grant_read_write_data(worker)
         deliberations_table.grant_read_write_data(worker)
-        gemini_secret.grant_read(worker)
 
         # ── Lambda: Publisher ─────────────────────────────────────────────
         publisher = lambda_.Function(

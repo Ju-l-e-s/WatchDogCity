@@ -218,10 +218,10 @@ function render() {
                 <div class="h-px flex-1 bg-slate-200/60"></div>
             </div>
             <div class="bg-white rounded-[2rem] shadow-card overflow-hidden">
-                <div class="px-4 py-5 md:p-12 border-b border-slate-100/60">
-                    <h3 class="text-2xl md:text-3xl font-bold text-slate-900 mb-3 tracking-tight">${escapedTitle}</h3>
-                    <p class="text-slate-400 leading-relaxed max-w-3xl text-[15px] font-light">${escapedSummary}</p>
-                    <span class="text-[11px] font-medium text-slate-300 uppercase tracking-widest mt-4 block">Cliquez sur un sujet pour voir le détail</span>
+                <div class="px-6 py-7 md:p-12 border-b border-slate-100/60">
+                    <h3 class="text-2xl md:text-3xl font-bold text-slate-900 mb-4 tracking-tight">${escapedTitle}</h3>
+                    <p class="text-slate-400 leading-relaxed max-w-3xl text-base font-light">${escapedSummary}</p>
+                    <span class="text-[12px] font-medium text-slate-300 uppercase tracking-widest mt-6 block">Cliquez sur un sujet pour voir le détail</span>
                 </div>
                 <div class="divide-y divide-slate-100/50">${council.deliberations.map(d => renderDeliberationRow(d)).join('')}</div>
             </div>`;
@@ -258,14 +258,14 @@ function renderDeliberationRow(d) {
             { label: 'Points de controverse', content: d.analysis_data.points_debattus }
         ];
         const content = sections.filter(s => s.content).map(s =>
-            `<div class="mb-4 last:mb-0"><p class="text-[10px] font-semibold text-brand-600 uppercase tracking-widest mb-1">${escapeHTML(s.label)}</p><p class="text-[14px] text-slate-500 leading-relaxed">${highlightText(s.content, searchQuery, d.acronyms)}</p></div>`
+            `<div class="mb-6 last:mb-0"><p class="text-[11px] font-semibold text-brand-600 uppercase tracking-widest mb-1.5">${escapeHTML(s.label)}</p><p class="text-[15px] text-slate-500 leading-relaxed">${highlightText(s.content, searchQuery, d.acronyms)}</p></div>`
         ).join('');
         if (content) {
-            analysisHTML = `<div class="bg-brand-50/50 rounded-xl px-3 py-5 border border-brand-100/60 mb-8"><h5 class="text-[10px] font-semibold text-brand-700 uppercase tracking-widest mb-4 flex items-center gap-2"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path></svg>Éclairage</h5>${content}</div>`;
+            analysisHTML = `<div class="bg-brand-50/50 rounded-xl px-4 py-6 border border-brand-100/60 mb-8"><h5 class="text-[11px] font-semibold text-brand-700 uppercase tracking-widest mb-5 flex items-center gap-2"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path></svg>Éclairage</h5>${content}</div>`;
         }
     }
 
-    const unanimityBadge = isUnanimous ? `<span class="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-600 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-full ml-2">Unanimité</span>` : '';
+    const unanimityBadge = isUnanimous ? `<span class="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-full ml-2">Unanimité</span>` : '';
 
     const voteWidget = hasVote
         ? `<div class="bg-white rounded-2xl p-6 shadow-micro border border-slate-100/80">
@@ -283,14 +283,14 @@ function renderDeliberationRow(d) {
            </div>`;
 
     return `<div class="group/item">
-        <button onclick="toggleDelib('${delibId}')" id="btn-${delibId}" aria-expanded="false" aria-controls="content-${delibId}" class="delib-trigger w-full text-left px-4 py-4 md:px-8 md:py-6 flex items-center justify-between gap-4 min-h-[56px]">
+        <button onclick="toggleDelib('${delibId}')" id="btn-${delibId}" aria-expanded="false" aria-controls="content-${delibId}" class="delib-trigger w-full text-left px-6 py-5 md:px-8 md:py-6 flex items-center justify-between gap-4 min-h-[64px]">
             <div class="flex-1 min-w-0">
-                <div class="flex items-center gap-2.5 mb-1.5">
+                <div class="flex items-center gap-2.5 mb-2">
                     <span class="w-1.5 h-1.5 rounded-full ${pourPct > 50 || isUnanimous ? 'bg-emerald-400' : (hasVote ? 'bg-amber-400' : 'bg-slate-300')} shrink-0"></span>
-                    <span class="text-[10px] font-medium text-slate-400 uppercase tracking-widest">${highlightedTag}</span>
-                    ${isUnanimous ? '<span class="text-[9px] font-semibold text-emerald-500 bg-emerald-50 px-1.5 py-0.5 rounded">Unanime</span>' : ''}
+                    <span class="text-[11px] font-medium text-slate-400 uppercase tracking-widest">${highlightedTag}</span>
+                    ${isUnanimous ? '<span class="text-[10px] font-semibold text-emerald-500 bg-emerald-50 px-1.5 py-0.5 rounded">Unanime</span>' : ''}
                 </div>
-                <h4 class="text-[15px] md:text-base font-semibold text-slate-800 group-hover/item:text-brand-600 transition-colors leading-snug">${highlightedTitle}</h4>
+                <h4 class="text-base md:text-base font-semibold text-slate-800 group-hover/item:text-brand-600 transition-colors leading-snug">${highlightedTitle}</h4>
             </div>
             <div class="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-300 group-hover/item:text-brand-600 group-hover/item:bg-brand-50 transition-all shrink-0">
                 <svg id="icon-${delibId}" class="w-4 h-4 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
@@ -299,12 +299,12 @@ function renderDeliberationRow(d) {
         <div id="content-${delibId}" class="delib-panel" role="region" aria-labelledby="btn-${delibId}">
             <div class="delib-panel-inner">
                 <div class="border-t border-slate-100/60 bg-slate-50/30">
-                    <div class="px-4 py-6 md:px-10 md:py-8">
+                    <div class="px-6 py-8 md:px-10 md:py-8">
                         <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
                             <div class="lg:col-span-7">
-                                <p class="text-slate-500 leading-relaxed text-[15px] mb-8">${highlightedSummary}</p>
+                                <p class="text-slate-500 leading-relaxed text-base mb-8">${highlightedSummary}</p>
                                 ${analysisHTML}
-                                ${d.disagreements ? `<div class="border-l-2 border-slate-200 pl-5 py-1 mb-8"><h5 class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-2">Opposition</h5><p class="text-[14px] text-slate-400 italic leading-relaxed">${highlightText(d.disagreements, searchQuery, d.acronyms)}</p></div>` : ''}
+                                ${d.disagreements ? `<div class="border-l-2 border-slate-200 pl-5 py-1 mb-8"><h5 class="text-[11px] font-semibold text-slate-400 uppercase tracking-widest mb-2">Opposition</h5><p class="text-[15px] text-slate-400 italic leading-relaxed">${highlightText(d.disagreements, searchQuery, d.acronyms)}</p></div>` : ''}
                                 <div class="pt-5 border-t border-slate-100">
                                     <a href="${escapeHTML(d.pdf_url)}" target="_blank" rel="noopener" class="inline-flex items-center gap-2 text-[11px] font-medium text-slate-500 hover:text-brand-600 transition-colors uppercase tracking-widest min-h-[44px]" aria-label="Télécharger le document PDF : ${escapeHTML(d.title)}">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>

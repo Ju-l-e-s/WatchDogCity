@@ -20,116 +20,8 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Inter:wght@400;500&display=swap" rel="stylesheet">
     
-    <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
+    <link rel="stylesheet" href="style.css">
     <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    fontFamily: {
-                        sans: ['Inter', 'sans-serif'],
-                        outfit: ['Outfit', 'sans-serif'],
-                    },
-                    colors: {
-                        brand: {
-                            50: '#f0f4ff',
-                            100: '#e0e9ff',
-                            200: '#c7d7fe',
-                            600: '#3b82f6',
-                            700: '#2563eb',
-                            800: '#1d4ed8',
-                            900: '#1e3a8a',
-                        }
-                    },
-                    animation: {
-                        'fade-in': 'fadeIn 0.5s ease-out forwards',
-                        'slide-up': 'slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards',
-                    },
-                    keyframes: {
-                        fadeIn: {
-                            '0%': { opacity: '0' },
-                            '100%': { opacity: '1' },
-                        },
-                        slideUp: {
-                            '0%': { transform: 'translateY(20px)', opacity: '0' },
-                            '100%': { transform: 'translateY(0)', opacity: '1' },
-                        }
-                    }
-                }
-            }
-        }
-    </script>
-    <style>
-        body { font-family: 'Inter', sans-serif; }
-        h1, h2, h3, .font-outfit { font-family: 'Outfit', sans-serif; }
-
-        .glass {
-            background: rgba(255, 255, 255, 0.75);
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
-            box-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 4px 16px rgba(0,0,0,0.02);
-        }
-
-        .gradient-text {
-            background: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-
-        /* Micro-shadow system */
-        .shadow-micro { box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.03); }
-        .shadow-elevated { box-shadow: 0 2px 8px rgba(0,0,0,0.04), 0 8px 30px rgba(0,0,0,0.06); }
-        .shadow-card { box-shadow: 0 1px 2px rgba(0,0,0,0.03), 0 8px 30px rgba(0,0,0,0.04); }
-        .shadow-card-hover { box-shadow: 0 4px 12px rgba(0,0,0,0.06), 0 12px 40px rgba(0,0,0,0.08); }
-
-        /* Accordion animation via grid-template-rows */
-        .delib-panel {
-            display: grid;
-            grid-template-rows: 0fr;
-            transition: grid-template-rows 0.35s cubic-bezier(0.16, 1, 0.3, 1);
-        }
-        .delib-panel.is-open {
-            grid-template-rows: 1fr;
-        }
-        .delib-panel-inner {
-            overflow: hidden;
-        }
-
-        /* Modal styles */
-        .modal-open { overflow: hidden; }
-        .modal-overlay {
-            background: rgba(15, 23, 42, 0.5);
-            backdrop-filter: blur(6px);
-        }
-
-        /* Skeleton loader */
-        @keyframes shimmer {
-            0% { background-position: -600px 0; }
-            100% { background-position: 600px 0; }
-        }
-        .skeleton {
-            background: linear-gradient(90deg, #f1f5f9 30%, #e2e8f0 50%, #f1f5f9 70%);
-            background-size: 600px 100%;
-            animation: shimmer 1.8s infinite linear;
-            border-radius: 8px;
-        }
-
-        /* Focus visible for keyboard navigation */
-        *:focus-visible {
-            outline: 2px solid #3b82f6;
-            outline-offset: 2px;
-            border-radius: 4px;
-        }
-
-        /* Deliberation row hover */
-        .delib-trigger {
-            transition: background-color 0.2s ease, box-shadow 0.2s ease;
-        }
-        .delib-trigger:hover {
-            background-color: rgba(248, 250, 252, 0.8);
-        }
-    </style>
 </head>
 <body class="bg-[#F8FAFC] text-slate-900 min-h-screen">
 
@@ -411,7 +303,7 @@
             <div class="p-8 overflow-y-auto" id="team-modal-body">
                 <div class="mb-12 bg-slate-50 rounded-[2rem] p-8 border border-slate-100 flex flex-col md:flex-row items-center gap-8">
                     <div class="w-32 h-32 md:w-40 md:h-40 shrink-0 rounded-full overflow-hidden border-4 border-white shadow-xl">
-                        <img src="maire.webp" alt="Christian BAGATE" class="w-full h-full object-cover">
+                        <img src="maire.webp" loading="lazy" alt="Christian BAGATE" class="w-full h-full object-cover">
                     </div>
                     <div class="text-center md:text-left">
                         <span class="inline-block bg-brand-600 text-white text-[10px] font-black uppercase tracking-[0.2em] px-4 py-1.5 rounded-full mb-4">Maire de Bègles</span>

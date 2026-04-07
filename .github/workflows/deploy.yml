@@ -9,46 +9,54 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
           go-version: '1.21'
           cache: true
+          cache-dependency-path: lambdas/**/go.sum
 
       - name: Set up Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: cdk/requirements.txt
 
       - name: Install dependencies
         run: |
           npm install -g aws-cdk
-          cd cdk && pip install -r requirements.txt
-          cd ../frontend && npm install
+          
+          # Setup Python Venv for CDK (Required by cdk.json)
+          cd cdk
+          python -m venv .venv
+          source .venv/bin/activate
+          pip install -r requirements.txt
+          
+          # Setup Frontend
+          cd ../frontend
+          npm install
 
       - name: Build Frontend
         run: |
           cd frontend
-          # 1. Build CSS
+          # Build CSS
           ./node_modules/.bin/tailwindcss -i input.css -o style.css -m
           
-          # 2. Minify JS
+          # Minify JS
           ./node_modules/.bin/terser app.js --compress --mangle --output app.js
           
-          # 3. Minify HTML
+          # Minify HTML
           ./node_modules/.bin/html-minifier-terser index.html --collapse-whitespace --remove-comments --minify-js true --output index.html
-          
-          # 3. Optimize Images (Convert PNG to WebP if missing or old)
-          if [ -f "maire.png" ]; then
-            convert maire.png -resize 400x400 -quality 80 maire.webp
-          fi
 
       - name: Build Lambdas
         run: make build
@@ -56,7 +64,8 @@ jobs:
       - name: Deploy to AWS
         run: |
           cd cdk
-          cdk deploy --require-approval never
+          source .venv/bin/activate
+          cdk deploy --all --require-approval never
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}

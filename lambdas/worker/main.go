@@ -6,14 +6,12 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	awslambda "github.com/aws/aws-sdk-go-v2/service/lambda"
-	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 )
 
 func main() {
 	cfg, _ := config.LoadDefaultConfig(context.TODO())
 	h := &WorkerHandler{
 		ddb:    dynamodb.NewFromConfig(cfg),
-		sm:     secretsmanager.NewFromConfig(cfg),
 		lambda: awslambda.NewFromConfig(cfg),
 	}
 	lambda.Start(h.HandleRequest)

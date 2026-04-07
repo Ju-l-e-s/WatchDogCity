@@ -19,12 +19,10 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	awslambda "github.com/aws/aws-sdk-go-v2/service/lambda"
 	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
-	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 )
 
 type WorkerHandler struct {
 	ddb    *dynamodb.Client
-	sm     *secretsmanager.Client
 	lambda *awslambda.Client
 }
 
@@ -36,13 +34,7 @@ type SQSPayload struct {
 }
 
 func (h *WorkerHandler) HandleRequest(ctx context.Context, event events.SQSEvent) error {
-	secretOut, err := h.sm.GetSecretValue(ctx, &secretsmanager.GetSecretValueInput{
-		SecretId: aws.String(os.Getenv("GEMINI_SECRET_ARN")),
-	})
-	if err != nil {
-		return fmt.Errorf("get secret: %w", err)
-	}
-	apiKey := *secretOut.SecretString
+	apiKey := os.Getenv("GEMINI_API_KEY")
 
 	for _, record := range event.Records {
 		var msg SQSPayload

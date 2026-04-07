@@ -200,33 +200,41 @@ class WatchdogStack(Stack):
         api.root.add_resource("subscribe").add_method("POST", subscriber_integration)
         api.root.add_resource("confirm").add_method("GET", subscriber_integration)
 
-        # ── Website Deployment ───────────────────────────────────────────
-        s3_deploy.BucketDeployment(
+        # ── Website Deployment (Architecture Sécurisée) ─────────────────────────────
+
+        # 1. Déploiement Principal : Assets Statiques (Images, Fonts) + Invalidation globale
+        deploy_website = s3_deploy.BucketDeployment(
             self, "DeployWebsite",
-            sources=[s3_deploy.Source.asset("../frontend", exclude=["style.css", "index.html", "data.json"])],
+            sources=[s3_deploy.Source.asset("../frontend", exclude=["data.json"])],
             destination_bucket=website_bucket,
             distribution=distribution,
-            distribution_paths=["/*"],
+            distribution_paths=["/*"], # On purge TOUT le cache ici, une seule fois.
             cache_control=[s3_deploy.CacheControl.max_age(Duration.days(365))],
         )
 
-        s3_deploy.BucketDeployment(
+        # 2. Déploiement de la Configuration (HTML/CSS/JS) : No-Cache
+        deploy_config = s3_deploy.BucketDeployment(
             self, "DeployWebsiteConfig",
-            sources=[s3_deploy.Source.asset("../frontend", exclude=["*.png", "*.svg", "node_modules/*", "data.json"])],
+            sources=[s3_deploy.Source.asset("../frontend", exclude=["*.png", "*.svg", "node_modules/*", "data.json", "fonts/*", "*.webp"])],
             destination_bucket=website_bucket,
-            distribution=distribution,
-            distribution_paths=["/index.html", "/style.css", "/app.js", "/fonts/*"],
-            cache_control=[s3_deploy.CacheControl.no_cache()],
+            # SUPPRESSION de la distribution ici pour éviter la Race Condition avec le bloc 1
+            cache_control=[s3_deploy.CacheControl.set_no_cache()],
             prune=False,
         )
 
-        s3_deploy.BucketDeployment(
+        # CRUCIAL : On force le Bloc 2 à s'exécuter APRES le Bloc 1 pour écraser le cache de 365j sur index.html par du no-cache.
+        deploy_config.node.add_dependency(deploy_website)
+
+        # 3. Déploiement des Données (data.json) : Cache Long SANS Invalidation
+        deploy_data = s3_deploy.BucketDeployment(
             self, "DeployDataJson",
             sources=[s3_deploy.Source.asset("../frontend", exclude=["*", "!data.json"])],
             destination_bucket=website_bucket,
-            distribution=distribution,
-            distribution_paths=["/data.json"],
-            cache_control=[s3_deploy.CacheControl.max_age(Duration.days(365))],
+            # Pas d'invalidation, le Publisher Go s'en charge
+            cache_control=[
+                s3_deploy.CacheControl.max_age(Duration.days(365)),
+                s3_deploy.CacheControl.set_public(),
+            ],
             prune=False,
         )
 

@@ -215,7 +215,7 @@ class WatchdogStack(Stack):
             sources=[s3_deploy.Source.asset("../frontend", exclude=["*.png", "*.svg", "node_modules/*"])],
             destination_bucket=website_bucket,
             distribution=distribution,
-            distribution_paths=["/index.html", "/data.json", "/style.css"],
+            distribution_paths=["/index.html", "/data.json", "/style.css", "/app.js"],
             cache_control=[s3_deploy.CacheControl.set_no_cache()],
             prune=False,
         )

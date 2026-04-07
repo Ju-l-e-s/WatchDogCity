@@ -199,7 +199,12 @@ class WatchdogStack(Stack):
         # 1. Déploiement Principal : Assets Statiques (Images, Fonts) - SANS Invalidation
         deploy_website = s3_deploy.BucketDeployment(
             self, "DeployWebsite",
-            sources=[s3_deploy.Source.asset("../frontend", exclude=["data.json", "index.html", "app.js", "style.css"])],
+            sources=[s3_deploy.Source.asset("../frontend", 
+                exclude=[
+                    "data.json", "index.html", "app.js", "style.css", "input.css",
+                    "node_modules/*", "package.json", "package-lock.json", "tailwind.config.js",
+                    "*.md", ".gitignore"
+                ])],
             destination_bucket=website_bucket,
             # On retire la distribution ici pour gagner 10-15 minutes de déploiement
             cache_control=[s3_deploy.CacheControl.from_string("public, max-age=31536000, immutable")],
@@ -208,7 +213,11 @@ class WatchdogStack(Stack):
         # 2. Déploiement de la Configuration (HTML/CSS/JS) - AVEC Invalidation Chirurgicale
         deploy_config = s3_deploy.BucketDeployment(
             self, "DeployWebsiteConfig",
-            sources=[s3_deploy.Source.asset("../frontend", exclude=["*.png", "*.svg", "node_modules/*", "data.json", "fonts/*", "*.webp"])],
+            sources=[s3_deploy.Source.asset("../frontend", 
+                exclude=[
+                    "*.png", "*.svg", "*.webp", "fonts/*", "node_modules/*", 
+                    "data.json", "package.json", "package-lock.json", "input.css", "tailwind.config.js"
+                ])],
             destination_bucket=website_bucket,
             distribution=distribution,
             # ON NE PURGE QUE LES FICHIERS CRITIQUES (Très rapide : < 60s)

@@ -202,10 +202,21 @@ class WatchdogStack(Stack):
         # ── Website Deployment ───────────────────────────────────────────
         s3_deploy.BucketDeployment(
             self, "DeployWebsite",
-            sources=[s3_deploy.Source.asset("../frontend")],
+            sources=[s3_deploy.Source.asset("../frontend", exclude=["style.css", "index.html", "data.json"])],
             destination_bucket=website_bucket,
             distribution=distribution,
             distribution_paths=["/*"],
+            cache_control=[s3_deploy.CacheControl.max_age(Duration.days(365))],
+        )
+
+        s3_deploy.BucketDeployment(
+            self, "DeployWebsiteConfig",
+            sources=[s3_deploy.Source.asset("../frontend", exclude=["*.png", "*.svg", "node_modules/*"])],
+            destination_bucket=website_bucket,
+            distribution=distribution,
+            distribution_paths=["/index.html", "/data.json", "/style.css"],
+            cache_control=[s3_deploy.CacheControl.set_no_cache()],
+            prune=False,
         )
 
         # ── Monitoring & Dashboard ────────────────────────────────────────

@@ -68,6 +68,7 @@ class WatchdogStack(Stack):
             default_behavior=cloudfront.BehaviorOptions(
                 origin=origins.S3StaticWebsiteOrigin(website_bucket),
                 viewer_protocol_policy=cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+                compress=True, # Active GZIP et Brotli automatiquement
             ),
             default_root_object="index.html",
         )

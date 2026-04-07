@@ -73,11 +73,21 @@ Le projet est conçu pour rester dans le **AWS Free Tier** (offre gratuite) mêm
 2.  **Secrets Manager** : La clé API Gemini n'est jamais en clair dans le code, elle est récupérée dynamiquement depuis AWS Secrets Manager.
 3.  **Cloudflare (WAF/Turnstile)** : Protection contre le spam des formulaires et les attaques par déni de service (DDoS).
 
+## 8. Engagement & Newsletter (Double Opt-in)
+
+Pour fidéliser les citoyens, un système de newsletter automatisé est intégré :
+- **Gestion des Abonnés** : Une table DynamoDB dédiée gère les états d'abonnement (`pending`, `confirmed`).
+- **Flux d'Inscription** :
+    1. **Saisie** : Le citoyen entre son email sur le frontend.
+    2. **Validation (Subscriber Lambda)** : Création d'un token UUID unique et envoi d'un email de confirmation via **AWS SES**.
+    3. **Confirmation** : Un clic sur le lien (`/confirm?token=...`) bascule le statut en `confirmed`.
+- **Désinscription Chirurgicale** : Chaque email contient un lien unique permettant une suppression immédiate des données (RGPD-compliant).
+- **Notifications Automatisées** : Le `Publisher` est configuré pour déclencher des envois ciblés dès qu'une nouvelle analyse majeure est publiée, garantissant une information fraîche et pertinente.
+
 ---
 
-## 7. Monitoring & Observabilité
-
-Un **CloudWatch Dashboard** centralise la santé du projet :
-- Taux d'erreur des Lambdas.
-- Nombre de messages dans la Dead Letter Queue (DLQ).
-- **Estimation des coûts Gemini** en temps réel via l'analyse des logs (CloudWatch Logs Insights).
+## 9. Vision Future & Évolutivité
+L'architecture modulaire permet d'envisager facilement :
+- **Multi-Communes** : Adapter le scraper pour supporter d'autres villes.
+- **Alertes Thématiques** : Permettre aux abonnés de ne recevoir que les délibérations sur l'Environnement ou l'Urbanisme.
+- **Analyse de Sentiment** : Utiliser l'IA pour détecter les sujets de tension lors des débats municipaux.

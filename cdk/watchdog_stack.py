@@ -196,22 +196,23 @@ class WatchdogStack(Stack):
 
         # ── Website Deployment (Architecture Sécurisée) ─────────────────────────────
 
-        # 1. Déploiement Principal : Assets Statiques (Images, Fonts) + Invalidation globale
+        # 1. Déploiement Principal : Assets Statiques (Images, Fonts) - SANS Invalidation
         deploy_website = s3_deploy.BucketDeployment(
             self, "DeployWebsite",
-            sources=[s3_deploy.Source.asset("../frontend", exclude=["data.json"])],
+            sources=[s3_deploy.Source.asset("../frontend", exclude=["data.json", "index.html", "app.js", "style.css"])],
             destination_bucket=website_bucket,
-            distribution=distribution,
-            distribution_paths=["/*"], # On purge TOUT le cache ici, une seule fois.
-            cache_control=[s3_deploy.CacheControl.max_age(Duration.days(365))],
+            # On retire la distribution ici pour gagner 10-15 minutes de déploiement
+            cache_control=[s3_deploy.CacheControl.from_string("public, max-age=31536000, immutable")],
         )
 
-        # 2. Déploiement de la Configuration (HTML/CSS/JS) : No-Cache
+        # 2. Déploiement de la Configuration (HTML/CSS/JS) - AVEC Invalidation Chirurgicale
         deploy_config = s3_deploy.BucketDeployment(
             self, "DeployWebsiteConfig",
             sources=[s3_deploy.Source.asset("../frontend", exclude=["*.png", "*.svg", "node_modules/*", "data.json", "fonts/*", "*.webp"])],
             destination_bucket=website_bucket,
-            # SUPPRESSION de la distribution ici pour éviter la Race Condition avec le bloc 1
+            distribution=distribution,
+            # ON NE PURGE QUE LES FICHIERS CRITIQUES (Très rapide : < 60s)
+            distribution_paths=["/index.html", "/app.js", "/style.css"],
             cache_control=[s3_deploy.CacheControl.from_string("no-cache, no-store, must-revalidate")],
             prune=False,
         )

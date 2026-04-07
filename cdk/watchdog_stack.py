@@ -218,7 +218,7 @@ class WatchdogStack(Stack):
             sources=[s3_deploy.Source.asset("../frontend", exclude=["*.png", "*.svg", "node_modules/*", "data.json", "fonts/*", "*.webp"])],
             destination_bucket=website_bucket,
             # SUPPRESSION de la distribution ici pour éviter la Race Condition avec le bloc 1
-            cache_control=[s3_deploy.CacheControl.set_no_cache()],
+            cache_control=[s3_deploy.CacheControl.from_string("no-cache, no-store, must-revalidate")],
             prune=False,
         )
 
@@ -231,10 +231,7 @@ class WatchdogStack(Stack):
             sources=[s3_deploy.Source.asset("../frontend", exclude=["*", "!data.json"])],
             destination_bucket=website_bucket,
             # Pas d'invalidation, le Publisher Go s'en charge
-            cache_control=[
-                s3_deploy.CacheControl.max_age(Duration.days(365)),
-                s3_deploy.CacheControl.set_public(),
-            ],
+            cache_control=[s3_deploy.CacheControl.from_string("public, max-age=31536000, immutable")],
             prune=False,
         )
 

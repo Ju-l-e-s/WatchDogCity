@@ -20,7 +20,8 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Inter:wght@400;500&display=swap" rel="stylesheet">
     
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css" media="print" onload="this.media='all'">
+    <noscript><link rel="stylesheet" href="style.css"></noscript>
     <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
 </head>
 <body class="bg-[#F8FAFC] text-slate-900 min-h-screen">
@@ -408,120 +409,9 @@
 
     <script>
         let allCouncils = [];
-        let visibleCouncilsCount = 3;
+        let visibleCouncilsCount = 1; 
         let searchTimeout;
         let searchQuery = '';
-
-        const GLOBAL_GLOSSARY = {
-            "CCAS": "Centre Communal d'Action Sociale",
-            "ZAC": "Zone d'Aménagement Concerté",
-            "PLU": "Plan Local d'Urbanisme",
-            "EPCI": "Établissement Public de Coopération Intercommunale",
-            "DSP": "Délégation de Service Public",
-            "AFL": "Agence France Locale",
-            "CREPAQ": "Centre de Ressources d'Écologie Pédagogique en Nouvelle-Aquitaine",
-            "BM": "Bordeaux Métropole",
-            "ALSH": "Accueil de Loisirs Sans Hébergement",
-            "PADD": "Projet d'Aménagement et de Développement Durable",
-            "SCOT": "Schéma de Cohérence Territoriale",
-            "CLSPD": "Conseil Local de Sécurité et de Prévention de la Délinquance",
-            "ERP": "Établissement Recevant du Public",
-            "QPV": "Quartier Prioritaire de la Politique de la Ville",
-            "AAP": "Appel à Projets",
-            "AMI": "Appel à Manifestation d'Intérêt",
-            "SIAE": "Structure de l'Insertion par l'Activité Économique",
-            "SIAL": "Système d'Information pour l'Accueil et le Logement"
-        };
-
-        function escapeHTML(str) {
-            if (!str) return "";
-            const div = document.createElement('div');
-            div.textContent = str;
-            return div.innerHTML;
-        }
-
-        function toggleAboutModal(show) {
-            const modal = document.getElementById('about-modal');
-            modal.classList.toggle('hidden', !show);
-            document.body.classList.toggle('modal-open', show);
-        }
-
-        function toggleTeamModal(show) {
-            const modal = document.getElementById('team-modal');
-            const body = document.getElementById('team-modal-body');
-            const indicator = document.getElementById('team-scroll-indicator');
-            
-            modal.classList.toggle('hidden', !show);
-            document.body.classList.toggle('modal-open', show);
-            
-            if (show && body && indicator) {
-                body.scrollTop = 0;
-                indicator.style.opacity = '1';
-                
-                if (!body.dataset.hasScrollListener) {
-                    body.addEventListener('scroll', () => {
-                        if (body.scrollTop > 50) {
-                            indicator.style.opacity = '0';
-                        } else {
-                            indicator.style.opacity = '1';
-                        }
-                    });
-                    body.dataset.hasScrollListener = 'true';
-                }
-            }
-        }
-
-        function toggleContactModal(show) {
-            const modal = document.getElementById('contact-modal');
-            modal.classList.toggle('hidden', !show);
-            document.body.classList.toggle('modal-open', show);
-        }
-
-        function toggleMobileMenu(show) {
-            const menu = document.getElementById('mobile-menu');
-            menu.classList.toggle('hidden', !show);
-            document.body.classList.toggle('modal-open', show);
-            if (!show) document.getElementById('mobile-search-input')?.blur();
-        }
-
-        function smartCapitalize(str) {
-            if (!str) return "";
-            const words = str.split(' ');
-            return words.map((word, index) => {
-                if (word.length > 1 && word === word.toUpperCase() && !/^[0-9]+$/.test(word)) return word;
-                const low = word.toLowerCase();
-                if (index === 0) return low.charAt(0).toUpperCase() + low.slice(1);
-                return low;
-            }).join(' ');
-        }
-
-        function applyAcronyms(text, localAcronyms) {
-            const acronymsMap = { ...GLOBAL_GLOSSARY, ...(localAcronyms || {}) };
-            if (Object.keys(acronymsMap).length === 0) return text;
-            let result = text;
-            const keys = Object.keys(acronymsMap).sort((a, b) => b.length - a.length);
-
-            keys.forEach(key => {
-                const definition = escapeHTML(acronymsMap[key]);
-                const regex = new RegExp(`\\b${key}\\b`, 'g');
-                result = result.replace(regex, `<abbr title="${definition}" class="cursor-help border-b border-dotted border-brand-300 decoration-brand-300 decoration-2 underline-offset-4" tabindex="0">${key}</abbr>`);
-            });
-            return result;
-        }
-
-
-        function highlightText(text, query, acronymsMap = null) {
-            let processedText = escapeHTML(text);
-            if (acronymsMap) processedText = applyAcronyms(processedText, acronymsMap);
-            if (!query) return processedText;
-            const escapedQuery = escapeHTML(query);
-            const regex = new RegExp(`(${escapedQuery})`, 'gi');
-            const parts = processedText.split(/(<[^>]+>)/g);
-            return parts.map(part => {
-                if (part.startsWith('<')) return part;
-                return part.replace(regex, `<mark class="bg-brand-100 text-brand-700 font-bold px-0.5 rounded">$1</mark>`);
-            }).join('');
-        }
 
         async function init() {
             try {
@@ -529,15 +419,18 @@
                 if (!resp.ok) throw new Error('Not found');
                 const data = await resp.json();
                 if (data.next_council_date) {
-                    document.getElementById('next-council-date').textContent = data.next_council_date;
-                    document.getElementById('next-council-block').classList.remove('hidden');
+                    const dateEl = document.getElementById('next-council-date');
+                    if (dateEl) dateEl.textContent = data.next_council_date;
+                    const blockEl = document.getElementById('next-council-block');
+                    if (blockEl) blockEl.classList.remove('hidden');
                 }
                 allCouncils = (data.councils || []).sort((a, b) => b.date.localeCompare(a.date));
                 updateStats();
                 render();
             } catch (e) {
                 console.error(e);
-                document.getElementById('timeline').innerHTML = `<p class="text-center text-red-500 py-20 font-medium">Erreur lors du chargement des données. Veuillez réessayer plus tard.</p>`;
+                const timelineEl = document.getElementById('timeline');
+                if (timelineEl) timelineEl.innerHTML = `<p class="text-center text-red-500 py-20 font-medium">Erreur lors du chargement des données. Veuillez réessayer plus tard.</p>`;
             }
         }
 
@@ -545,23 +438,21 @@
             clearTimeout(searchTimeout);
             searchTimeout = setTimeout(() => {
                 searchQuery = val.toLowerCase().trim();
-                visibleCouncilsCount = 3;
-                const navSearch = document.getElementById('nav-search-input');
-                const mobileSearch = document.getElementById('mobile-search-input');
-                if (navSearch && navSearch.value !== val) navSearch.value = val;
-                if (mobileSearch && mobileSearch.value !== val) mobileSearch.value = val;
+                visibleCouncilsCount = searchQuery ? 5 : 1;
                 render();
             }, 300);
         }
 
         function loadMore() {
-            visibleCouncilsCount += 3;
+            visibleCouncilsCount += 2;
             render();
         }
 
         function updateStats() {
-            document.getElementById('stat-councils').textContent = allCouncils.length;
-            document.getElementById('stat-deliberations').textContent = allCouncils.reduce((sum, c) => sum + (c.deliberations?.length || 0), 0);
+            const councilsEl = document.getElementById('stat-councils');
+            const delibsEl = document.getElementById('stat-deliberations');
+            if (councilsEl) councilsEl.textContent = allCouncils.length;
+            if (delibsEl) delibsEl.textContent = allCouncils.reduce((sum, c) => sum + (c.deliberations?.length || 0), 0);
         }
 
         function formatDate(iso) {
@@ -575,6 +466,8 @@
 
         function render() {
             const container = document.getElementById('timeline');
+            if (!container) return;
+
             let totalResults = 0;
             const filtered = allCouncils.map(council => {
                 const filteredDelibs = (council.deliberations || []).filter(d => 
@@ -638,8 +531,8 @@
                 const remaining = filtered.length - visibleCouncilsCount;
                 const loadMoreBtn = document.createElement('button');
                 loadMoreBtn.onclick = loadMore;
-                loadMoreBtn.className = 'w-full py-5 bg-white rounded-2xl text-slate-400 font-medium text-sm tracking-wide hover:text-slate-600 hover:shadow-card transition-all shadow-micro group active:scale-[0.98] min-h-[44px]';
-                loadMoreBtn.innerHTML = `<div class="flex items-center justify-center gap-2"><span>Charger les archives</span><span class="text-xs text-slate-300 font-normal">(${remaining} restant${remaining > 1 ? 's' : ''})</span><svg class="w-4 h-4 opacity-40 group-hover:translate-y-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg></div>`;
+                loadMoreBtn.className = 'w-full py-5 bg-white rounded-2xl text-slate-400 hover:text-brand-600 font-medium text-sm tracking-wide transition-all shadow-micro group active:scale-[0.98] min-h-[44px] mb-12';
+                loadMoreBtn.innerHTML = `<div class="flex items-center justify-center gap-2"><span>Charger les archives</span><span class="text-xs text-slate-300 font-normal">(${remaining} restants)</span><svg class="w-4 h-4 opacity-40 group-hover:translate-y-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg></div>`;
                 container.appendChild(loadMoreBtn);
             }
         }

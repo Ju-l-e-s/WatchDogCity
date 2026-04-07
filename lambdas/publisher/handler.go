@@ -138,6 +138,9 @@ func buildDataJSON(ctx context.Context, ddb *dynamodb.Client, councils []Council
 }
 
 func fetchNextCouncilDate(ctx context.Context, ddb *dynamodb.Client) string {
+	if ddb == nil {
+		return ""
+	}
 	out, err := ddb.GetItem(ctx, &dynamodb.GetItemInput{
 		TableName: aws.String(os.Getenv("COUNCILS_TABLE")),
 		Key: map[string]types.AttributeValue{
@@ -181,10 +184,11 @@ func HandleRequest(ctx context.Context, event PublisherEvent) error {
 	jsonBytes, _ := json.MarshalIndent(data, "", "  ")
 	s3Client := s3.NewFromConfig(cfg)
 	_, err = s3Client.PutObject(ctx, &s3.PutObjectInput{
-		Bucket:      aws.String(os.Getenv("WEBSITE_BUCKET")),
-		Key:         aws.String("data.json"),
-		Body:        bytes.NewReader(jsonBytes),
-		ContentType: aws.String("application/json"),
+		Bucket:       aws.String(os.Getenv("WEBSITE_BUCKET")),
+		Key:          aws.String("data.json"),
+		Body:         bytes.NewReader(jsonBytes),
+		ContentType:  aws.String("application/json"),
+		CacheControl: aws.String("public, max-age=31536000, immutable"),
 	})
 	if err != nil {
 		return fmt.Errorf("upload data.json: %w", err)

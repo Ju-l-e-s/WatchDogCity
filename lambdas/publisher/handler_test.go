@@ -1,13 +1,19 @@
 package main
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
+func intPtr(i int) *int { return &i }
+func strPtr(s string) *string { return &s }
+
 func TestBuildDataJSON(t *testing.T) {
+	ctx := context.Background()
+
 	councils := []CouncilRecord{
 		{
 			CouncilID: "conseil_municipal#2026-03-28",
@@ -28,16 +34,16 @@ func TestBuildDataJSON(t *testing.T) {
 				TopicTag:       "politique",
 				PDFURL:         "https://example.com/D01.pdf",
 				Summary:        "Résumé.",
-				Analysis:       "Analyse détaillée.",
-				VotePour:       32,
-				VoteContre:     5,
-				VoteAbstention: 2,
-				Disagreements:  "",
+				AnalysisData:   AnalysisData{Contexte: strPtr("Analyse détaillée.")},
+				VotePour:       intPtr(32),
+				VoteContre:     intPtr(5),
+				VoteAbstention: intPtr(2),
+				Disagreements:  strPtr(""),
 			},
 		},
 	}
 
-	data, err := buildDataJSON(councils, delibs)
+	data, err := buildDataJSON(ctx, nil, councils, delibs)
 	require.NoError(t, err)
 
 	require.Len(t, data.Councils, 1)
@@ -45,6 +51,6 @@ func TestBuildDataJSON(t *testing.T) {
 	require.Len(t, data.Councils[0].Deliberations, 1)
 	assert.Equal(t, "Élection du Maire", data.Councils[0].Deliberations[0].Title)
 	assert.Equal(t, "politique", data.Councils[0].Deliberations[0].TopicTag)
-	assert.Equal(t, "Analyse détaillée.", data.Councils[0].Deliberations[0].Analysis)
-	assert.Equal(t, 32, data.Councils[0].Deliberations[0].Vote.Pour)
+	assert.Equal(t, "Analyse détaillée.", *data.Councils[0].Deliberations[0].AnalysisData.Contexte)
+	assert.Equal(t, 32, *data.Councils[0].Deliberations[0].Vote.Pour)
 }

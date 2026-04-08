@@ -386,7 +386,7 @@ if (contactForm) {
             captcha_token: token
         };
 
-        const API_URL = 'https://TON_API_ID.execute-api.eu-west-3.amazonaws.com/prod/contact';
+        const API_URL = 'https://zq7qfmhra1.execute-api.eu-west-3.amazonaws.com/prod/contact';
 
         try {
             if (e.submitter) e.submitter.disabled = true;
@@ -407,10 +407,12 @@ if (contactForm) {
             } else {
                 contactStatus.textContent = data.error || "Erreur lors de l'envoi.";
                 contactStatus.className = "text-sm font-medium text-center py-2 rounded-xl text-red-600 bg-red-50 block";
+                turnstile.reset(contactWidgetId);
             }
         } catch (error) {
             contactStatus.textContent = "Erreur réseau. Impossible de contacter le serveur.";
             contactStatus.className = "text-sm font-medium text-center py-2 rounded-xl text-red-600 bg-red-50 block";
+            turnstile.reset(contactWidgetId);
         } finally {
             if (e.submitter) e.submitter.disabled = false;
         }
@@ -437,7 +439,7 @@ if (newsletterForm) {
             captcha_token: token
         };
 
-        const API_URL = 'https://TON_API_ID.execute-api.eu-west-3.amazonaws.com/prod/subscribe';
+        const API_URL = 'https://zq7qfmhra1.execute-api.eu-west-3.amazonaws.com/prod/subscribe';
 
         try {
             if (e.submitter) e.submitter.disabled = true;
@@ -457,10 +459,12 @@ if (newsletterForm) {
             } else {
                 newsletterStatus.textContent = data.error || "Erreur lors de l'inscription.";
                 newsletterStatus.className = "text-sm font-medium text-center py-2 rounded-xl text-red-600 bg-red-50 block";
+                turnstile.reset(newsletterWidgetId);
             }
         } catch (error) {
             newsletterStatus.textContent = "Erreur réseau. Impossible de contacter le serveur.";
             newsletterStatus.className = "text-sm font-medium text-center py-2 rounded-xl text-red-600 bg-red-50 block";
+            turnstile.reset(newsletterWidgetId);
         } finally {
             if (e.submitter) e.submitter.disabled = false;
         }

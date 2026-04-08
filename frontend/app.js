@@ -350,7 +350,15 @@ window.initTurnstile = function () {
     if (contactEl) {
         contactWidgetId = turnstile.render('#cf-contact', {
             sitekey: SITE_KEY,
-            theme: 'light'
+            theme: 'light',
+            callback: function(token) {
+                const s = document.getElementById('contact-status');
+                if(s && s.textContent.includes('Validation')) {
+                    // Si on attendait le jeton, on supprime le message d'attente
+                    s.textContent = "✔ Vérification réussie. Vous pouvez envoyer (ou ça partira de suite).";
+                    s.className = "text-sm font-medium text-center py-2 rounded-xl text-emerald-600 bg-emerald-50 block mt-3";
+                }
+            }
         });
     }
 
@@ -358,7 +366,14 @@ window.initTurnstile = function () {
     if (newsletterEl) {
         newsletterWidgetId = turnstile.render('#cf-newsletter', {
             sitekey: SITE_KEY,
-            theme: 'dark'
+            theme: 'dark',
+            callback: function(token) {
+                const s = document.getElementById('newsletter-status');
+                if(s && s.textContent.includes('Validation')) {
+                    s.textContent = "✔ Vérification réussie. Vous pouvez envoyer.";
+                    s.className = "text-sm font-medium text-center py-2 rounded-xl text-emerald-600 bg-emerald-50 block mt-3";
+                }
+            }
         });
     }
 };

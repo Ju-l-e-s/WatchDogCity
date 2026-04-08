@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"regexp"
 	"strings"
@@ -31,7 +32,7 @@ func isValidEmail(email string) bool {
 func corsHeaders() map[string]string {
 	return map[string]string{
 		"Access-Control-Allow-Origin":  "*",
-		"Access-Control-Allow-Methods": "POST,GET,OPTIONS",
+		"Access-Control-Allow-Methods": "POST,OPTIONS",
 		"Access-Control-Allow-Headers": "Content-Type",
 		"Content-Type":                 "application/json",
 	}
@@ -52,149 +53,114 @@ func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 		return events.APIGatewayProxyResponse{StatusCode: 200, Headers: corsHeaders()}, nil
 	case http.MethodPost:
 		return handleSubscribe(ctx, req)
-	case http.MethodGet:
-		if strings.Contains(req.Path, "unsubscribe") {
-			return handleUnsubscribe(ctx, req)
-		}
-		return handleConfirm(ctx, req)
 	default:
 		return apiResponse(405, map[string]string{"error": "method not allowed"}), nil
 	}
 }
 
-func handleUnsubscribe(ctx context.Context, req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
-	token := req.QueryStringParameters["token"]
-	if token == "" {
-		return apiResponse(400, map[string]string{"error": "missing token"}), nil
-	}
+type turnstileResp struct {
+	Success bool `json:"success"`
+}
 
-	cfg, _ := config.LoadDefaultConfig(ctx)
-	ddb := dynamodb.NewFromConfig(cfg)
-
-	// Find subscriber by token using GSI
-	out, err := ddb.Query(ctx, &dynamodb.QueryInput{
-		TableName:              aws.String(os.Getenv("SUBSCRIBERS_TABLE")),
-		IndexName:              aws.String("token-index"),
-		KeyConditionExpression: aws.String("token = :t"),
-		ExpressionAttributeValues: map[string]types.AttributeValue{
-			":t": &types.AttributeValueMemberS{Value: token},
-		},
-	})
-	if err != nil || len(out.Items) == 0 {
-		return apiResponse(404, map[string]string{"error": "invalid token"}), nil
-	}
-
-	emailAttr := out.Items[0]["email"].(*types.AttributeValueMemberS)
-	_, err = ddb.DeleteItem(ctx, &dynamodb.DeleteItemInput{
-		TableName: aws.String(os.Getenv("SUBSCRIBERS_TABLE")),
-		Key:       map[string]types.AttributeValue{"email": &types.AttributeValueMemberS{Value: emailAttr.Value}},
-	})
+func verifyTurnstile(ctx context.Context, secret, token string) bool {
+	resp, err := http.PostForm(
+		"https://challenges.cloudflare.com/turnstile/v0/siteverify",
+		url.Values{"secret": {secret}, "response": {token}},
+	)
 	if err != nil {
-		log.Printf("error deleting subscriber: %v", err)
-		return apiResponse(500, map[string]string{"error": "internal error"}), nil
+		log.Printf("turnstile request error: %v", err)
+		return false
 	}
-
-	// Redirect to site
-	return events.APIGatewayProxyResponse{
-		StatusCode: 302,
-		Headers:    map[string]string{"Location": os.Getenv("SITE_URL") + "?unsubscribed=true"},
-	}, nil
+	defer resp.Body.Close()
+	var tr turnstileResp
+	if err := json.NewDecoder(resp.Body).Decode(&tr); err != nil {
+		return false
+	}
+	return tr.Success
 }
 
 func handleSubscribe(ctx context.Context, req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
 	var body struct {
-		Email string `json:"email"`
+		Email        string `json:"email"`
+		CaptchaToken string `json:"captcha_token"`
 	}
 	if err := json.Unmarshal([]byte(req.Body), &body); err != nil || !isValidEmail(body.Email) {
 		return apiResponse(400, map[string]string{"error": "invalid email"}), nil
 	}
+
+	if !verifyTurnstile(ctx, os.Getenv("TURNSTILE_SECRET"), body.CaptchaToken) {
+		return apiResponse(403, map[string]string{"error": "captcha verification failed"}), nil
+	}
+
 	email := strings.ToLower(strings.TrimSpace(body.Email))
 
 	cfg, _ := config.LoadDefaultConfig(ctx)
 	ddb := dynamodb.NewFromConfig(cfg)
+	tableName := os.Getenv("TABLE_NAME")
 
-	// Check existing subscriber
+	// Block re-registration if already confirmed.
 	existing, _ := ddb.GetItem(ctx, &dynamodb.GetItemInput{
-		TableName: aws.String(os.Getenv("SUBSCRIBERS_TABLE")),
+		TableName: aws.String(tableName),
 		Key:       map[string]types.AttributeValue{"email": &types.AttributeValueMemberS{Value: email}},
 	})
 	if existing.Item != nil {
-		return apiResponse(200, map[string]string{"message": "already registered"}), nil
+		if status, ok := existing.Item["status"].(*types.AttributeValueMemberS); ok && status.Value == "CONFIRMED" {
+			return apiResponse(200, map[string]string{"message": "already subscribed"}), nil
+		}
 	}
 
 	token := uuid.New().String()
 	item, _ := attributevalue.MarshalMap(map[string]interface{}{
 		"email":      email,
-		"status":     "pending",
+		"status":     "PENDING",
 		"token":      token,
 		"created_at": time.Now().UTC().Format(time.RFC3339),
 	})
-	ddb.PutItem(ctx, &dynamodb.PutItemInput{
-		TableName: aws.String(os.Getenv("SUBSCRIBERS_TABLE")),
+	if _, err := ddb.PutItem(ctx, &dynamodb.PutItemInput{
+		TableName: aws.String(tableName),
 		Item:      item,
-	})
+	}); err != nil {
+		log.Printf("error saving subscriber %s: %v", email, err)
+		return apiResponse(500, map[string]string{"error": "internal error"}), nil
+	}
 
-	apiID := os.Getenv("API_ID")
-	region := os.Getenv("AWS_REGION")
-	stage := os.Getenv("API_STAGE")
-	apiBaseURL := fmt.Sprintf("https://%s.execute-api.%s.amazonaws.com/%s/", apiID, region, stage)
-	confirmURL := fmt.Sprintf("%sconfirm?token=%s", apiBaseURL, token)
+	confirmURL := fmt.Sprintf("%s?token=%s&email=%s",
+		os.Getenv("CONFIRM_BASE_URL"),
+		url.QueryEscape(token),
+		url.QueryEscape(email),
+	)
 	sendConfirmationEmail(ctx, cfg, email, confirmURL)
 
 	return apiResponse(200, map[string]string{"message": "confirmation email sent"}), nil
 }
 
-func handleConfirm(ctx context.Context, req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
-	token := req.QueryStringParameters["token"]
-	if token == "" {
-		return apiResponse(400, map[string]string{"error": "missing token"}), nil
-	}
-
-	cfg, _ := config.LoadDefaultConfig(ctx)
-	ddb := dynamodb.NewFromConfig(cfg)
-
-	// Find subscriber by token using GSI
-	out, err := ddb.Query(ctx, &dynamodb.QueryInput{
-		TableName:              aws.String(os.Getenv("SUBSCRIBERS_TABLE")),
-		IndexName:              aws.String("token-index"),
-		KeyConditionExpression: aws.String("token = :t"),
-		ExpressionAttributeValues: map[string]types.AttributeValue{
-			":t": &types.AttributeValueMemberS{Value: token},
-		},
-	})
-	if err != nil || len(out.Items) == 0 {
-		return apiResponse(404, map[string]string{"error": "invalid token"}), nil
-	}
-
-	emailAttr := out.Items[0]["email"].(*types.AttributeValueMemberS)
-	ddb.UpdateItem(ctx, &dynamodb.UpdateItemInput{
-		TableName: aws.String(os.Getenv("SUBSCRIBERS_TABLE")),
-		Key:       map[string]types.AttributeValue{"email": &types.AttributeValueMemberS{Value: emailAttr.Value}},
-		UpdateExpression: aws.String("SET #s = :confirmed"),
-		ExpressionAttributeNames:  map[string]string{"#s": "status"},
-		ExpressionAttributeValues: map[string]types.AttributeValue{":confirmed": &types.AttributeValueMemberS{Value: "confirmed"}},
-	})
-
-	// Redirect to site
-	return events.APIGatewayProxyResponse{
-		StatusCode: 302,
-		Headers:    map[string]string{"Location": os.Getenv("SITE_URL") + "?subscribed=true"},
-	}, nil
-}
-
 func sendConfirmationEmail(ctx context.Context, cfg aws.Config, email, confirmURL string) {
 	ses := sesv2.NewFromConfig(cfg)
-	body := fmt.Sprintf(`<p>Cliquez sur ce lien pour confirmer votre abonnement au Watchdog Bègles :</p>
-<p><a href="%s">Confirmer mon abonnement</a></p>
-<p>Si vous n'avez pas demandé cet abonnement, ignorez ce message.</p>`, confirmURL)
+	htmlBody := fmt.Sprintf(`<!DOCTYPE html>
+<html lang="fr">
+<body style="font-family:sans-serif;max-width:600px;margin:40px auto;color:#333">
+  <h2>Confirmez votre inscription</h2>
+  <p>Merci de votre intérêt pour <strong>L'Observatoire de Bègles</strong>.</p>
+  <p>Cliquez sur le bouton ci-dessous pour confirmer votre abonnement à nos alertes citoyennes :</p>
+  <p style="text-align:center;margin:32px 0">
+    <a href="%s" style="background:#1d4ed8;color:#fff;padding:14px 28px;border-radius:6px;text-decoration:none;font-weight:bold">
+      Confirmer mon abonnement
+    </a>
+  </p>
+  <p style="font-size:12px;color:#888">Si vous n'avez pas demandé cet abonnement, ignorez simplement ce message.</p>
+</body>
+</html>`, confirmURL)
 
 	_, err := ses.SendEmail(ctx, &sesv2.SendEmailInput{
-		FromEmailAddress: aws.String(os.Getenv("FROM_EMAIL")),
+		FromEmailAddress: aws.String(os.Getenv("SENDER_EMAIL")),
 		Destination:      &sestypes.Destination{ToAddresses: []string{email}},
 		Content: &sestypes.EmailContent{
 			Simple: &sestypes.Message{
-				Subject: &sestypes.Content{Data: aws.String("Confirmez votre abonnement — Watchdog Bègles")},
-				Body:    &sestypes.Body{Html: &sestypes.Content{Data: aws.String(body)}},
+				Subject: &sestypes.Content{Data: aws.String("Confirmez votre abonnement — L'Observatoire de Bègles")},
+				Body: &sestypes.Body{
+					Html: &sestypes.Content{Data: aws.String(htmlBody)},
+					Text: &sestypes.Content{Data: aws.String(fmt.Sprintf("Confirmez votre abonnement : %s", confirmURL))},
+				},
 			},
 		},
 	})

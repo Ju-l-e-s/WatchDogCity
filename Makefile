@@ -14,9 +14,15 @@ build:
 	# Publisher
 	cd lambdas/publisher && GOOS=linux GOARCH=arm64 go build -o bootstrap main.go handler.go
 	cd lambdas/publisher && zip -j ../../dist/publisher.zip bootstrap && rm bootstrap
-	# Subscriber
-	cd lambdas/subscriber && GOOS=linux GOARCH=arm64 go build -o bootstrap main.go handler.go
+	# SubscribeFunction
+	cd lambdas/subscriber && go mod tidy && GOOS=linux GOARCH=arm64 go build -o bootstrap main.go handler.go
 	cd lambdas/subscriber && zip -j ../../dist/subscriber.zip bootstrap && rm bootstrap
+	# ConfirmFunction
+	cd lambdas/confirm && go mod tidy && GOOS=linux GOARCH=arm64 go build -o bootstrap main.go handler.go
+	cd lambdas/confirm && zip -j ../../dist/confirm.zip bootstrap && rm bootstrap
+	# ContactFunction
+	cd lambdas/contact && go mod tidy && GOOS=linux GOARCH=arm64 go build -o bootstrap main.go handler.go
+	cd lambdas/contact && zip -j ../../dist/contact.zip bootstrap && rm bootstrap
 
 deploy: build
 	cd cdk && cdk deploy --require-approval never

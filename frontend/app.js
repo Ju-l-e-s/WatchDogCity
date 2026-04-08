@@ -338,3 +338,131 @@ function toggleDelib(id) {
 }
 
 init();
+
+// --- Ajout pour Cloudflare Turnstile ---
+const SITE_KEY = '0x4AAAAAAC2Q6uQa1butMlkC'; // Ta clé publique Cloudflare
+let contactWidgetId;
+let newsletterWidgetId;
+
+// 1. Initialisation explicite de Turnstile (appelé par le script Cloudflare dans l'HTML)
+window.initTurnstile = function () {
+    const contactEl = document.getElementById('cf-contact');
+    if (contactEl) {
+        contactWidgetId = turnstile.render('#cf-contact', {
+            sitekey: SITE_KEY,
+            theme: 'light'
+        });
+    }
+
+    const newsletterEl = document.getElementById('cf-newsletter');
+    if (newsletterEl) {
+        newsletterWidgetId = turnstile.render('#cf-newsletter', {
+            sitekey: SITE_KEY,
+            theme: 'dark'
+        });
+    }
+};
+
+// 2. Interception du formulaire de Contact
+const contactForm = document.getElementById('contact-form');
+const contactStatus = document.getElementById('contact-status'); // Utilisation de ta div
+
+if (contactForm) {
+    contactForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const token = turnstile.getResponse(contactWidgetId);
+        
+        if (!token) {
+            contactStatus.textContent = "Validation anti-bot en cours, patientez.";
+            contactStatus.className = "text-sm font-medium text-center py-2 rounded-xl text-amber-600 bg-amber-50 block";
+            return;
+        }
+
+        const payload = {
+            name: document.getElementById('contact-name').value,
+            email_sender: document.getElementById('contact-email').value,
+            message: document.getElementById('contact-message').value,
+            captcha_token: token
+        };
+
+        const API_URL = 'https://TON_API_ID.execute-api.eu-west-3.amazonaws.com/prod/contact';
+
+        try {
+            if (e.submitter) e.submitter.disabled = true;
+            const response = await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            // Récupération du JSON de la Lambda Go
+            const data = await response.json().catch(() => ({}));
+
+            if (response.ok) {
+                contactStatus.textContent = "Message envoyé avec succès.";
+                contactStatus.className = "text-sm font-medium text-center py-2 rounded-xl text-green-600 bg-green-50 block";
+                contactForm.reset();
+                turnstile.reset(contactWidgetId);
+            } else {
+                contactStatus.textContent = data.error || "Erreur lors de l'envoi.";
+                contactStatus.className = "text-sm font-medium text-center py-2 rounded-xl text-red-600 bg-red-50 block";
+            }
+        } catch (error) {
+            contactStatus.textContent = "Erreur réseau. Impossible de contacter le serveur.";
+            contactStatus.className = "text-sm font-medium text-center py-2 rounded-xl text-red-600 bg-red-50 block";
+        } finally {
+            if (e.submitter) e.submitter.disabled = false;
+        }
+    });
+}
+
+// 3. Interception du formulaire Newsletter (Même logique)
+const newsletterForm = document.getElementById('newsletter-form');
+const newsletterStatus = document.getElementById('newsletter-status');
+
+if (newsletterForm) {
+    newsletterForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const token = turnstile.getResponse(newsletterWidgetId);
+        if (!token) {
+            newsletterStatus.textContent = "Validation anti-bot en cours, patientez.";
+            newsletterStatus.className = "text-sm font-medium text-center py-2 rounded-xl text-amber-600 bg-amber-50 block";
+            return;
+        }
+
+        const payload = {
+            email: document.getElementById('newsletter-email').value,
+            captcha_token: token
+        };
+
+        const API_URL = 'https://TON_API_ID.execute-api.eu-west-3.amazonaws.com/prod/subscribe';
+
+        try {
+            if (e.submitter) e.submitter.disabled = true;
+            const response = await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            const data = await response.json().catch(() => ({}));
+
+            if (response.ok) {
+                newsletterStatus.textContent = "Vérifiez votre boîte mail pour confirmer l'inscription.";
+                newsletterStatus.className = "text-sm font-medium text-center py-2 rounded-xl text-green-600 bg-green-50 block";
+                newsletterForm.reset();
+                turnstile.reset(newsletterWidgetId);
+            } else {
+                newsletterStatus.textContent = data.error || "Erreur lors de l'inscription.";
+                newsletterStatus.className = "text-sm font-medium text-center py-2 rounded-xl text-red-600 bg-red-50 block";
+            }
+        } catch (error) {
+            newsletterStatus.textContent = "Erreur réseau. Impossible de contacter le serveur.";
+            newsletterStatus.className = "text-sm font-medium text-center py-2 rounded-xl text-red-600 bg-red-50 block";
+        } finally {
+            if (e.submitter) e.submitter.disabled = false;
+        }
+    });
+}

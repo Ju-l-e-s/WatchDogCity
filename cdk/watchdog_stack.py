@@ -160,23 +160,70 @@ class WatchdogStack(Stack):
         publisher.grant_invoke(worker)
         worker.add_environment("PUBLISHER_FUNCTION_NAME", publisher.function_name)
 
-        # ── Lambda: Subscriber ────────────────────────────────────────────
-        subscriber = lambda_.Function(
-            self, "Subscriber",
+        # ── Newsletter & Contact config ───────────────────────────────────
+        site_url = os.environ.get("SITE_URL", "https://www.lobservatoiredebegles.fr")
+        sender_email = os.environ.get("SENDER_EMAIL", "noreply@lobservatoiredebegles.fr")
+        contact_sender = os.environ.get("CONTACT_SENDER", "contact@lobservatoiredebegles.fr")
+        admin_email = os.environ.get("ADMIN_EMAIL", "")
+        turnstile_secret = os.environ.get("TURNSTILE_SECRET", "")
+
+        ses_identity_arns = [
+            f"arn:aws:ses:{self.region}:{self.account}:identity/lobservatoiredebegles.fr",
+        ]
+
+        # ── Lambda: SubscribeFunction ─────────────────────────────────────
+        subscribe_fn = lambda_.Function(
+            self, "SubscribeFunction",
             runtime=lambda_.Runtime.PROVIDED_AL2023,
             architecture=lambda_.Architecture.ARM_64,
             handler="bootstrap",
             code=lambda_.Code.from_asset("../dist/subscriber.zip"),
             timeout=Duration.seconds(10),
             environment={
-                **common_env,
-                "FROM_EMAIL": "watchdog@begles.citoyen",
+                "TABLE_NAME": subscribers_table.table_name,
+                "SENDER_EMAIL": sender_email,
+                "CONFIRM_BASE_URL": f"{site_url}/confirm",
+                "TURNSTILE_SECRET": turnstile_secret,
             },
         )
-        subscribers_table.grant_read_write_data(subscriber)
-        subscriber.add_to_role_policy(iam.PolicyStatement(
+        subscribers_table.grant_read_write_data(subscribe_fn)
+        subscribe_fn.add_to_role_policy(iam.PolicyStatement(
             actions=["ses:SendEmail"],
-            resources=["*"],
+            resources=ses_identity_arns,
+        ))
+
+        # ── Lambda: ConfirmFunction ───────────────────────────────────────
+        confirm_fn = lambda_.Function(
+            self, "ConfirmFunction",
+            runtime=lambda_.Runtime.PROVIDED_AL2023,
+            architecture=lambda_.Architecture.ARM_64,
+            handler="bootstrap",
+            code=lambda_.Code.from_asset("../dist/confirm.zip"),
+            timeout=Duration.seconds(10),
+            environment={
+                "TABLE_NAME": subscribers_table.table_name,
+                "SITE_URL": site_url,
+            },
+        )
+        subscribers_table.grant_read_write_data(confirm_fn)
+
+        # ── Lambda: ContactFunction ───────────────────────────────────────
+        contact_fn = lambda_.Function(
+            self, "ContactFunction",
+            runtime=lambda_.Runtime.PROVIDED_AL2023,
+            architecture=lambda_.Architecture.ARM_64,
+            handler="bootstrap",
+            code=lambda_.Code.from_asset("../dist/contact.zip"),
+            timeout=Duration.seconds(10),
+            environment={
+                "SENDER_EMAIL": contact_sender,
+                "ADMIN_EMAIL": admin_email,
+                "TURNSTILE_SECRET": turnstile_secret,
+            },
+        )
+        contact_fn.add_to_role_policy(iam.PolicyStatement(
+            actions=["ses:SendEmail"],
+            resources=ses_identity_arns,
         ))
 
         # ── API Gateway ───────────────────────────────────────────────────
@@ -190,9 +237,9 @@ class WatchdogStack(Stack):
                 allow_headers=["Content-Type"],
             ),
         )
-        subscriber_integration = apigw.LambdaIntegration(subscriber)
-        api.root.add_resource("subscribe").add_method("POST", subscriber_integration)
-        api.root.add_resource("confirm").add_method("GET", subscriber_integration)
+        api.root.add_resource("subscribe").add_method("POST", apigw.LambdaIntegration(subscribe_fn))
+        api.root.add_resource("confirm").add_method("GET", apigw.LambdaIntegration(confirm_fn))
+        api.root.add_resource("contact").add_method("POST", apigw.LambdaIntegration(contact_fn))
 
         # ── Website Deployment (Architecture Sécurisée) ─────────────────────────────
 

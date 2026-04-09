@@ -165,13 +165,13 @@ class WatchdogStack(Stack):
         sender_email = os.environ.get("SENDER_EMAIL", "noreply@lobservatoiredebegles.fr")
         contact_sender = os.environ.get("CONTACT_SENDER", "contact@lobservatoiredebegles.fr")
         admin_email = os.environ.get("ADMIN_EMAIL", "")
-        turnstile_secret = os.environ.get("TURNSTILE_SECRET", "")
-
         ses_identity_arns = [
             f"arn:aws:ses:{self.region}:{self.account}:identity/lobservatoiredebegles.fr",
         ]
 
         # ── Lambda: SubscribeFunction ─────────────────────────────────────
+        mail_api_key = os.environ.get("MAIL_API_KEY", "")
+
         subscribe_fn = lambda_.Function(
             self, "SubscribeFunction",
             runtime=lambda_.Runtime.PROVIDED_AL2023,
@@ -183,14 +183,10 @@ class WatchdogStack(Stack):
                 "TABLE_NAME": subscribers_table.table_name,
                 "SENDER_EMAIL": sender_email,
                 "CONFIRM_BASE_URL": f"{site_url}/confirm",
-                "TURNSTILE_SECRET": turnstile_secret,
+                "MAIL_API_KEY": mail_api_key,
             },
         )
         subscribers_table.grant_read_write_data(subscribe_fn)
-        subscribe_fn.add_to_role_policy(iam.PolicyStatement(
-            actions=["ses:SendEmail"],
-            resources=ses_identity_arns,
-        ))
 
         # ── Lambda: ConfirmFunction ───────────────────────────────────────
         confirm_fn = lambda_.Function(
@@ -218,7 +214,6 @@ class WatchdogStack(Stack):
             environment={
                 "SENDER_EMAIL": contact_sender,
                 "ADMIN_EMAIL": admin_email,
-                "TURNSTILE_SECRET": turnstile_secret,
             },
         )
         contact_fn.add_to_role_policy(iam.PolicyStatement(

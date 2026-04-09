@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"net/url"
 	"os"
 	"strings"
 
@@ -35,32 +34,10 @@ func apiResponse(status int, body map[string]string) events.APIGatewayProxyRespo
 	}
 }
 
-type turnstileResp struct {
-	Success bool `json:"success"`
-}
-
-func verifyTurnstile(ctx context.Context, secret, token string) bool {
-	resp, err := http.PostForm(
-		"https://challenges.cloudflare.com/turnstile/v0/siteverify",
-		url.Values{"secret": {secret}, "response": {token}},
-	)
-	if err != nil {
-		log.Printf("turnstile request error: %v", err)
-		return false
-	}
-	defer resp.Body.Close()
-	var tr turnstileResp
-	if err := json.NewDecoder(resp.Body).Decode(&tr); err != nil {
-		return false
-	}
-	return tr.Success
-}
-
 type contactRequest struct {
-	Name         string `json:"name"`
-	EmailSender  string `json:"email_sender"`
-	Message      string `json:"message"`
-	CaptchaToken string `json:"captcha_token"`
+	Name        string `json:"name"`
+	EmailSender string `json:"email_sender"`
+	Message     string `json:"message"`
 }
 
 func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
@@ -79,10 +56,6 @@ func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 
 	if cr.Name == "" || cr.EmailSender == "" || cr.Message == "" {
 		return apiResponse(400, map[string]string{"error": "name, email_sender and message are required"}), nil
-	}
-
-	if !verifyTurnstile(ctx, os.Getenv("TURNSTILE_SECRET"), cr.CaptchaToken) {
-		return apiResponse(403, map[string]string{"error": "captcha verification failed"}), nil
 	}
 
 	cfg, _ := config.LoadDefaultConfig(ctx)

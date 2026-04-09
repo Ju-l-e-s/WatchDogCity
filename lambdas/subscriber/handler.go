@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -18,8 +19,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
-	"github.com/aws/aws-sdk-go-v2/service/sesv2"
-	sestypes "github.com/aws/aws-sdk-go-v2/service/sesv2/types"
 	"github.com/google/uuid"
 )
 
@@ -58,38 +57,12 @@ func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 	}
 }
 
-type turnstileResp struct {
-	Success bool `json:"success"`
-}
-
-func verifyTurnstile(ctx context.Context, secret, token string) bool {
-	resp, err := http.PostForm(
-		"https://challenges.cloudflare.com/turnstile/v0/siteverify",
-		url.Values{"secret": {secret}, "response": {token}},
-	)
-	if err != nil {
-		log.Printf("turnstile request error: %v", err)
-		return false
-	}
-	defer resp.Body.Close()
-	var tr turnstileResp
-	if err := json.NewDecoder(resp.Body).Decode(&tr); err != nil {
-		return false
-	}
-	return tr.Success
-}
-
 func handleSubscribe(ctx context.Context, req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
 	var body struct {
-		Email        string `json:"email"`
-		CaptchaToken string `json:"captcha_token"`
+		Email string `json:"email"`
 	}
 	if err := json.Unmarshal([]byte(req.Body), &body); err != nil || !isValidEmail(body.Email) {
 		return apiResponse(400, map[string]string{"error": "invalid email"}), nil
-	}
-
-	if !verifyTurnstile(ctx, os.Getenv("TURNSTILE_SECRET"), body.CaptchaToken) {
-		return apiResponse(403, map[string]string{"error": "captcha verification failed"}), nil
 	}
 
 	email := strings.ToLower(strings.TrimSpace(body.Email))
@@ -129,13 +102,12 @@ func handleSubscribe(ctx context.Context, req events.APIGatewayProxyRequest) (ev
 		url.QueryEscape(token),
 		url.QueryEscape(email),
 	)
-	sendConfirmationEmail(ctx, cfg, email, confirmURL)
+	sendConfirmationEmail(email, confirmURL)
 
 	return apiResponse(200, map[string]string{"message": "confirmation email sent"}), nil
 }
 
-func sendConfirmationEmail(ctx context.Context, cfg aws.Config, email, confirmURL string) {
-	ses := sesv2.NewFromConfig(cfg)
+func sendConfirmationEmail(email, confirmURL string) {
 	htmlBody := fmt.Sprintf(`<!DOCTYPE html>
 <html lang="fr">
 <body style="font-family:sans-serif;max-width:600px;margin:40px auto;color:#333">
@@ -151,20 +123,29 @@ func sendConfirmationEmail(ctx context.Context, cfg aws.Config, email, confirmUR
 </body>
 </html>`, confirmURL)
 
-	_, err := ses.SendEmail(ctx, &sesv2.SendEmailInput{
-		FromEmailAddress: aws.String(os.Getenv("SENDER_EMAIL")),
-		Destination:      &sestypes.Destination{ToAddresses: []string{email}},
-		Content: &sestypes.EmailContent{
-			Simple: &sestypes.Message{
-				Subject: &sestypes.Content{Data: aws.String("Confirmez votre abonnement — L'Observatoire de Bègles")},
-				Body: &sestypes.Body{
-					Html: &sestypes.Content{Data: aws.String(htmlBody)},
-					Text: &sestypes.Content{Data: aws.String(fmt.Sprintf("Confirmez votre abonnement : %s", confirmURL))},
-				},
-			},
-		},
+	payload, _ := json.Marshal(map[string]interface{}{
+		"from":    os.Getenv("SENDER_EMAIL"),
+		"to":      []string{email},
+		"subject": "Confirmez votre abonnement — L'Observatoire de Bègles",
+		"html":    htmlBody,
+		"text":    fmt.Sprintf("Confirmez votre abonnement : %s", confirmURL),
 	})
+
+	req, err := http.NewRequest(http.MethodPost, "https://api.resend.com/emails", bytes.NewReader(payload))
+	if err != nil {
+		log.Printf("warn: failed to build email request for %s: %v", email, err)
+		return
+	}
+	req.Header.Set("Authorization", "Bearer "+os.Getenv("MAIL_API_KEY"))
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		log.Printf("warn: confirmation email failed for %s: %v", email, err)
+		return
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 300 {
+		log.Printf("warn: resend returned %d for %s", resp.StatusCode, email)
 	}
 }

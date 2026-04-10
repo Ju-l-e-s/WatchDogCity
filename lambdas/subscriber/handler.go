@@ -4,12 +4,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
-	"net/url"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -19,7 +18,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
-	"github.com/google/uuid"
 )
 
 var emailRegex = regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$`)
@@ -71,7 +69,7 @@ func handleSubscribe(ctx context.Context, req events.APIGatewayProxyRequest) (ev
 	ddb := dynamodb.NewFromConfig(cfg)
 	tableName := os.Getenv("TABLE_NAME")
 
-	// Block re-registration if already confirmed.
+	// Check if already in DynamoDB (for info)
 	existing, _ := ddb.GetItem(ctx, &dynamodb.GetItemInput{
 		TableName: aws.String(tableName),
 		Key:       map[string]types.AttributeValue{"email": &types.AttributeValueMemberS{Value: email}},
@@ -82,58 +80,39 @@ func handleSubscribe(ctx context.Context, req events.APIGatewayProxyRequest) (ev
 		}
 	}
 
-	token := uuid.New().String()
+	// Save/Update in DynamoDB (informational status)
 	item, _ := attributevalue.MarshalMap(map[string]interface{}{
 		"email":      email,
-		"status":     "PENDING",
-		"token":      token,
+		"status":     "BREVO_PENDING",
 		"created_at": time.Now().UTC().Format(time.RFC3339),
 	})
 	if _, err := ddb.PutItem(ctx, &dynamodb.PutItemInput{
 		TableName: aws.String(tableName),
 		Item:      item,
 	}); err != nil {
-		log.Printf("error saving subscriber %s: %v", email, err)
-		return apiResponse(500, map[string]string{"error": "internal error"}), nil
+		log.Printf("warn: failed to save subscriber info for %s: %v", email, err)
 	}
 
-	confirmURL := fmt.Sprintf("%s?token=%s&email=%s",
-		os.Getenv("CONFIRM_BASE_URL"),
-		url.QueryEscape(token),
-		url.QueryEscape(email),
-	)
-	sendConfirmationEmail(email, confirmURL)
+	sendDoubleOptin(email)
 
 	return apiResponse(200, map[string]string{"message": "confirmation email sent"}), nil
 }
 
-func sendConfirmationEmail(email, confirmURL string) {
-	htmlBody := fmt.Sprintf(`<!DOCTYPE html>
-<html lang="fr">
-<body style="font-family:sans-serif;max-width:600px;margin:40px auto;color:#333">
-  <h2>Confirmez votre inscription</h2>
-  <p>Merci de votre intérêt pour <strong>L'Observatoire de Bègles</strong>.</p>
-  <p>Cliquez sur le bouton ci-dessous pour confirmer votre abonnement à nos alertes citoyennes :</p>
-  <p style="text-align:center;margin:32px 0">
-    <a href="%s" style="background:#1d4ed8;color:#fff;padding:14px 28px;border-radius:6px;text-decoration:none;font-weight:bold">
-      Confirmer mon abonnement
-    </a>
-  </p>
-  <p style="font-size:12px;color:#888">Si vous n'avez pas demandé cet abonnement, ignorez simplement ce message.</p>
-</body>
-</html>`, confirmURL)
+func sendDoubleOptin(email string) {
+	listID, _ := strconv.Atoi(os.Getenv("BREVO_LIST_ID"))
+	templateID, _ := strconv.Atoi(os.Getenv("BREVO_TEMPLATE_ID"))
+	redirectionURL := os.Getenv("REDIRECTION_URL")
 
 	payload, _ := json.Marshal(map[string]interface{}{
-		"sender":      map[string]string{"email": os.Getenv("SENDER_EMAIL")},
-		"to":          []map[string]string{{"email": email}},
-		"subject":     "Confirmez votre abonnement — L'Observatoire de Bègles",
-		"htmlContent": htmlBody,
-		"textContent": fmt.Sprintf("Confirmez votre abonnement : %s", confirmURL),
+		"email":          email,
+		"includeListIds": []int{listID},
+		"templateId":     templateID,
+		"redirectionUrl": redirectionURL,
 	})
 
-	req, err := http.NewRequest(http.MethodPost, "https://api.brevo.com/v3/smtp/email", bytes.NewReader(payload))
+	req, err := http.NewRequest(http.MethodPost, "https://api.brevo.com/v3/contacts/doubleOptinConfirmation", bytes.NewReader(payload))
 	if err != nil {
-		log.Printf("warn: failed to build email request for %s: %v", email, err)
+		log.Printf("warn: failed to build double opt-in request for %s: %v", email, err)
 		return
 	}
 	req.Header.Set("api-key", os.Getenv("MAIL_API_KEY"))
@@ -141,11 +120,11 @@ func sendConfirmationEmail(email, confirmURL string) {
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		log.Printf("warn: confirmation email failed for %s: %v", email, err)
+		log.Printf("warn: double opt-in request failed for %s: %v", email, err)
 		return
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode >= 300 {
-		log.Printf("warn: brevo returned %d for %s", resp.StatusCode, email)
+		log.Printf("warn: brevo double opt-in returned %d for %s", resp.StatusCode, email)
 	}
 }

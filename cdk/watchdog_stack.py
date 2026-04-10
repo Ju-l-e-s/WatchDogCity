@@ -52,10 +52,6 @@ class WatchdogStack(Stack):
             billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
             removal_policy=RemovalPolicy.RETAIN,
         )
-        subscribers_table.add_global_secondary_index(
-            index_name="token-index",
-            partition_key=dynamodb.Attribute(name="token", type=dynamodb.AttributeType.STRING),
-        )
 
         # ── S3 Website Bucket (EXISTING) ──────────────────────────────────
         historical_bucket_name = "watchdogstack-websitebucket75c24d94-clsmaf2ocvxq"
@@ -171,6 +167,8 @@ class WatchdogStack(Stack):
 
         # ── Lambda: SubscribeFunction ─────────────────────────────────────
         mail_api_key = os.environ.get("MAIL_API_KEY", "")
+        brevo_list_id = os.environ.get("BREVO_LIST_ID", "2")
+        brevo_template_id = os.environ.get("BREVO_TEMPLATE_ID", "1")
 
         subscribe_fn = lambda_.Function(
             self, "SubscribeFunction",
@@ -182,26 +180,13 @@ class WatchdogStack(Stack):
             environment={
                 "TABLE_NAME": subscribers_table.table_name,
                 "SENDER_EMAIL": sender_email,
-                "CONFIRM_BASE_URL": f"{site_url}/confirm",
                 "MAIL_API_KEY": mail_api_key,
+                "BREVO_LIST_ID": brevo_list_id,
+                "BREVO_TEMPLATE_ID": brevo_template_id,
+                "REDIRECTION_URL": f"{site_url}/merci",
             },
         )
         subscribers_table.grant_read_write_data(subscribe_fn)
-
-        # ── Lambda: ConfirmFunction ───────────────────────────────────────
-        confirm_fn = lambda_.Function(
-            self, "ConfirmFunction",
-            runtime=lambda_.Runtime.PROVIDED_AL2023,
-            architecture=lambda_.Architecture.ARM_64,
-            handler="bootstrap",
-            code=lambda_.Code.from_asset("../dist/confirm.zip"),
-            timeout=Duration.seconds(10),
-            environment={
-                "TABLE_NAME": subscribers_table.table_name,
-                "SITE_URL": site_url,
-            },
-        )
-        subscribers_table.grant_read_write_data(confirm_fn)
 
         # ── Lambda: ContactFunction ───────────────────────────────────────
         contact_fn = lambda_.Function(
@@ -233,7 +218,6 @@ class WatchdogStack(Stack):
             ),
         )
         api.root.add_resource("subscribe").add_method("POST", apigw.LambdaIntegration(subscribe_fn))
-        api.root.add_resource("confirm").add_method("GET", apigw.LambdaIntegration(confirm_fn))
         api.root.add_resource("contact").add_method("POST", apigw.LambdaIntegration(contact_fn))
 
         # ── Website Deployment (Architecture Sécurisée) ─────────────────────────────

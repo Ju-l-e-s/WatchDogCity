@@ -409,8 +409,8 @@ if (newsletterForm) {
             const data = await response.json().catch(() => ({}));
 
             if (response.ok) {
-                newsletterStatus.textContent = "Vérifiez votre boîte mail pour confirmer l'inscription.";
-                newsletterStatus.className = "text-sm font-medium text-center py-2 rounded-xl text-green-600 bg-green-50 block";
+                newsletterStatus.innerHTML = "Vérifiez votre boîte mail pour confirmer.<br><span class='text-[11px] opacity-80'>Pensez aux spams. Si c'est le cas, marquez-le comme 'non-spam'.</span>";
+                newsletterStatus.className = "text-sm font-medium text-center py-2 rounded-xl text-green-700 bg-green-50 block leading-tight";
                 newsletterForm.reset();
             } else {
                 newsletterStatus.textContent = data.error || "Erreur lors de l'inscription.";

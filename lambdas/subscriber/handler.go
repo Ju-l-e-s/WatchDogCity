@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -120,11 +121,15 @@ func sendDoubleOptin(email string) {
 
 	resp, err := http.DefaultClient.Do(brevoReq)
 	if err != nil {
-		log.Printf("warn: double opt-in request failed for %s: %v", email, err)
+		log.Printf("error: double opt-in request failed for %s: %v", email, err)
 		return
 	}
 	defer resp.Body.Close()
+
+	bodyBytes, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode >= 300 {
-		log.Printf("warn: brevo double opt-in returned %d for %s", resp.StatusCode, email)
+		log.Printf("error: brevo double opt-in failed for %s. Status: %d, Body: %s", email, resp.StatusCode, string(bodyBytes))
+	} else {
+		log.Printf("success: brevo double opt-in request sent for %s. Response: %s", email, string(bodyBytes))
 	}
 }

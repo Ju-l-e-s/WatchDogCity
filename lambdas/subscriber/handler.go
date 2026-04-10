@@ -124,19 +124,19 @@ func sendConfirmationEmail(email, confirmURL string) {
 </html>`, confirmURL)
 
 	payload, _ := json.Marshal(map[string]interface{}{
-		"from":    os.Getenv("SENDER_EMAIL"),
-		"to":      []string{email},
-		"subject": "Confirmez votre abonnement — L'Observatoire de Bègles",
-		"html":    htmlBody,
-		"text":    fmt.Sprintf("Confirmez votre abonnement : %s", confirmURL),
+		"sender":      map[string]string{"email": os.Getenv("SENDER_EMAIL")},
+		"to":          []map[string]string{{"email": email}},
+		"subject":     "Confirmez votre abonnement — L'Observatoire de Bègles",
+		"htmlContent": htmlBody,
+		"textContent": fmt.Sprintf("Confirmez votre abonnement : %s", confirmURL),
 	})
 
-	req, err := http.NewRequest(http.MethodPost, "https://api.resend.com/emails", bytes.NewReader(payload))
+	req, err := http.NewRequest(http.MethodPost, "https://api.brevo.com/v3/smtp/email", bytes.NewReader(payload))
 	if err != nil {
 		log.Printf("warn: failed to build email request for %s: %v", email, err)
 		return
 	}
-	req.Header.Set("Authorization", "Bearer "+os.Getenv("MAIL_API_KEY"))
+	req.Header.Set("api-key", os.Getenv("MAIL_API_KEY"))
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := http.DefaultClient.Do(req)
@@ -146,6 +146,6 @@ func sendConfirmationEmail(email, confirmURL string) {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode >= 300 {
-		log.Printf("warn: resend returned %d for %s", resp.StatusCode, email)
+		log.Printf("warn: brevo returned %d for %s", resp.StatusCode, email)
 	}
 }

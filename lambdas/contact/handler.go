@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -10,10 +11,6 @@ import (
 	"strings"
 
 	"github.com/aws/aws-lambda-go/events"
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/service/sesv2"
-	sestypes "github.com/aws/aws-sdk-go-v2/service/sesv2/types"
 )
 
 func corsHeaders() map[string]string {
@@ -58,9 +55,6 @@ func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 		return apiResponse(400, map[string]string{"error": "name, email_sender and message are required"}), nil
 	}
 
-	cfg, _ := config.LoadDefaultConfig(ctx)
-	ses := sesv2.NewFromConfig(cfg)
-
 	domainSender := os.Getenv("SENDER_EMAIL")
 	adminEmail := os.Getenv("ADMIN_EMAIL")
 
@@ -81,25 +75,34 @@ func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 
 	textBody := fmt.Sprintf("Nom : %s\nEmail : %s\n\n%s", cr.Name, cr.EmailSender, cr.Message)
 
-	_, err := ses.SendEmail(ctx, &sesv2.SendEmailInput{
-		// Source must be an SES-verified identity (SPF/DKIM pass).
-		FromEmailAddress: aws.String(domainSender),
-		// ReplyTo is the visitor's address so you can reply directly.
-		ReplyToAddresses: []string{cr.EmailSender},
-		Destination:      &sestypes.Destination{ToAddresses: []string{adminEmail}},
-		Content: &sestypes.EmailContent{
-			Simple: &sestypes.Message{
-				Subject: &sestypes.Content{Data: aws.String(subject)},
-				Body: &sestypes.Body{
-					Html: &sestypes.Content{Data: aws.String(htmlBody)},
-					Text: &sestypes.Content{Data: aws.String(textBody)},
-				},
-			},
-		},
+	payload, _ := json.Marshal(map[string]interface{}{
+		"sender":      map[string]string{"email": domainSender},
+		"to":          []map[string]string{{"email": adminEmail}},
+		"replyTo":     map[string]string{"email": cr.EmailSender},
+		"subject":     subject,
+		"htmlContent": htmlBody,
+		"textContent": textBody,
 	})
+
+	req, err := http.NewRequest(http.MethodPost, "https://api.brevo.com/v3/smtp/email", bytes.NewReader(payload))
 	if err != nil {
-		log.Printf("ses send error: %v", err)
+		log.Printf("failed to build brevo request: %v", err)
+		return apiResponse(500, map[string]string{"error": "failed to build message"}), nil
+	}
+
+	req.Header.Set("api-key", os.Getenv("MAIL_API_KEY"))
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		log.Printf("brevo send error: %v", err)
 		return apiResponse(500, map[string]string{"error": "failed to send message"}), nil
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 300 {
+		log.Printf("brevo returned error status: %d", resp.StatusCode)
+		return apiResponse(500, map[string]string{"error": "delivery failed"}), nil
 	}
 
 	return apiResponse(200, map[string]string{"message": "message sent"}), nil

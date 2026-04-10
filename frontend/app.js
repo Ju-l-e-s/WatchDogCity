@@ -256,7 +256,7 @@ function renderDeliberationRow(d) {
             { label: 'Impacts concrets', content: d.analysis_data.impacts },
             { label: 'Points de controverse', content: d.analysis_data.points_debattus }
         ];
-        const content = sections.filter(s => s.content).map(s =>
+        const content = sections.filter(s => s.content && s.content !== 'null').map(s =>
             `<div class="mb-6 last:mb-0"><p class="text-[11px] font-semibold text-brand-600 uppercase tracking-widest mb-1.5">${escapeHTML(s.label)}</p><p class="text-[15px] text-slate-500 leading-relaxed">${highlightText(s.content, searchQuery, d.acronyms)}</p></div>`
         ).join('');
         if (content) {
@@ -303,7 +303,7 @@ function renderDeliberationRow(d) {
                             <div class="lg:col-span-7">
                                 <p class="text-slate-500 leading-relaxed text-base mb-8">${highlightedSummary}</p>
                                 ${analysisHTML}
-                                ${d.disagreements ? `<div class="border-l-2 border-slate-200 pl-5 py-1 mb-8"><h5 class="text-[11px] font-semibold text-slate-400 uppercase tracking-widest mb-2">Opposition</h5><p class="text-[15px] text-slate-400 italic leading-relaxed">${highlightText(d.disagreements, searchQuery, d.acronyms)}</p></div>` : ''}
+                                ${d.disagreements && d.disagreements !== 'null' ? `<div class="border-l-2 border-slate-200 pl-5 py-1 mb-8"><h5 class="text-[11px] font-semibold text-slate-400 uppercase tracking-widest mb-2">Opposition</h5><p class="text-[15px] text-slate-400 italic leading-relaxed">${highlightText(d.disagreements, searchQuery, d.acronyms)}</p></div>` : ''}
                                 <div class="pt-5 border-t border-slate-100">
                                     <a href="${escapeHTML(d.pdf_url)}" target="_blank" rel="noopener" class="inline-flex items-center gap-2 text-[11px] font-medium text-slate-500 hover:text-brand-600 transition-colors uppercase tracking-widest min-h-[44px]" aria-label="Télécharger le document PDF : ${escapeHTML(d.title)}">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>

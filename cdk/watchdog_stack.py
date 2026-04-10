@@ -166,7 +166,7 @@ class WatchdogStack(Stack):
         ]
 
         # ── Lambda: SubscribeFunction ─────────────────────────────────────
-        mail_api_key = os.environ.get("MAIL_API_KEY", "")
+        mail_api_key = os.environ.get("BREVO_API_KEY", "")
         brevo_list_id = os.environ.get("BREVO_LIST_ID", "2")
         brevo_template_id = os.environ.get("BREVO_TEMPLATE_ID", "1")
 
@@ -199,6 +199,7 @@ class WatchdogStack(Stack):
             environment={
                 "SENDER_EMAIL": contact_sender,
                 "ADMIN_EMAIL": admin_email,
+                "MAIL_API_KEY": mail_api_key,
             },
         )
         contact_fn.add_to_role_policy(iam.PolicyStatement(

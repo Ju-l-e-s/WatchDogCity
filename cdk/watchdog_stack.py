@@ -183,7 +183,7 @@ class WatchdogStack(Stack):
                 "MAIL_API_KEY": mail_api_key,
                 "BREVO_LIST_ID": brevo_list_id,
                 "BREVO_TEMPLATE_ID": brevo_template_id,
-                "REDIRECTION_URL": f"{site_url}/merci",
+                "REDIRECTION_URL": f"{site_url}/merci.html",
             },
         )
         subscribers_table.grant_read_write_data(subscribe_fn)
@@ -248,7 +248,7 @@ class WatchdogStack(Stack):
             destination_bucket=website_bucket,
             distribution=distribution,
             # ON NE PURGE QUE LES FICHIERS CRITIQUES (Très rapide : < 60s)
-            distribution_paths=["/index.html", "/app.js", "/style.css"],
+            distribution_paths=["/index.html", "/app.js", "/style.css", "/merci.html"],
             cache_control=[s3_deploy.CacheControl.from_string("no-cache, no-store, must-revalidate")],
             prune=False,
         )

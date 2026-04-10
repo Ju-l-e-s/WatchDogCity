@@ -84,16 +84,16 @@ func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 		"textContent": textBody,
 	})
 
-	req, err := http.NewRequest(http.MethodPost, "https://api.brevo.com/v3/smtp/email", bytes.NewReader(payload))
+	brevoReq, err := http.NewRequest(http.MethodPost, "https://api.brevo.com/v3/smtp/email", bytes.NewReader(payload))
 	if err != nil {
 		log.Printf("failed to build brevo request: %v", err)
 		return apiResponse(500, map[string]string{"error": "failed to build message"}), nil
 	}
 
-	req.Header.Set("api-key", os.Getenv("MAIL_API_KEY"))
-	req.Header.Set("Content-Type", "application/json")
+	brevoReq.Header.Set("api-key", os.Getenv("MAIL_API_KEY"))
+	brevoReq.Header.Set("Content-Type", "application/json")
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := http.DefaultClient.Do(brevoReq)
 	if err != nil {
 		log.Printf("brevo send error: %v", err)
 		return apiResponse(500, map[string]string{"error": "failed to send message"}), nil

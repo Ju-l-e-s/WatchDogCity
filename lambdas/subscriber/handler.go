@@ -110,15 +110,15 @@ func sendDoubleOptin(email string) {
 		"redirectionUrl": redirectionURL,
 	})
 
-	req, err := http.NewRequest(http.MethodPost, "https://api.brevo.com/v3/contacts/doubleOptinConfirmation", bytes.NewReader(payload))
+	brevoReq, err := http.NewRequest(http.MethodPost, "https://api.brevo.com/v3/contacts/doubleOptinConfirmation", bytes.NewReader(payload))
 	if err != nil {
 		log.Printf("warn: failed to build double opt-in request for %s: %v", email, err)
 		return
 	}
-	req.Header.Set("api-key", os.Getenv("MAIL_API_KEY"))
-	req.Header.Set("Content-Type", "application/json")
+	brevoReq.Header.Set("api-key", os.Getenv("MAIL_API_KEY"))
+	brevoReq.Header.Set("Content-Type", "application/json")
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := http.DefaultClient.Do(brevoReq)
 	if err != nil {
 		log.Printf("warn: double opt-in request failed for %s: %v", email, err)
 		return

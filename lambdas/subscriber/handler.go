@@ -3,7 +3,9 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -94,42 +96,51 @@ func handleSubscribe(ctx context.Context, req events.APIGatewayProxyRequest) (ev
 		log.Printf("warn: failed to save subscriber info for %s: %v", email, err)
 	}
 
-	sendDoubleOptin(email)
+	sendConfirmationEmail(email)
 
 	return apiResponse(200, map[string]string{"message": "confirmation email sent"}), nil
 }
 
-func sendDoubleOptin(email string) {
-	listID, _ := strconv.Atoi(os.Getenv("BREVO_LIST_ID"))
+func sendConfirmationEmail(email string) {
 	templateID, _ := strconv.Atoi(os.Getenv("BREVO_TEMPLATE_ID"))
-	redirectionURL := os.Getenv("REDIRECTION_URL")
+	apiURL := os.Getenv("API_URL")
+
+	token := base64.URLEncoding.EncodeToString([]byte(email))
+	confirmLink := fmt.Sprintf("%sconfirm?token=%s", apiURL, token)
 
 	payload, _ := json.Marshal(map[string]interface{}{
-		"email":          email,
-		"includeListIds": []int{listID},
-		"templateId":     templateID,
-		"redirectionUrl": redirectionURL,
+		"to": []map[string]string{
+			{"email": email},
+		},
+		"templateId": templateID,
+		"params": map[string]interface{}{
+			"confirm_link": confirmLink,
+		},
+		"tracking": map[string]bool{
+			"clicks": false,
+		},
 	})
 
-	brevoReq, err := http.NewRequest(http.MethodPost, "https://api.brevo.com/v3/contacts/doubleOptinConfirmation", bytes.NewReader(payload))
+	brevoReq, err := http.NewRequest(http.MethodPost, "https://api.brevo.com/v3/smtp/email", bytes.NewReader(payload))
 	if err != nil {
-		log.Printf("warn: failed to build double opt-in request for %s: %v", email, err)
+		log.Printf("warn: failed to build confirmation request for %s: %v", email, err)
 		return
 	}
 	brevoReq.Header.Set("api-key", os.Getenv("MAIL_API_KEY"))
 	brevoReq.Header.Set("Content-Type", "application/json")
+	brevoReq.Header.Set("accept", "application/json")
 
 	resp, err := http.DefaultClient.Do(brevoReq)
 	if err != nil {
-		log.Printf("error: double opt-in request failed for %s: %v", email, err)
+		log.Printf("error: confirmation request failed for %s: %v", email, err)
 		return
 	}
 	defer resp.Body.Close()
 
 	bodyBytes, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode >= 300 {
-		log.Printf("error: brevo double opt-in failed for %s. Status: %d, Body: %s", email, resp.StatusCode, string(bodyBytes))
+		log.Printf("error: brevo confirmation failed for %s. Status: %d, Body: %s", email, resp.StatusCode, string(bodyBytes))
 	} else {
-		log.Printf("success: brevo double opt-in request sent for %s. Response: %s", email, string(bodyBytes))
+		log.Printf("success: brevo confirmation email sent for %s. Response: %s", email, string(bodyBytes))
 	}
 }

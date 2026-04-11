@@ -43,14 +43,14 @@ Le projet suit un pattern asynchrone pour éviter les timeouts et garantir la ro
 2.  **Scraping (Orchestrator)** : Elle vérifie si un nouveau compte-rendu PDF est disponible sur le site de la mairie.
 3.  **Messaging (SQS)** : Si un PDF est trouvé, elle envoie un message dans une file d'attente SQS.
     - *Pourquoi SQS ?* Pour isoler les erreurs. Si l'analyse d'un PDF échoue, il retourne dans la file (Retry) sans bloquer le reste.
-4.  **Intelligence (Worker)** : La Lambda `Worker` consomme le message, télécharge le PDF, l'envoie à l'API **Gemini 1.5 Flash** pour résumé/analyse, et stocke le résultat en base.
+4.  **Intelligence (Worker)** : La Lambda `Worker` consomme le message, télécharge le PDF, l'envoie à l'API **Gemini 3.1** pour résumé/analyse, et stocke le résultat en base.
 5.  **Diffusion (Publisher)** : Une fois les données en base, le `Publisher` regénère le fichier `data.json` sur S3 et invalide le cache CloudFront.
 
 ---
 
 ## 4. Stratégie DevOps (CI/CD)
 
-**GitHub Actions** automatise tout le cycle de vie :
+**GitHub Actions** automa@tise tout le cycle de vie :
 - **Build** : Compilation des binaires Go (multi-architecture ARM64 pour réduire les coûts Lambda de 20% par rapport à x86).
 - **Test** : Exécution des tests unitaires avant chaque déploiement.
 - **Deploy** : Utilisation du secret `AWS_ACCESS_KEY_ID` pour pousser l'infrastructure via `cdk deploy`.
@@ -63,7 +63,6 @@ Le projet est conçu pour rester dans le **AWS Free Tier** (offre gratuite) mêm
 - **Lambda ARM64 (Graviton2)** : Plus performant et moins cher.
 - **DynamoDB On-Demand** : On ne paie pas pour une capacité "réservée" inutile.
 - **CloudFront Cache** : 99% des requêtes ne touchent jamais S3, ce qui minimise les coûts de transfert.
-- **IA (Gemini)** : Utilisation du modèle **Gemini 1.5 Pro** (Version "Précision Max"). Contrairement au modèle Flash, le modèle Pro possède une capacité de raisonnement accrue et une fenêtre contextuelle immense, permettant d'analyser des rapports budgétaires de plusieurs centaines de pages sans perte de détail.
 
 ---
 
@@ -73,21 +72,11 @@ Le projet est conçu pour rester dans le **AWS Free Tier** (offre gratuite) mêm
 2.  **Secrets Manager** : La clé API Gemini n'est jamais en clair dans le code, elle est récupérée dynamiquement depuis AWS Secrets Manager.
 3.  **Cloudflare (WAF/Turnstile)** : Protection contre le spam des formulaires et les attaques par déni de service (DDoS).
 
-## 8. Engagement & Newsletter (Double Opt-in)
-
-Pour fidéliser les citoyens, un système de newsletter automatisé est intégré :
-- **Gestion des Abonnés** : Une table DynamoDB dédiée gère les états d'abonnement (`pending`, `confirmed`).
-- **Flux d'Inscription** :
-    1. **Saisie** : Le citoyen entre son email sur le frontend.
-    2. **Validation (Subscriber Lambda)** : Création d'un token UUID unique et envoi d'un email de confirmation via **AWS SES**.
-    3. **Confirmation** : Un clic sur le lien (`/confirm?token=...`) bascule le statut en `confirmed`.
-- **Désinscription Chirurgicale** : Chaque email contient un lien unique permettant une suppression immédiate des données (RGPD-compliant).
-- **Notifications Automatisées** : Le `Publisher` est configuré pour déclencher des envois ciblés dès qu'une nouvelle analyse majeure est publiée, garantissant une information fraîche et pertinente.
-
 ---
 
-## 9. Vision Future & Évolutivité
-L'architecture modulaire permet d'envisager facilement :
-- **Multi-Communes** : Adapter le scraper pour supporter d'autres villes.
-- **Alertes Thématiques** : Permettre aux abonnés de ne recevoir que les délibérations sur l'Environnement ou l'Urbanisme.
-- **Analyse de Sentiment** : Utiliser l'IA pour détecter les sujets de tension lors des débats municipaux.
+## 7. Monitoring & Observabilité
+
+Un **CloudWatch Dashboard** centralise la santé du projet :
+- Taux d'erreur des Lambdas.
+- Nombre de messages dans la Dead Letter Queue (DLQ).
+- **Estimation des coûts Gemini** en temps réel via l'analyse des logs (CloudWatch Logs Insights).

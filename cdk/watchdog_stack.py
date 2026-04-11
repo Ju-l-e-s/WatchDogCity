@@ -181,6 +181,17 @@ class WatchdogStack(Stack):
         brevo_list_id = os.environ.get("BREVO_LIST_ID", "2")
         brevo_template_id = os.environ.get("BREVO_TEMPLATE_ID", "1")
 
+        api = apigw.RestApi(
+            self, "WatchdogApi",
+            rest_api_name="watchdog-api",
+            deploy_options=apigw.StageOptions(stage_name="prod"),
+            default_cors_preflight_options=apigw.CorsOptions(
+                allow_origins=apigw.Cors.ALL_ORIGINS,
+                allow_methods=["GET", "POST", "OPTIONS"],
+                allow_headers=["Content-Type"],
+            ),
+        )
+
         subscribe_fn = lambda_.Function(
             self, "SubscribeFunction",
             runtime=lambda_.Runtime.PROVIDED_AL2023,
@@ -194,10 +205,26 @@ class WatchdogStack(Stack):
                 "MAIL_API_KEY": mail_api_key,
                 "BREVO_LIST_ID": brevo_list_id,
                 "BREVO_TEMPLATE_ID": brevo_template_id,
-                "REDIRECTION_URL": f"{site_url}/merci.html",
+                "API_URL": api.url,
             },
         )
         subscribers_table.grant_read_write_data(subscribe_fn)
+
+        confirmer_fn = lambda_.Function(
+            self, "ConfirmerFunction",
+            runtime=lambda_.Runtime.PROVIDED_AL2023,
+            architecture=lambda_.Architecture.ARM_64,
+            handler="bootstrap",
+            code=lambda_.Code.from_asset("../dist/confirmer.zip"),
+            timeout=Duration.seconds(10),
+            environment={
+                "TABLE_NAME": subscribers_table.table_name,
+                "MAIL_API_KEY": mail_api_key,
+                "BREVO_LIST_ID": brevo_list_id,
+                "REDIRECTION_URL": f"{site_url}/merci.html",
+            },
+        )
+        subscribers_table.grant_read_write_data(confirmer_fn)
 
         # ── Lambda: ContactFunction ───────────────────────────────────────
         contact_fn = lambda_.Function(
@@ -218,19 +245,10 @@ class WatchdogStack(Stack):
             resources=ses_identity_arns,
         ))
 
-        # ── API Gateway ───────────────────────────────────────────────────
-        api = apigw.RestApi(
-            self, "WatchdogApi",
-            rest_api_name="watchdog-api",
-            deploy_options=apigw.StageOptions(stage_name="prod"),
-            default_cors_preflight_options=apigw.CorsOptions(
-                allow_origins=apigw.Cors.ALL_ORIGINS,
-                allow_methods=["GET", "POST", "OPTIONS"],
-                allow_headers=["Content-Type"],
-            ),
-        )
+        # ── API Gateway Routing ───────────────────────────────────────────
         api.root.add_resource("subscribe").add_method("POST", apigw.LambdaIntegration(subscribe_fn))
         api.root.add_resource("contact").add_method("POST", apigw.LambdaIntegration(contact_fn))
+        api.root.add_resource("confirm").add_method("GET", apigw.LambdaIntegration(confirmer_fn))
 
         # ── Website Deployment (Architecture Sécurisée) ─────────────────────────────
 

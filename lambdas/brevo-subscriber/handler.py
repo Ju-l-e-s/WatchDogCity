@@ -48,6 +48,9 @@ def _send_welcome_email(email: str) -> None:
             '<h1>Merci pour votre inscription</h1>'
             '<p>Vous recevrez bientôt nos analyses.</p>'
         ),
+        'tracking': {
+            'clicks': False
+        }
     }).encode()
 
     req = urllib.request.Request(

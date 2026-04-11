@@ -20,6 +20,9 @@ build:
 	# ContactFunction
 	cd lambdas/contact && go mod tidy && GOOS=linux GOARCH=arm64 go build -o bootstrap main.go handler.go
 	cd lambdas/contact && zip -j ../../dist/contact.zip bootstrap && rm bootstrap
+	# Confirmer
+	cd lambdas/confirmer && go mod tidy && GOOS=linux GOARCH=arm64 go build -o bootstrap main.go handler.go
+	cd lambdas/confirmer && zip -j ../../dist/confirmer.zip bootstrap && rm bootstrap
 
 deploy: build
 	cd cdk && cdk deploy --require-approval never

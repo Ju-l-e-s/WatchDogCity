@@ -72,3 +72,5 @@ jobs:
           AWS_DEFAULT_REGION: eu-west-3
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
+          ACM_CERTIFICATE_ARN: ${{ secrets.ACM_CERTIFICATE_ARN }}
+          DOMAIN_NAME: 'lobservatoiredebegles.fr'

@@ -19,6 +19,7 @@
     "terser": "^5.46.1"
   },
   "dependencies": {
-    "@tailwindcss/typography": "^0.5.19"
+    "@tailwindcss/typography": "^0.5.19",
+    "lighthouse": "^12.8.2"
   }
 }

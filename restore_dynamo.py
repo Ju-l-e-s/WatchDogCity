@@ -37,16 +37,19 @@ def restore():
     councils = data.get('councils', [])
     print(f"📦 {len(councils)} conseils trouvés.")
 
+    now_iso = datetime.utcnow().isoformat() + 'Z'
+
     with councils_table.batch_writer() as council_batch, \
          delibs_table.batch_writer() as delib_batch:
         
         for c in councils:
             council_id = c.get('id')
+            if not council_id: continue
+            
             print(f"  🔹 Traitement du conseil : {c.get('title')}")
             
             # Préparation de l'item Conseil
-            # Note: total_pdfs et processed_pdfs sont estimés à partir du nombre de délibs présentes
-            delibs = c.get('deliberations', [])
+            delibs = c.get('deliberations') or []
             council_item = {
                 'council_id': council_id,
                 'category': c.get('category'),
@@ -56,14 +59,14 @@ def restore():
                 'source_url': c.get('source_url'),
                 'total_pdfs': len(delibs),
                 'processed_pdfs': len(delibs),
-                'created_at': data.get('generated_at', datetime.utcnow().isoformat() + 'Z')
+                'created_at': data.get('generated_at') or now_iso
             }
             council_batch.put_item(Item=council_item)
 
             # Préparation des items Délibérations
             for d in delibs:
                 # On aplatit l'objet vote pour correspondre au schéma DynamoDB
-                vote = d.get('vote', {})
+                vote = d.get('vote') or {}
                 delib_item = {
                     'id': d.get('id'),
                     'council_id': council_id,
@@ -79,9 +82,9 @@ def restore():
                     'vote_contre': vote.get('contre'),
                     'vote_abstention': vote.get('abstention'),
                     'disagreements': d.get('disagreements'),
-                    'processed_at': data.get('generated_at', datetime.utcnow().isoformat() + 'Z')
+                    'processed_at': data.get('generated_at') or now_iso
                 }
-                # Nettoyage des valeurs None (DynamoDB n'aime pas les None pour certains types)
+                # Nettoyage des valeurs None
                 delib_item = {k: v for k, v in delib_item.items() if v is not None}
                 delib_batch.put_item(Item=delib_item)
 

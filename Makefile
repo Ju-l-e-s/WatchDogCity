@@ -26,7 +26,12 @@ deploy: build
 
 # --- Tests & Diagnostics ---
 test:
-	go test ./lambdas/...
+	@for dir in lambdas/*/ ; do \
+		if [ -f "$${dir}go.mod" ]; then \
+			echo "Testing $$dir..." ; \
+			(cd $$dir && go test ./... || exit 1) ; \
+		fi \
+	done
 
 logs-orchestrator:
 	aws logs tail /aws/lambda/WatchdogStack-Orchestrator --follow

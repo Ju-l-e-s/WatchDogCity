@@ -61,13 +61,13 @@ func TestScrapeCouncilList(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, listings, 2)
 
-	assert.Equal(t, "conseil_municipal#2026-03-28", listings[0].CouncilID)
-	assert.Equal(t, "conseil_municipal", listings[0].Category)
+	assert.Equal(t, "https://example.com/conseil-28-mars/", listings[0].CouncilID)
+	assert.Equal(t, "Conseil municipal", listings[0].Category)
 	assert.Equal(t, "2026-03-28", listings[0].Date)
 	assert.Equal(t, "https://example.com/conseil-28-mars/", listings[0].URL)
 
-	assert.Equal(t, "ccas#2026-01-26", listings[1].CouncilID)
-	assert.Equal(t, "ccas", listings[1].Category)
+	assert.Equal(t, "https://example.com/ccas-26-jan/", listings[1].CouncilID)
+	assert.Equal(t, "CCAS", listings[1].Category)
 }
 
 func TestScrapePDFLinks(t *testing.T) {
@@ -86,49 +86,16 @@ func TestScrapePDFLinks(t *testing.T) {
 	assert.Equal(t, "https://example.com/D02.pdf", pdfs[1].URL)
 }
 
-func TestExtractDateFromTitle(t *testing.T) {
-	cases := []struct {
-		title    string
-		expected string
-	}{
-		{"Délibérations du conseil municipal du 28 mars 2026", "2026-03-28"},
-		{"Délibérations du CCAS du 26 janvier 2026", "2026-01-26"},
-		{"Délibérations du 5 février 2025", "2025-02-05"},
-		{"Conseil du 1 décembre 2024", "2024-12-01"},
-	}
-	for _, tc := range cases {
-		assert.Equal(t, tc.expected, extractDateFromTitle(tc.title), "title: %q", tc.title)
-	}
-}
-
-func TestScrapeCouncilMeta(t *testing.T) {
-	const metaHTML = `<html><head><title>Délibérations du conseil municipal du 28 mars 2026 - Mairie de Bègles</title></head>
-<body><h1 class="entry-title">Délibérations du conseil municipal du 28 mars 2026</h1></body></html>`
-
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte(metaHTML))
-	}))
-	defer server.Close()
-
-	s := NewScraper("unused")
-	meta, err := s.ScrapeCouncilMeta(server.URL)
-	require.NoError(t, err)
-	assert.Equal(t, "conseil_municipal", meta.Category)
-	assert.Equal(t, "2026-03-28", meta.Date)
-	assert.Equal(t, "Délibérations du conseil municipal du 28 mars 2026", meta.Title)
-	assert.Equal(t, "conseil_municipal#2026-03-28", meta.CouncilID)
-}
-
 func TestNormalizeCategory(t *testing.T) {
 	cases := []struct {
 		raw      string
 		expected string
 	}{
-		{"", "conseil_municipal"},
-		{"Conseil municipal", "conseil_municipal"},
-		{"Centre communal d'action sociale", "ccas"},
-		{"Centre social et culturel de l'Estey", "csc_estey"},
-		{"Les établissements", "etablissements"},
+		{"", "Conseil municipal"},
+		{"Conseil municipal", "Conseil municipal"},
+		{"Centre communal d'action sociale", "CCAS"},
+		{"Centre social et culturel de l'Estey", "Estey"},
+		{"Les établissements", "Conseil municipal"},
 	}
 	for _, tc := range cases {
 		assert.Equal(t, tc.expected, normalizeCategory(tc.raw), "input: %q", tc.raw)

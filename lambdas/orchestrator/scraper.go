@@ -128,7 +128,7 @@ func fetchDocument(url string) (*goquery.Document, error) {
 
 func normalizeCategory(cat string) string {
 	cat = strings.ToLower(cat)
-	if strings.Contains(cat, "ccas") {
+	if strings.Contains(cat, "ccas") || strings.Contains(cat, "centre communal") {
 		return "CCAS"
 	}
 	if strings.Contains(cat, "estey") {

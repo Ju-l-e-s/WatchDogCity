@@ -21,9 +21,18 @@ import (
 	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 )
 
+type DynamoDBAPI interface {
+	PutItem(ctx context.Context, params *dynamodb.PutItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.PutItemOutput, error)
+	UpdateItem(ctx context.Context, params *dynamodb.UpdateItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.UpdateItemOutput, error)
+}
+
+type LambdaAPI interface {
+	Invoke(ctx context.Context, params *awslambda.InvokeInput, optFns ...func(*awslambda.Options)) (*awslambda.InvokeOutput, error)
+}
+
 type WorkerHandler struct {
-	ddb    *dynamodb.Client
-	lambda *awslambda.Client
+	ddb    DynamoDBAPI
+	lambda LambdaAPI
 }
 
 type SQSPayload struct {

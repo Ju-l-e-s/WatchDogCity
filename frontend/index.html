@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr" class="scroll-smooth">
+<html lang="fr" class="scroll-smooth overflow-x-hidden">
 
 <head>
   <meta charset="UTF-8">
@@ -10,15 +10,19 @@
 
   <!-- Open Graph / Facebook -->
   <meta property="og:type" content="website">
-  <meta property="og:url" content="https://d1lrclzu1l51ys.cloudfront.net/">
+  <meta property="og:url" content="https://www.lobservatoiredebegles.fr/">
   <meta property="og:title" content="Observatoire Citoyen de Bègles">
   <meta property="og:description"
     content="La vie municipale de Bègles déchiffrée par l'IA. Accédez aux résumés clairs des délibérations et aux résultats des votes.">
-  <meta property="og:image" content="https://d1lrclzu1l51ys.cloudfront.net/logo-begles.png">
+  <meta property="og:image" content="https://www.lobservatoiredebegles.fr/logo-begles.webp">
 
   <link rel="icon"
     href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔭</text></svg>">
 
+  <link rel="preload" href="./fonts/inter-400.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="./fonts/inter-500.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="./fonts/outfit-600.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="./fonts/outfit-700.woff2" as="font" type="font/woff2" crossorigin>
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -32,33 +36,33 @@
   </noscript>
 </head>
 
-<body class="bg-[#F8FAFC] text-slate-900 min-h-screen">
+<body class="bg-[#F8FAFC] text-slate-900 min-h-screen overflow-x-hidden">
 
   <!-- Navbar -->
   <nav class="glass sticky top-0 z-50 transition-all duration-300" role="navigation" aria-label="Navigation principale">
     <div class="max-w-5xl mx-auto px-6 h-16 flex items-center justify-between">
       <div class="flex items-center gap-3">
-        <div class="w-9 h-9 bg-brand-600 rounded-xl flex items-center justify-center shadow-micro">
-          <img src="logo-blanc.svg" class="w-5 h-5" alt="Logo Observatoire Citoyen">
+        <div class="w-9 h-9 bg-brand-700 rounded-xl flex items-center justify-center shadow-micro">
+          <img src="logo-blanc.svg" class="w-5 h-5" width="20" height="20" alt="Logo Observatoire Citoyen">
         </div>
         <div class="cursor-pointer" onclick="window.scrollTo({top: 0, behavior: 'smooth'})" role="button" tabindex="0"
-          aria-label="Retour en haut de page">
+          aria-label="Observatoire de Bègles - Retour en haut">
           <span class="block text-lg font-semibold tracking-tight text-slate-900 leading-none">Observatoire</span>
-          <span class="text-[10px] uppercase tracking-[0.2em] font-medium text-slate-400">Bègles • Citoyen</span>
+          <span class="text-[10px] uppercase tracking-[0.2em] font-medium text-slate-600">Bègles • Citoyen</span>
         </div>
       </div>
 
       <!-- Search Bar (Navbar) -->
       <div class="hidden md:flex flex-1 max-w-xs mx-4 lg:mx-8 relative group">
         <div
-          class="absolute inset-y-0 left-4 flex items-center pointer-events-none text-slate-400 group-focus-within:text-brand-600 transition-colors">
+          class="absolute inset-y-0 left-4 flex items-center pointer-events-none text-slate-600 group-focus-within:text-brand-700 transition-colors">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
               d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
           </svg>
         </div>
         <input type="search" id="nav-search-input"
-          class="w-full bg-slate-50/80 border border-slate-100 rounded-xl py-2 pl-10 pr-4 text-sm outline-none focus:bg-white focus:border-brand-200 focus:shadow-[0_0_0_3px_rgba(59,130,246,0.08)] transition-all placeholder:text-slate-300"
+          class="w-full bg-slate-50/80 border border-slate-100 rounded-xl py-2 pl-10 pr-4 text-sm outline-none focus:bg-white focus:border-brand-200 focus:shadow-[0_0_0_3px_rgba(59,130,246,0.08)] transition-all placeholder:text-slate-500"
           placeholder="Rechercher..." aria-label="Rechercher dans les délibérations" oninput="handleSearch(this.value)">
       </div>
 
@@ -127,7 +131,7 @@
           class="text-2xl font-bold text-white uppercase tracking-[0.2em]">Contact</button>
         <button
           onclick="document.getElementById('newsletter').scrollIntoView({behavior:'smooth'}); toggleMobileMenu(false)"
-          class="bg-brand-600 text-white text-lg font-bold px-10 py-5 rounded-2xl shadow-xl shadow-brand-600/20 uppercase tracking-widest mt-4">
+          class="bg-brand-700 text-white text-lg font-bold px-10 py-5 rounded-2xl shadow-xl shadow-brand-600/20 uppercase tracking-widest mt-4">
           Newsletter
         </button>
       </div>
@@ -139,12 +143,12 @@
 
   <!-- About Modal -->
   <div id="about-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center p-4">
-    <div class="modal-overlay absolute inset-0" onclick="toggleAboutModal(false)"></div>
+    <div class="modal-overlay absolute inset-0" onclick="toggleAboutModal(false)" aria-hidden="true"></div>
     <div
       class="bg-white w-full max-w-2xl max-h-[90vh] rounded-[2.5rem] shadow-2xl relative z-10 overflow-hidden flex flex-col animate-slide-up">
       <div class="absolute top-8 right-8 z-20">
         <button onclick="toggleAboutModal(false)"
-          class="w-11 h-11 flex items-center justify-center rounded-full bg-white/80 backdrop-blur shadow-micro border border-slate-100 hover:bg-slate-50 transition-colors text-slate-400"
+          class="w-11 h-11 flex items-center justify-center rounded-full bg-white/80 backdrop-blur shadow-micro border border-slate-100 hover:bg-slate-50 transition-colors text-slate-600"
           aria-label="Fermer">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M6 18L18 6M6 6l12 12"></path>
@@ -153,7 +157,7 @@
       </div>
 
       <div class="overflow-y-auto p-10 md:p-12">
-        <div class="w-16 h-16 bg-brand-50 rounded-2xl flex items-center justify-center text-brand-600 mb-8">
+        <div class="w-16 h-16 bg-brand-50 rounded-2xl flex items-center justify-center text-brand-700 mb-8">
           <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
               d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
@@ -199,11 +203,11 @@
 
   <!-- Contact Modal -->
   <div id="contact-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center p-4">
-    <div class="modal-overlay absolute inset-0" onclick="toggleContactModal(false)"></div>
+    <div class="modal-overlay absolute inset-0" onclick="toggleContactModal(false)" aria-hidden="true"></div>
     <div class="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl relative z-10 overflow-hidden animate-slide-up">
       <div class="absolute top-8 right-8">
         <button onclick="toggleContactModal(false)"
-          class="w-11 h-11 flex items-center justify-center rounded-full hover:bg-slate-50 transition-colors text-slate-400"
+          class="w-11 h-11 flex items-center justify-center rounded-full hover:bg-slate-50 transition-colors text-slate-600"
           aria-label="Fermer">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M6 18L18 6M6 6l12 12"></path>
@@ -216,19 +220,19 @@
 
         <form id="contact-form" class="space-y-4">
           <div>
-            <label class="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Votre Nom</label>
+            <label class="block text-xs font-bold text-slate-600 uppercase tracking-widest mb-2">Votre Nom</label>
             <input type="text" name="name" id="contact-name" required
               class="w-full bg-slate-50 border border-slate-100 rounded-2xl px-6 py-4 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all"
               placeholder="Prénom Nom">
           </div>
           <div>
-            <label class="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Votre Email</label>
+            <label class="block text-xs font-bold text-slate-600 uppercase tracking-widest mb-2">Votre Email</label>
             <input type="email" name="email_sender" id="contact-email" required
               class="w-full bg-slate-50 border border-slate-100 rounded-2xl px-6 py-4 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all"
               placeholder="votre@email.com">
           </div>
           <div>
-            <label class="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Message</label>
+            <label class="block text-xs font-bold text-slate-600 uppercase tracking-widest mb-2">Message</label>
             <textarea name="message" id="contact-message" required rows="4"
               class="w-full bg-slate-50 border border-slate-100 rounded-2xl px-6 py-4 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all resize-none"
               placeholder="Votre message..."></textarea>
@@ -247,13 +251,13 @@
 
   <!-- Hero Section -->
   <header class="max-w-4xl mx-auto px-4 md:px-6 py-16 md:py-24 animate-fade-in text-center">
-    <h1 class="text-5xl md:text-7xl font-bold text-slate-900 mb-8 tracking-[-0.03em] leading-[1.08]">
+    <h1 class="text-4xl sm:text-5xl md:text-7xl font-bold text-slate-900 mb-8 tracking-[-0.03em] leading-[1.08]">
       La vie municipale<br>
       <span class="gradient-text"> décryptée.</span>
     </h1>
     <div class="max-w-3xl mx-auto mb-12">
-      <p class="text-xl md:text-2xl font-semibold text-brand-600 mb-4">L'IA au service du citoyen.</p>
-      <p class="text-lg md:text-xl text-slate-400 leading-relaxed font-light">
+      <p class="text-xl md:text-2xl font-semibold text-brand-700 mb-4">L'IA au service du citoyen.</p>
+      <p class="text-lg md:text-xl text-slate-600 leading-relaxed font-light">
         Ce service décode les rapports municipaux complexes en résumés clairs et fidèles aux sources officielles. Un
         accès direct à l'information pour comprendre et suivre la vie de Bègles.
       </p>
@@ -264,12 +268,12 @@
       class="hidden inline-flex items-center gap-3 bg-orange-50 border border-orange-100 px-4 py-2 rounded-xl">
       <span class="w-2 h-2 rounded-full bg-orange-500 animate-pulse"></span>
       <span class="text-xs font-bold text-orange-700 uppercase tracking-widest">Prochain Conseil</span>
-      <span id="next-council-date" class="text-xs text-orange-600 font-medium tracking-tight">--</span>
+      <span id="next-council-date" class="text-xs text-orange-700 font-medium tracking-tight">--</span>
     </div>
   </header>
 
   <!-- Content Area -->
-  <main class="max-w-5xl mx-auto pb-24">
+  <main class="max-w-5xl mx-auto px-4 md:px-6 pb-24">
     <div id="timeline" class="space-y-16 min-h-[400px]">
       <!-- Skeleton Loader -->
       <section class="mb-20" aria-busy="true" aria-label="Chargement des données">
@@ -305,26 +309,19 @@
 
   <!-- Newsletters -->
   <section id="newsletter" class="bg-slate-900 text-white py-24 mb-10 overflow-hidden relative">
-    <div
-      class="absolute top-0 right-0 w-96 h-96 bg-brand-600 rounded-full blur-[160px] opacity-15 -translate-y-1/2 translate-x-1/2">
-    </div>
-    <div class="max-w-3xl mx-auto px-6 relative z-10 text-center">
-      <div
-        class="inline-flex items-center gap-2 bg-white/5 border border-white/10 px-4 py-2 rounded-full text-slate-400 text-[11px] font-medium uppercase tracking-widest mb-8">
-        Arrive bientôt
-      </div>
-      <img src="logo-blanc.svg" class="w-14 h-14 mx-auto mb-6 opacity-60" alt="Logo">
+    
+      <img src="logo-blanc.svg" class="w-14 h-14 mx-auto mb-6 opacity-60" width="56" height="56" alt="Logo">
       <h2 class="text-4xl font-bold mb-6 tracking-[-0.02em]">Le résumé dans votre poche.</h2>
-      <p class="text-slate-400 text-lg mb-10 max-w-xl mx-auto font-light leading-relaxed">Recevez les points clés du
+      <p class="text-slate-200 text-lg mb-10 max-w-xl mx-auto font-light leading-relaxed">Recevez les points clés du
         conseil directement par email après chaque séance. Nous finalisons le service pour vous offrir une expérience
         optimale.</p>
 
       <form id="newsletter-form" class="flex flex-col gap-3 max-w-md mx-auto">
         <div class="flex flex-col md:flex-row gap-3">
           <input type="email" id="newsletter-email" required placeholder="votre@email.com"
-            class="flex-1 bg-white/10 border border-white/20 px-6 py-4 rounded-2xl text-white font-medium placeholder:text-slate-500 focus:outline-none focus:border-brand-400 transition-colors">
+            class="flex-1 bg-white/10 border border-white/20 px-6 py-4 rounded-2xl text-white font-medium placeholder:text-slate-200 focus:outline-none focus:border-brand-400 transition-colors">
           <button type="submit" id="newsletter-submit"
-            class="bg-brand-600 text-white font-bold px-8 py-4 rounded-2xl hover:bg-brand-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+            class="bg-brand-700 text-white font-bold px-8 py-4 rounded-2xl hover:bg-brand-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
             S'inscrire
           </button>
         </div>
@@ -336,7 +333,7 @@
   <footer class="max-w-5xl mx-auto px-6 pb-12">
     <div class="flex flex-wrap justify-center md:justify-start gap-8 mb-8 border-b border-slate-50 pb-8">
       <div class="flex items-center gap-3">
-        <div class="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center text-slate-400">
+        <div class="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center text-slate-600">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
               d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
@@ -344,11 +341,11 @@
         </div>
         <div>
           <span class="block text-sm font-semibold text-slate-900 leading-none mb-1" id="stat-councils">--</span>
-          <span class="text-[10px] font-medium text-slate-400 uppercase tracking-widest">Conseils analysés</span>
+          <span class="text-[10px] font-medium text-slate-600 uppercase tracking-widest">Conseils analysés</span>
         </div>
       </div>
       <div class="flex items-center gap-3">
-        <div class="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center text-slate-400">
+        <div class="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center text-slate-600">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
               d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01">
@@ -357,30 +354,30 @@
         </div>
         <div>
           <span class="block text-sm font-semibold text-slate-900 leading-none mb-1" id="stat-deliberations">--</span>
-          <span class="text-[10px] font-medium text-slate-400 uppercase tracking-widest">Décryptages IA</span>
+          <span class="text-[10px] font-medium text-slate-600 uppercase tracking-widest">Décryptages IA</span>
         </div>
       </div>
     </div>
-    <div class="flex flex-col md:flex-row justify-between items-center gap-4 text-slate-400 text-[13px] font-light">
+    <div class="flex flex-col md:flex-row justify-between items-center gap-4 text-slate-600 text-[13px] font-light">
       <p>© 2026 Observatoire Bègles — Données publiques gratuites</p>
       <p>Source officielle : <a href="https://www.mairie-begles.fr/"
-          class="text-slate-600 font-medium hover:text-brand-600 transition-colors" target="_blank"
+          class="text-slate-600 font-medium hover:text-brand-700 transition-colors" target="_blank"
           rel="noopener">mairie-begles.fr</a></p>
     </div>
   </footer>
 
   <!-- Team Modal -->
   <div id="team-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center p-4">
-    <div class="modal-overlay absolute inset-0" onclick="toggleTeamModal(false)"></div>
+    <div class="modal-overlay absolute inset-0" onclick="toggleTeamModal(false)" aria-hidden="true"></div>
     <div
       class="bg-white w-full max-w-4xl max-h-[85vh] rounded-[2rem] shadow-2xl relative z-10 overflow-hidden flex flex-col animate-slide-up">
       <div class="p-8 border-b border-slate-100 flex items-center justify-between shrink-0">
         <div>
           <h3 class="text-2xl font-bold text-slate-900">Équipe Municipale</h3>
-          <p class="text-sm text-brand-600 font-bold uppercase tracking-wider">Majorité « Espoir Béglais »</p>
+          <p class="text-sm text-brand-700 font-bold uppercase tracking-wider">Majorité « Espoir Béglais »</p>
         </div>
         <button onclick="toggleTeamModal(false)"
-          class="w-11 h-11 flex items-center justify-center rounded-full hover:bg-slate-50 transition-colors text-slate-400"
+          class="w-11 h-11 flex items-center justify-center rounded-full hover:bg-slate-50 transition-colors text-slate-600"
           aria-label="Fermer">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M6 18L18 6M6 6l12 12"></path>
@@ -391,11 +388,11 @@
         <div
           class="mb-12 bg-slate-50 rounded-[2rem] p-8 border border-slate-100 flex flex-col md:flex-row items-center gap-8">
           <div class="w-32 h-32 md:w-40 md:h-40 shrink-0 rounded-full overflow-hidden border-4 border-white shadow-xl">
-            <img src="maire.webp" loading="lazy" alt="Christian BAGATE" class="w-full h-full object-cover">
+            <img src="maire.webp" loading="lazy" alt="Christian BAGATE" class="w-full h-full object-cover" width="160" height="160">
           </div>
           <div class="text-center md:text-left">
             <span
-              class="inline-block bg-brand-600 text-white text-[10px] font-black uppercase tracking-[0.2em] px-4 py-1.5 rounded-full mb-4">Maire
+              class="inline-block bg-brand-700 text-white text-[10px] font-black uppercase tracking-[0.2em] px-4 py-1.5 rounded-full mb-4">Maire
               de Bègles</span>
             <h2 class="text-3xl font-bold text-slate-900 mb-2">Christian BAGATE</h2>
             <p class="text-slate-500 font-medium italic">Liste « Espoir Béglais »</p>
@@ -403,12 +400,12 @@
         </div>
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-6">
           <div class="col-span-full mb-2">
-            <h4 class="text-xs font-black text-slate-400 uppercase tracking-[0.2em]">Adjoints au Maire (Majorité)</h4>
+            <h4 class="text-xs font-black text-slate-600 uppercase tracking-[0.2em]">Adjoints au Maire (Majorité)</h4>
           </div>
 
           <div class="p-4 bg-brand-50 rounded-2xl border border-brand-100">
             <p class="font-bold text-slate-900">Isabelle BERRIÉ</p>
-            <p class="text-[11px] text-brand-600 font-bold uppercase">1ère adjointe</p>
+            <p class="text-[11px] text-brand-700 font-bold uppercase">1ère adjointe</p>
           </div>
           <div class="p-4 bg-slate-50 rounded-2xl border border-slate-100">
             <p class="font-bold text-slate-900">Mohammed MICHRAFY</p>
@@ -456,13 +453,13 @@
           </div>
 
           <div class="col-span-full mt-8 mb-2">
-            <h4 class="text-xs font-black text-slate-400 uppercase tracking-[0.2em]">Conseillers de la Majorité (Espoir
+            <h4 class="text-xs font-black text-slate-600 uppercase tracking-[0.2em]">Conseillers de la Majorité (Espoir
               Béglais)</h4>
           </div>
 
           <div class="p-4 bg-slate-50/50 rounded-2xl border border-slate-100">
             <p class="font-bold text-slate-900 text-sm">Alain NAU <span
-                class="text-[10px] text-slate-400 font-normal ml-1">(Doyen d'âge)</span></p>
+                class="text-[10px] text-slate-600 font-normal ml-1">(Doyen d'âge)</span></p>
           </div>
           <div class="p-4 bg-slate-50/50 rounded-2xl border border-slate-100">
             <p class="font-bold text-slate-900 text-sm">Patrick LAFON</p>
@@ -514,7 +511,7 @@
           </div>
 
           <div class="col-span-full mt-10 mb-2 border-t border-slate-100 pt-8">
-            <h4 class="text-xs font-black text-slate-400 uppercase tracking-[0.2em]">Opposition Municipale (Vivons
+            <h4 class="text-xs font-black text-slate-600 uppercase tracking-[0.2em]">Opposition Municipale (Vivons
               Bègles Ensemble)</h4>
           </div>
 
@@ -551,9 +548,9 @@
       <div id="team-scroll-indicator"
         class="absolute bottom-6 left-1/2 -translate-x-1/2 pointer-events-none animate-bounce flex flex-col items-center gap-1 z-20 transition-opacity duration-300">
         <span
-          class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] bg-white/90 backdrop-blur px-3 py-1 rounded-full shadow-sm border border-slate-100">Scrollez
+          class="text-[9px] font-black text-slate-600 uppercase tracking-[0.2em] bg-white/90 backdrop-blur px-3 py-1 rounded-full shadow-sm border border-slate-100">Scrollez
           pour découvrir</span>
-        <svg class="w-5 h-5 text-brand-600 drop-shadow-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg class="w-5 h-5 text-brand-700 drop-shadow-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
         </svg>
       </div>
@@ -561,8 +558,7 @@
   </div>
 
   <script src="app.js" defer></script>
-  <script defer src='https://static.cloudflareinsights.com/beacon.min.js'
-    data-cf-beacon='{"token": "203e3ce8e4394fc985f06c3a746f576c"}'></script>
+  
 </body>
 
 </html>

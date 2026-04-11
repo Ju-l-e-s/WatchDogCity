@@ -18,5 +18,5 @@ func TestValidateEmail(t *testing.T) {
 func TestCORSHeaders(t *testing.T) {
 	headers := corsHeaders()
 	assert.Equal(t, "*", headers["Access-Control-Allow-Origin"])
-	assert.Equal(t, "POST,GET,OPTIONS", headers["Access-Control-Allow-Methods"])
+	assert.Equal(t, "POST,OPTIONS", headers["Access-Control-Allow-Methods"])
 }

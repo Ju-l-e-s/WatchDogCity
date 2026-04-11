@@ -117,8 +117,23 @@ function highlightText(text, query, acronymsMap = null) {
 async function init() {
     try {
         const resp = await fetch('./data.json');
-        if (!resp.ok) throw new Error('Not found');
-        const data = await resp.json();
+        
+        if (!resp.ok) {
+            const err = new Error(`HTTP Error: ${resp.status} ${resp.statusText}`);
+            err.type = 'HTTP';
+            err.status = resp.status;
+            throw err;
+        }
+        
+        let data;
+        try {
+            data = await resp.json();
+        } catch (parseError) {
+            const err = new Error(`JSON Parse Error: ${parseError.message}`);
+            err.type = 'PARSE';
+            throw err;
+        }
+        
         if (data.next_council_date) {
             const dateEl = document.getElementById('next-council-date');
             if (dateEl) dateEl.textContent = data.next_council_date;
@@ -129,9 +144,31 @@ async function init() {
         updateStats();
         render();
     } catch (e) {
-        console.error(e);
+        console.error("Initialization Error:", e);
         const timelineEl = document.getElementById('timeline');
-        if (timelineEl) timelineEl.innerHTML = `<p class="text-center text-red-500 py-20 font-medium">Erreur lors du chargement des données. Veuillez réessayer plus tard.</p>`;
+        let errorMsg = "Erreur inattendue lors du chargement.";
+        
+        if (e.name === 'TypeError' || e.message.includes('fetch')) {
+            errorMsg = "Erreur réseau : Impossible de contacter le serveur (problème de connexion ou DNS).";
+        } else if (e.type === 'HTTP') {
+            if (e.status === 404) {
+                errorMsg = "Erreur 404 : Les données des conseils (data.json) n'ont pas encore été générées.";
+            } else if (e.status === 403) {
+                errorMsg = "Erreur 403 : Accès refusé aux données (problème de permissions S3/CloudFront).";
+            } else {
+                errorMsg = `Erreur serveur (${e.status}). Veuillez réessayer plus tard.`;
+            }
+        } else if (e.type === 'PARSE') {
+             errorMsg = "Erreur de format : Le fichier de données reçu est corrompu ou invalide.";
+        }
+
+        if (timelineEl) {
+            timelineEl.innerHTML = `<div class="bg-red-50 border border-red-200 rounded-xl p-6 max-w-lg mx-auto mt-10">
+                <h3 class="text-red-800 font-semibold mb-2">Impossible de charger les délibérations</h3>
+                <p class="text-red-600 text-sm">${errorMsg}</p>
+                <p class="text-red-500 text-xs mt-4 font-mono">Détail technique : ${e.message}</p>
+            </div>`;
+        }
     }
 }
 

@@ -298,6 +298,9 @@ class WatchdogStack(Stack):
             prune=False,
         )
 
+        # On s'assure que DeployDataJson s'exécute après DeployWebsite pour éviter un potentiel PRUNE
+        deploy_data.node.add_dependency(deploy_website)
+
         # ── Monitoring & Dashboard ────────────────────────────────────────
         dashboard = cloudwatch.Dashboard(self, "WatchdogDashboard", dashboard_name="Watchdog-Begles-Health")
         

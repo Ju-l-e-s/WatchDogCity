@@ -46,7 +46,7 @@ logs-publisher:
 	aws logs tail /aws/lambda/WatchdogStack-Publisher --follow
 
 update-data:
-	aws lambda invoke --function-name WatchdogStack-Orchestrator response.json
+	aws lambda invoke --function-name $$(aws lambda list-functions --query "Functions[?contains(FunctionName, 'Orchestrator')].FunctionName" --output text | head -n 1) response.json
 	@cat response.json
 
 clean:

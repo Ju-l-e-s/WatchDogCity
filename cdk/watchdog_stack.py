@@ -205,7 +205,7 @@ class WatchdogStack(Stack):
                 "MAIL_API_KEY": mail_api_key,
                 "BREVO_LIST_ID": brevo_list_id,
                 "BREVO_TEMPLATE_ID": brevo_template_id,
-                "API_URL": api.url,
+                "API_URL": f"https://{api.rest_api_id}.execute-api.{self.region}.amazonaws.com/prod/",
             },
         )
         subscribers_table.grant_read_write_data(subscribe_fn)

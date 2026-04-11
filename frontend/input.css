@@ -108,6 +108,10 @@
     font-family: var(--font-sans);
   }
 
+  body.modal-open {
+    overflow: hidden;
+  }
+
   h1,
   h2,
   h3,
@@ -151,10 +155,7 @@
   }
 
   .skeleton {
-    position: relative;
-    overflow: hidden;
-    background-color: #f1f5f9;
-    border-radius: 8px;
+    @apply relative overflow-hidden bg-slate-100 rounded-xl;
   }
 
   .skeleton::after {

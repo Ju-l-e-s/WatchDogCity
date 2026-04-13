@@ -46,7 +46,8 @@ function highlightText(e, t, n = null) { let s = escapeHTML(e); if (n && (s = ap
 async function init() {
     console.log("🔍 Chargement des données...");
     try {
-        const e = await fetch("./data.json");
+        // Ajout d'un timestamp pour éviter le cache navigateur
+        const e = await fetch(`./data.json?v=${new Date().getTime()}`);
         if (!e.ok) { throw new Error(`HTTP Error: ${e.status}`) }
         const t = await e.json();
         console.log("✅ Données reçues:", t);
@@ -73,25 +74,32 @@ function renderDashboard() {
     console.log("🎨 Rendu du Dashboard...");
     const container = document.getElementById('global-dashboard');
     if (!container) { console.warn("⚠️ Conteneur #global-dashboard introuvable"); return; }
-    if (!allCouncils.length) { console.warn("⚠️ Aucun conseil à afficher dans le dashboard"); return; }
+    
+    // On ne garde que les conseils de 2026 avec une analyse valide
+    const councils2026 = allCouncils.filter(c => c.date && c.date.startsWith('2026') && c.analysis && c.analysis.budget_impact);
+    
+    if (councils2026.length === 0) {
+        console.log("ℹ️ Pas encore d'analyses 2026 disponibles, dashboard masqué.");
+        container.classList.add('hidden');
+        return;
+    }
 
+    container.classList.remove('hidden');
     let totalBudget = 0;
     const categories = {};
-    allCouncils.forEach(c => {
-        if (c.analysis && c.analysis.budget_impact) {
-            totalBudget += c.analysis.budget_impact;
-            const cat = c.analysis.budget_label || 'Autres';
-            categories[cat] = (categories[cat] || 0) + c.analysis.budget_impact;
-        }
+    councils2026.forEach(c => {
+        totalBudget += c.analysis.budget_impact;
+        const cat = c.analysis.budget_label || 'Autres';
+        categories[cat] = (categories[cat] || 0) + c.analysis.budget_impact;
     });
 
-    console.log("💰 Budget Total:", totalBudget);
+    console.log("💰 Budget Total 2026:", totalBudget);
 
     const sortedCats = Object.entries(categories).sort((a, b) => b[1] - a[1]);
     
     let ribbonHtml = '<div class="ribbon-bar flex h-3 bg-slate-100 rounded-full overflow-hidden mb-4 shadow-inner">';
     sortedCats.forEach(([name, val]) => {
-        const pct = (val / totalBudget * 100).toFixed(1);
+        const pct = totalBudget > 0 ? (val / totalBudget * 100).toFixed(1) : 0;
         const color = COLORS[name] || COLORS['Autres'];
         ribbonHtml += `<div class="ribbon-segment" style="width: ${pct}%; background: ${color}" title="${name}: ${pct}%"></div>`;
     });
@@ -110,7 +118,7 @@ function renderDashboard() {
 
     let gridHtml = '<div class="categories-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">';
     sortedCats.forEach(([name, val]) => {
-        const pct = (val / totalBudget * 100).toFixed(1);
+        const pct = totalBudget > 0 ? (val / totalBudget * 100).toFixed(1) : 0;
         const color = COLORS[name] || COLORS['Autres'];
         gridHtml += `
             <div class="category-row p-4 bg-white rounded-2xl border border-slate-100 hover:shadow-micro transition-all">
@@ -135,7 +143,7 @@ function renderDashboard() {
                 <div class="budget-total-val text-4xl md:text-5xl font-black text-slate-900 tracking-tight">${(totalBudget / 1000000).toFixed(1)} M€</div>
             </div>
             
-            <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Répartition thématique</h4>
+            <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Répartition thématique (Cumul Annuel)</h4>
             ${ribbonHtml}
             ${legendHtml}
             ${gridHtml}
@@ -166,34 +174,26 @@ function render() {
         let councilRibbonHtml = '';
         let councilLegendHtml = '';
         if (t.analysis && t.analysis.budget_impact) {
-            const mainLabel = t.analysis.budget_label;
+            const mainLabel = t.analysis.budget_label || 'Autres';
             const mainColor = COLORS[mainLabel] || COLORS['Autres'];
-            const socialColor = COLORS['Solidarité & Social'];
-            const otherColor = COLORS['Autres'];
 
             councilRibbonHtml = `
                 <div class="flex gap-1 rounded-full overflow-hidden mt-5 bg-slate-100" style="height: 10px;">
-                    <div style="width: 65%; background: ${mainColor};"></div>
-                    <div style="width: 20%; background: ${socialColor}; opacity: 0.6;"></div>
-                    <div style="width: 15%; background: ${otherColor}; opacity: 0.4;"></div>
+                    <div style="width: 100%; background: ${mainColor};"></div>
                 </div>`;
 
             councilLegendHtml = `
                 <div class="flex flex-wrap mt-4 text-xs font-bold text-slate-500 leading-none" style="gap: 20px; row-gap: 12px;">
                     <div class="flex items-center gap-2">
                         <span class="mr-1" style="width: 10px; height: 10px; border-radius: 2px; background: ${mainColor}"></span>
-                        <span>65% ${mainLabel.split(' ')[0]}</span>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <span class="mr-1" style="width: 10px; height: 10px; border-radius: 2px; background: ${socialColor}; opacity: 0.6;"></span>
-                        <span>20% Solidarité</span>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <span class="mr-1" style="width: 10px; height: 10px; border-radius: 2px; background: ${otherColor}; opacity: 0.4;"></span>
-                        <span>15% Autres</span>
+                        <span>100% ${mainLabel}</span>
                     </div>
                 </div>`;
         }
+
+        const totalVotes = t.analysis ? (t.analysis.votes_pour + t.analysis.votes_contre) : 0;
+        const pourPct = totalVotes > 0 ? (t.analysis.votes_pour / totalVotes * 100).toFixed(0) : 0;
+        const contrePct = totalVotes > 0 ? (t.analysis.votes_contre / totalVotes * 100).toFixed(0) : 0;
 
         const analysisHtml = t.analysis ? `<div class="analysis-grid grid grid-cols-1 gap-4 mt-6">
             <div class="analysis-card bg-slate-50/50 border border-slate-100 rounded-2xl p-6">
@@ -211,13 +211,16 @@ function render() {
                         <span>Contre: ${t.analysis.votes_contre}</span>
                     </div>
                     <div class="h-1.5 w-full bg-slate-100 rounded-full flex overflow-hidden">
-                        <div style="width: ${(t.analysis.votes_pour / 35 * 100).toFixed(0)}%; background: #10b981;"></div>
-                        <div style="width: ${(t.analysis.votes_contre / 35 * 100).toFixed(0)}%; background: #ef4444;"></div>
+                        <div style="width: ${pourPct}%; background: #10b981;"></div>
+                        <div style="width: ${contrePct}%; background: #ef4444;"></div>
                     </div>
                 </div>
             </div>
         </div>` : "";
         
+        const enjeuCleHtml = t.analysis && t.analysis.vote_summary ? 
+            `<p class="text-slate-600 leading-relaxed max-w-4xl text-xl font-light mt-8"><span class="font-bold text-slate-900 mr-2">Enjeu Clé :</span>${t.analysis.vote_summary.replace("Enjeu Clé :", "").replace("Enjeu Clé", "")}</p>` : "";
+
         n.innerHTML = `
             <div class="flex items-center gap-6 mb-8">
                 <div class="h-px flex-1 bg-slate-200/60"></div>
@@ -229,7 +232,7 @@ function render() {
                     ${agendaHtml}
                     <h3 class="text-2xl md:text-3xl font-bold text-slate-900 pt-4 md:pt-0 mb-4 tracking-tight">${r}</h3>
                     ${analysisHtml}
-                    <p class="text-slate-600 leading-relaxed max-w-4xl text-xl font-light mt-8"><span class="font-bold text-slate-900 mr-2">Enjeu Clé :</span>${i.replace("Enjeu Clé :", "").replace("Enjeu Clé", "")}</p>
+                    ${enjeuCleHtml}
                 </div>
                 <div class="divide-y divide-slate-100/50">${t.deliberations.map(e => renderDeliberationRow(e)).join("")}</div>
             </div>`, e.appendChild(n)

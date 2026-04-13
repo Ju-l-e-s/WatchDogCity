@@ -213,28 +213,45 @@ function render() {
         const pourPct = totalVotes > 0 ? (council.analysis.votes_pour / totalVotes * 100).toFixed(0) : 0;
         const contrePct = totalVotes > 0 ? (council.analysis.votes_contre / totalVotes * 100).toFixed(0) : 0;
 
-        const analysisHtml = council.analysis ? `<div class="analysis-grid grid grid-cols-1 gap-4 mt-6">
-            <div class="analysis-card bg-slate-50/50 border border-slate-100 rounded-2xl p-6">
-                <span class="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">💰 Impact Financier</span>
-                <div class="text-2xl font-black text-slate-900">${council.analysis.budget_impact.toLocaleString("fr-FR")} €</div>
-                ${councilRibbonHtml}
-                ${councilLegendHtml}
-            </div>
-            <div class="analysis-card bg-slate-50/50 border border-slate-100 rounded-2xl p-6">
-                <span class="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">⚖️ Climat des Votes</span>
-                <div class="vote-climat ${council.analysis.vote_climat === "consensus" ? "climat-consensus" : "climat-tensions"}">${council.analysis.vote_climat.toUpperCase()}</div>
-                <div class="mt-4 flex flex-col gap-2">
-                    <div class="flex justify-between text-[11px] font-bold text-slate-500">
-                        <span>Pour: ${council.analysis.votes_pour}</span>
-                        <span>Contre: ${council.analysis.votes_contre}</span>
-                    </div>
-                    <div class="h-1.5 w-full bg-slate-100 rounded-full flex overflow-hidden">
-                        <div style="width: ${pourPct}%; background: #10b981;"></div>
-                        <div style="width: ${contrePct}%; background: #ef4444;"></div>
-                    </div>
-                </div>
-            </div>
-        </div>` : "";
+        let analysisHtml = "";
+        if (council.analysis) {
+            const hasFinancial = council.analysis.budget_impact > 0;
+            const hasVotes = totalVotes > 0;
+
+            if (hasFinancial || hasVotes) {
+                analysisHtml = `<div class="analysis-grid grid grid-cols-1 gap-4 mt-6">`;
+                
+                if (hasFinancial) {
+                    analysisHtml += `
+                    <div class="analysis-card bg-slate-50/50 border border-slate-100 rounded-2xl p-6">
+                        <span class="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">💰 Impact Financier</span>
+                        <div class="text-2xl font-black text-slate-900">${council.analysis.budget_impact.toLocaleString("fr-FR")} €</div>
+                        ${councilRibbonHtml}
+                        ${councilLegendHtml}
+                    </div>`;
+                }
+
+                if (hasVotes) {
+                    analysisHtml += `
+                    <div class="analysis-card bg-slate-50/50 border border-slate-100 rounded-2xl p-6">
+                        <span class="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">⚖️ Climat des Votes</span>
+                        <div class="vote-climat ${council.analysis.vote_climat === "consensus" ? "climat-consensus" : "climat-tensions"}">${council.analysis.vote_climat.toUpperCase()}</div>
+                        <div class="mt-4 flex flex-col gap-2">
+                            <div class="flex justify-between text-[11px] font-bold text-slate-500">
+                                <span>Pour: ${council.analysis.votes_pour}</span>
+                                <span>Contre: ${council.analysis.votes_contre}</span>
+                            </div>
+                            <div class="h-1.5 w-full bg-slate-100 rounded-full flex overflow-hidden">
+                                <div style="width: ${pourPct}%; background: #10b981;"></div>
+                                <div style="width: ${contrePct}%; background: #ef4444;"></div>
+                            </div>
+                        </div>
+                    </div>`;
+                }
+
+                analysisHtml += `</div>`;
+            }
+        }
         
         const enjeuCleHtml = council.analysis && council.analysis.vote_summary ? 
             `<p class="text-slate-600 leading-relaxed max-w-4xl text-xl font-light mt-8"><span class="font-bold text-slate-900 mr-2">Enjeu Clé :</span>${council.analysis.vote_summary.replace("Enjeu Clé :", "").replace("Enjeu Clé", "")}</p>` : "";

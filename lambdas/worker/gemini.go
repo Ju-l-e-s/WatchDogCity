@@ -47,7 +47,11 @@ Retourne UNIQUEMENT un objet JSON valide avec cette structure exacte :
 
 Règles d'exécution strictes :
 - Identifie systématiquement les acronymes ou sigles techniques (ex: CCAS, CREPAQ, EPCI, DSP) présents dans le PDF et donne leur définition complète dans le champ "acronyms".
-- Le champ "budget_impact" doit contenir le montant total HT (Hors Taxes) mentionné en euros (entier). Si aucun montant n'est mentionné, mets impérativement 0. Ne mets jamais null.
+- Le champ "budget_impact" est CRUCIAL. Cherche tous les montants monétaires (€, euros, HT, TTC, crédits). 
+  * Priorise le montant total de l'opération, de l'investissement ou de la subvention accordée.
+  * Si plusieurs montants sont cités (ex: coût total vs subvention attendue), prends le coût total de l'action municipale.
+  * Cherche aussi dans les tableaux financiers s'ils existent.
+  * Si aucun montant n'est mentionné, mets 0. Ne mets jamais null.
 - Le champ "climate_impact" doit être "positif" (investissement vert, nature en ville, isolation), "negatif" (artificialisation, fossile) ou "neutre" (fonctionnement courant, social sans impact bâti). Par défaut, mets "neutre".
 - Le champ "is_substantial" doit être "true" uniquement si le document est dense (budget, DSP, projet structurant).
 - Séparation des préoccupations : Ne génère JAMAIS de balises HTML. Retourne uniquement du texte brut dans les champs.

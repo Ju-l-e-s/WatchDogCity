@@ -110,7 +110,25 @@ func (h *WorkerHandler) handleRecord(ctx context.Context, msg SQSPayload, result
 		if !strings.Contains(err.Error(), "ConditionalCheckFailedException") {
 			return fmt.Errorf("put deliberation: %w", err)
 		}
-		log.Printf("deliberation %s already processed, skipping", id)
+		// Item exists — update budget_impact if it was previously missing or zero
+		if result.BudgetImpact > 0 {
+			_, uerr := h.ddb.UpdateItem(ctx, &dynamodb.UpdateItemInput{
+				TableName: aws.String(os.Getenv("DELIBERATIONS_TABLE")),
+				Key: map[string]types.AttributeValue{
+					"id": &types.AttributeValueMemberS{Value: id},
+				},
+				UpdateExpression:    aws.String("SET budget_impact = :bi"),
+				ConditionExpression: aws.String("attribute_not_exists(budget_impact) OR budget_impact = :zero"),
+				ExpressionAttributeValues: map[string]types.AttributeValue{
+					":bi":   &types.AttributeValueMemberN{Value: strconv.FormatInt(result.BudgetImpact, 10)},
+					":zero": &types.AttributeValueMemberN{Value: "0"},
+				},
+			})
+			if uerr != nil && !strings.Contains(uerr.Error(), "ConditionalCheckFailedException") {
+				log.Printf("warn: could not update budget_impact for %s: %v", id, uerr)
+			}
+		}
+		log.Printf("deliberation %s already processed, budget_impact updated if needed", id)
 	}
 
 	// 2. Increment counter

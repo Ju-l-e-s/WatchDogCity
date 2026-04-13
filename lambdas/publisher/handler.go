@@ -54,6 +54,7 @@ type DeliberationRecord struct {
 	IsSubstantial  bool              `dynamodbav:"is_substantial"`
 	Acronyms       map[string]string `dynamodbav:"acronyms"`
 	AnalysisData   AnalysisData      `dynamodbav:"analysis_data"`
+	BudgetImpact   int64             `dynamodbav:"budget_impact"`
 	HasVote        bool              `dynamodbav:"has_vote"`
 	VotePour       *int              `dynamodbav:"vote_pour"`
 	VoteContre     *int              `dynamodbav:"vote_contre"`
@@ -90,6 +91,7 @@ type DeliberationOutput struct {
 	IsSubstantial bool              `json:"is_substantial"`
 	Acronyms      map[string]string `json:"acronyms"`
 	AnalysisData  AnalysisData      `json:"analysis_data"`
+	BudgetImpact  int64             `json:"budget_impact"`
 	Vote          VoteCount         `json:"vote"`
 	Disagreements *string           `json:"disagreements"`
 }
@@ -116,6 +118,14 @@ func buildDataJSON(ctx context.Context, ddb *dynamodb.Client, councils []Council
 		NextCouncilDate: fetchNextCouncilDate(ctx, ddb),
 	}
 	for _, c := range councils {
+		analysis := c.Analysis
+		// Budget impact = sum of individual deliberations only (verified PDF amounts)
+		var deliberationsTotal int64
+		for _, d := range delibs[c.CouncilID] {
+			deliberationsTotal += d.BudgetImpact
+		}
+		analysis.BudgetImpact = deliberationsTotal
+
 		co := CouncilOutput{
 			CouncilID: c.CouncilID,
 			Category:  c.Category,
@@ -123,7 +133,7 @@ func buildDataJSON(ctx context.Context, ddb *dynamodb.Client, councils []Council
 			Title:     c.Title,
 			Summary:   c.Summary,
 			SourceURL: c.SourceURL,
-			Analysis:  c.Analysis,
+			Analysis:  analysis,
 		}
 		for _, d := range delibs[c.CouncilID] {
 			co.Deliberations = append(co.Deliberations, DeliberationOutput{
@@ -135,6 +145,7 @@ func buildDataJSON(ctx context.Context, ddb *dynamodb.Client, councils []Council
 				IsSubstantial: d.IsSubstantial,
 				Acronyms:      d.Acronyms,
 				AnalysisData:  d.AnalysisData,
+				BudgetImpact:  d.BudgetImpact,
 				Vote: VoteCount{
 					HasVote:    d.HasVote || d.VotePour != nil || d.VoteContre != nil || d.VoteAbstention != nil,
 					Pour:       d.VotePour,

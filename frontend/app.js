@@ -158,23 +158,41 @@ function updateStats() { const e = document.getElementById("stat-councils"), t =
 function formatDate(e) { if (!e) return "Date inconnue"; try { const t = new Date(e); return isNaN(t.getTime()) ? e : t.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" }) } catch (t) { return e } }
 
 function render() {
-    const e = document.getElementById("timeline");
-    if (!e) return;
-    let t = 0;
-    const n = allCouncils.map(e => { const n = (e.deliberations || []).filter(e => e.title.toLowerCase().includes(searchQuery) || e.summary.toLowerCase().includes(searchQuery) || e.topic_tag && e.topic_tag.toLowerCase().includes(searchQuery)); return t += n.length, n.length > 0 ? { ...e, deliberations: n } : null }).filter(e => null !== e), s = n.slice(0, visibleCouncilsCount);
-    if (e.innerHTML = "", s.forEach(t => {
-        const n = document.createElement("section");
-        n.className = "council-group animate-slide-up mb-20";
-        const s = formatDate(t.date), a = t.deliberations?.length || 0, r = escapeHTML(t.title);
-        let o = (t.summary || "").replace(/\s+/g, " ").trim(), l = o;
-        (!o || o === t.title || o.length < 10) && (l = `Ce conseil a traité ${a} délibérations.`);
-        const i = t.analysis ? escapeHTML(t.analysis.vote_summary) : escapeHTML(l);
-        const agendaHtml = t.agenda ? `<div class="badge-agenda"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>${t.agenda}</div>` : "";
+    const container = document.getElementById("timeline");
+    if (!container) return;
+
+    // Filtrage des conseils selon la recherche
+    const filteredCouncils = allCouncils.map(council => {
+        const matchingDelibs = (council.deliberations || []).filter(d => 
+            d.title.toLowerCase().includes(searchQuery) || 
+            d.summary.toLowerCase().includes(searchQuery) || 
+            (d.topic_tag && d.topic_tag.toLowerCase().includes(searchQuery))
+        );
+        return matchingDelibs.length > 0 || searchQuery === "" ? { ...council, deliberations: matchingDelibs } : null;
+    }).filter(c => c !== null);
+
+    const visibleCouncils = filteredCouncils.slice(0, visibleCouncilsCount);
+    container.innerHTML = "";
+
+    visibleCouncils.forEach(council => {
+        const section = document.createElement("section");
+        section.className = "council-group animate-slide-up mb-20";
+        
+        const dateStr = formatDate(council.date);
+        const delibCount = council.deliberations?.length || 0;
+        const title = escapeHTML(council.title);
+        
+        let rawSummary = (council.summary || "").replace(/\s+/g, " ").trim();
+        if (!rawSummary || rawSummary === council.title || rawSummary.length < 10) {
+            rawSummary = `Ce conseil a traité ${delibCount} délibérations.`;
+        }
+
+        const agendaHtml = council.agenda ? `<div class="badge-agenda"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>${council.agenda}</div>` : "";
         
         let councilRibbonHtml = '';
         let councilLegendHtml = '';
-        if (t.analysis && t.analysis.budget_impact) {
-            const mainLabel = t.analysis.budget_label || 'Autres';
+        if (council.analysis && council.analysis.budget_impact) {
+            const mainLabel = council.analysis.budget_label || 'Autres';
             const mainColor = COLORS[mainLabel] || COLORS['Autres'];
 
             councilRibbonHtml = `
@@ -191,24 +209,24 @@ function render() {
                 </div>`;
         }
 
-        const totalVotes = t.analysis ? (t.analysis.votes_pour + t.analysis.votes_contre) : 0;
-        const pourPct = totalVotes > 0 ? (t.analysis.votes_pour / totalVotes * 100).toFixed(0) : 0;
-        const contrePct = totalVotes > 0 ? (t.analysis.votes_contre / totalVotes * 100).toFixed(0) : 0;
+        const totalVotes = council.analysis ? (council.analysis.votes_pour + council.analysis.votes_contre) : 0;
+        const pourPct = totalVotes > 0 ? (council.analysis.votes_pour / totalVotes * 100).toFixed(0) : 0;
+        const contrePct = totalVotes > 0 ? (council.analysis.votes_contre / totalVotes * 100).toFixed(0) : 0;
 
-        const analysisHtml = t.analysis ? `<div class="analysis-grid grid grid-cols-1 gap-4 mt-6">
+        const analysisHtml = council.analysis ? `<div class="analysis-grid grid grid-cols-1 gap-4 mt-6">
             <div class="analysis-card bg-slate-50/50 border border-slate-100 rounded-2xl p-6">
                 <span class="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">💰 Impact Financier</span>
-                <div class="text-2xl font-black text-slate-900">${t.analysis.budget_impact.toLocaleString("fr-FR")} €</div>
+                <div class="text-2xl font-black text-slate-900">${council.analysis.budget_impact.toLocaleString("fr-FR")} €</div>
                 ${councilRibbonHtml}
                 ${councilLegendHtml}
             </div>
             <div class="analysis-card bg-slate-50/50 border border-slate-100 rounded-2xl p-6">
                 <span class="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">⚖️ Climat des Votes</span>
-                <div class="vote-climat ${t.analysis.vote_climat === "consensus" ? "climat-consensus" : "climat-tensions"}">${t.analysis.vote_climat.toUpperCase()}</div>
+                <div class="vote-climat ${council.analysis.vote_climat === "consensus" ? "climat-consensus" : "climat-tensions"}">${council.analysis.vote_climat.toUpperCase()}</div>
                 <div class="mt-4 flex flex-col gap-2">
                     <div class="flex justify-between text-[11px] font-bold text-slate-500">
-                        <span>Pour: ${t.analysis.votes_pour}</span>
-                        <span>Contre: ${t.analysis.votes_contre}</span>
+                        <span>Pour: ${council.analysis.votes_pour}</span>
+                        <span>Contre: ${council.analysis.votes_contre}</span>
                     </div>
                     <div class="h-1.5 w-full bg-slate-100 rounded-full flex overflow-hidden">
                         <div style="width: ${pourPct}%; background: #10b981;"></div>
@@ -218,27 +236,34 @@ function render() {
             </div>
         </div>` : "";
         
-        const enjeuCleHtml = t.analysis && t.analysis.vote_summary ? 
-            `<p class="text-slate-600 leading-relaxed max-w-4xl text-xl font-light mt-8"><span class="font-bold text-slate-900 mr-2">Enjeu Clé :</span>${t.analysis.vote_summary.replace("Enjeu Clé :", "").replace("Enjeu Clé", "")}</p>` : "";
+        const enjeuCleHtml = council.analysis && council.analysis.vote_summary ? 
+            `<p class="text-slate-600 leading-relaxed max-w-4xl text-xl font-light mt-8"><span class="font-bold text-slate-900 mr-2">Enjeu Clé :</span>${council.analysis.vote_summary.replace("Enjeu Clé :", "").replace("Enjeu Clé", "")}</p>` : "";
 
-        n.innerHTML = `
+        section.innerHTML = `
             <div class="flex items-center gap-6 mb-8">
                 <div class="h-px flex-1 bg-slate-200/60"></div>
-                <h2 class="text-[13px] font-semibold text-slate-500 uppercase tracking-[0.15em] bg-white px-6 py-2.5 rounded-full shadow-micro">${s}</h2>
+                <h2 class="text-[13px] font-semibold text-slate-500 uppercase tracking-[0.15em] bg-white px-6 py-2.5 rounded-full shadow-micro">${dateStr}</h2>
                 <div class="h-px flex-1 bg-slate-200/60"></div>
             </div>
             <div class="bg-white rounded-[2rem] shadow-card overflow-hidden mt-5 md:mt-0">
                 <div class="px-4 pt-5 pb-[10px] md:px-12 md:py-10 border-b border-slate-100/60">
                     ${agendaHtml}
-                    <h3 class="text-2xl md:text-3xl font-bold text-slate-900 pt-4 md:pt-0 mb-4 tracking-tight">${r}</h3>
+                    <h3 class="text-2xl md:text-3xl font-bold text-slate-900 pt-4 md:pt-0 mb-4 tracking-tight">${title}</h3>
                     ${analysisHtml}
                     ${enjeuCleHtml}
                 </div>
-                <div class="divide-y divide-slate-100/50">${t.deliberations.map(e => renderDeliberationRow(e)).join("")}</div>
-            </div>`, e.appendChild(n)
-    }), n.length > visibleCouncilsCount) {
-        const t = n.length - visibleCouncilsCount, s = document.createElement("button");
-        s.onclick = loadMore, s.className = "w-full py-5 bg-white rounded-2xl text-slate-600 hover:text-brand-600 font-medium text-sm tracking-wide transition-all shadow-micro group active:scale-[0.98] min-h-[44px] mb-12", s.innerHTML = `<div class="flex items-center justify-center gap-2"><span>Charger les archives</span><span class="text-xs text-slate-500 font-normal">(${t} restants)</span><svg class="w-4 h-4 opacity-40 group-hover:translate-y-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg></div>`, e.appendChild(s)
+                <div class="divide-y divide-slate-100/50">${council.deliberations.map(d => renderDeliberationRow(d)).join("")}</div>
+            </div>`;
+        container.appendChild(section);
+    });
+
+    if (filteredCouncils.length > visibleCouncilsCount) {
+        const remaining = filteredCouncils.length - visibleCouncilsCount;
+        const loadMoreBtn = document.createElement("button");
+        loadMoreBtn.onclick = loadMore;
+        loadMoreBtn.className = "w-full py-5 bg-white rounded-2xl text-slate-600 hover:text-brand-600 font-medium text-sm tracking-wide transition-all shadow-micro group active:scale-[0.98] min-h-[44px] mb-12";
+        loadMoreBtn.innerHTML = `<div class="flex items-center justify-center gap-2"><span>Charger les archives</span><span class="text-xs text-slate-500 font-normal">(${remaining} restants)</span><svg class="w-4 h-4 opacity-40 group-hover:translate-y-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg></div>`;
+        container.appendChild(loadMoreBtn);
     }
 }
 

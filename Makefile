@@ -11,6 +11,9 @@ build:
 	# Worker
 	cd lambdas/worker && GOOS=linux GOARCH=arm64 go build -o bootstrap main.go gemini.go handler.go
 	cd lambdas/worker && zip -j ../../dist/worker.zip bootstrap && rm bootstrap
+	# Aggregator
+	cd lambdas/aggregator && go mod tidy && GOOS=linux GOARCH=arm64 go build -o bootstrap main.go
+	cd lambdas/aggregator && zip -j ../../dist/aggregator.zip bootstrap && rm bootstrap
 	# Publisher
 	cd lambdas/publisher && GOOS=linux GOARCH=arm64 go build -o bootstrap main.go handler.go
 	cd lambdas/publisher && zip -j ../../dist/publisher.zip bootstrap && rm bootstrap

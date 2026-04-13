@@ -187,10 +187,26 @@ function render() {
         const agendaHtml = council.agenda ? `<div class="badge-agenda"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>${council.agenda}</div>` : "";
         
         let councilRibbonHtml = '', councilLegendHtml = '';
-        if (council.analysis && council.analysis.budget_impact) {
-            const mainLabel = council.analysis.budget_label || 'Autres', mainColor = COLORS[mainLabel] || COLORS['Autres'];
-            councilRibbonHtml = `<div class="flex gap-1 rounded-full overflow-hidden mt-5 bg-slate-100" style="height: 10px;"><div style="width: 100%; background: ${mainColor};"></div></div>`;
-            councilLegendHtml = `<div class="flex flex-wrap mt-4 text-xs font-bold text-slate-500 leading-none" style="gap: 20px; row-gap: 12px;"><div class="flex items-center gap-2"><span class="mr-1" style="width: 10px; height: 10px; border-radius: 2px; background: ${mainColor}"></span><span>100% ${mainLabel}</span></div></div>`;
+        const councilTotal = council.analysis ? council.analysis.budget_impact : 0;
+        if (councilTotal > 0) {
+            const cats = {};
+            (council.deliberations || []).forEach(d => {
+                if (d.budget_impact > 0) { const cat = d.topic_tag || 'Autres'; cats[cat] = (cats[cat] || 0) + d.budget_impact; }
+            });
+            const sortedCats = Object.entries(cats).sort((a, b) => b[1] - a[1]);
+            councilRibbonHtml = '<div class="flex rounded-full overflow-hidden mt-5 bg-slate-100" style="height: 10px;">';
+            sortedCats.forEach(([name, val]) => {
+                const pct = (val / councilTotal * 100).toFixed(1);
+                councilRibbonHtml += `<div style="width:${pct}%;background:${COLORS[name]||COLORS['Autres']}"></div>`;
+            });
+            councilRibbonHtml += '</div>';
+            councilLegendHtml = '<div class="flex flex-wrap mt-4 text-xs font-bold text-slate-500 leading-none" style="gap:20px;row-gap:12px;">';
+            sortedCats.forEach(([name, val]) => {
+                const pct = Math.round(val / councilTotal * 100);
+                const color = COLORS[name] || COLORS['Autres'];
+                councilLegendHtml += `<div class="flex items-center gap-2"><span class="mr-1" style="width:10px;height:10px;border-radius:2px;background:${color}"></span><span>${pct}% ${name}</span></div>`;
+            });
+            councilLegendHtml += '</div>';
         }
 
         const totalVotes = council.analysis ? (council.analysis.votes_pour + council.analysis.votes_contre) : 0;

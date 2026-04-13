@@ -6,25 +6,25 @@
 build:
 	mkdir -p dist
 	# Orchestrator
-	cd lambdas/orchestrator && GOOS=linux GOARCH=arm64 go build -o bootstrap main.go scraper.go
+	cd lambdas/orchestrator && GOOS=linux GOARCH=arm64 go build -o bootstrap .
 	cd lambdas/orchestrator && zip -j ../../dist/orchestrator.zip bootstrap && rm bootstrap
 	# Worker
-	cd lambdas/worker && GOOS=linux GOARCH=arm64 go build -o bootstrap main.go gemini.go handler.go
+	cd lambdas/worker && GOOS=linux GOARCH=arm64 go build -o bootstrap .
 	cd lambdas/worker && zip -j ../../dist/worker.zip bootstrap && rm bootstrap
 	# Aggregator
-	cd lambdas/aggregator && go mod tidy && GOOS=linux GOARCH=arm64 go build -o bootstrap main.go
+	cd lambdas/aggregator && go mod tidy && GOOS=linux GOARCH=arm64 go build -o bootstrap .
 	cd lambdas/aggregator && zip -j ../../dist/aggregator.zip bootstrap && rm bootstrap
 	# Publisher
-	cd lambdas/publisher && GOOS=linux GOARCH=arm64 go build -o bootstrap main.go handler.go
+	cd lambdas/publisher && GOOS=linux GOARCH=arm64 go build -o bootstrap .
 	cd lambdas/publisher && zip -j ../../dist/publisher.zip bootstrap && rm bootstrap
 	# SubscribeFunction
-	cd lambdas/subscriber && go mod tidy && GOOS=linux GOARCH=arm64 go build -o bootstrap main.go handler.go
+	cd lambdas/subscriber && go mod tidy && GOOS=linux GOARCH=arm64 go build -o bootstrap .
 	cd lambdas/subscriber && zip -j ../../dist/subscriber.zip bootstrap && rm bootstrap
 	# ContactFunction
-	cd lambdas/contact && go mod tidy && GOOS=linux GOARCH=arm64 go build -o bootstrap main.go handler.go
+	cd lambdas/contact && go mod tidy && GOOS=linux GOARCH=arm64 go build -o bootstrap .
 	cd lambdas/contact && zip -j ../../dist/contact.zip bootstrap && rm bootstrap
 	# Confirmer
-	cd lambdas/confirmer && go mod tidy && GOOS=linux GOARCH=arm64 go build -o bootstrap main.go handler.go
+	cd lambdas/confirmer && go mod tidy && GOOS=linux GOARCH=arm64 go build -o bootstrap .
 	cd lambdas/confirmer && zip -j ../../dist/confirmer.zip bootstrap && rm bootstrap
 
 deploy: build

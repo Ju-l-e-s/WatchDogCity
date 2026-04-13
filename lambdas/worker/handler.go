@@ -85,6 +85,8 @@ func (h *WorkerHandler) handleRecord(ctx context.Context, msg SQSPayload, result
 		"summary":         result.Summary,
 		"is_substantial":  result.IsSubstantial,
 		"analysis_data":   result.AnalysisData,
+		"budget_impact":   result.BudgetImpact,
+		"climate_impact":  result.ClimateImpact,
 		"key_points":      result.KeyPoints,
 		"has_vote":        result.Vote.HasVote,
 		"vote_pour":       result.Vote.Pour,

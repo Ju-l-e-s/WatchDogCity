@@ -9,8 +9,6 @@ import (
 	"google.golang.org/genai"
 )
 
-const geminiModel = "gemini-2.5-pro"
-
 const deliberationPrompt = `Tu es un analyste de données factuel et neutre spécialisé dans les affaires publiques locales. 
 Analyse ce document PDF de délibération du conseil municipal de Bègles.
 
@@ -30,6 +28,8 @@ Retourne UNIQUEMENT un objet JSON valide avec cette structure exacte :
     "impacts": "en 1 à 2 phrases : conséquences directes pour les Béglaises et Béglais (ou null si aucun impact identifiable)",
     "points_debattus": "en 1 phrase : s'il y a eu débat ou opposition, résumer le désaccord (ou null si vote unanime sans discussion)"
   },
+  "budget_impact": 150000,
+  "climate_impact": "positif/neutre/negatif",
   "key_points": [
     "point clé 1 (style télégraphique, très concis)",
     "point clé 2",
@@ -46,6 +46,8 @@ Retourne UNIQUEMENT un objet JSON valide avec cette structure exacte :
 
 Règles d'exécution strictes :
 - Identifie systématiquement les acronymes ou sigles techniques (ex: CCAS, CREPAQ, EPCI, DSP) présents dans le PDF et donne leur définition complète dans le champ "acronyms".
+- Le champ "budget_impact" doit contenir le montant total HT (Hors Taxes) mentionné en euros (entier). Si aucun montant n'est mentionné, mets impérativement 0. Ne mets jamais null.
+- Le champ "climate_impact" doit être "positif" (investissement vert, nature en ville, isolation), "negatif" (artificialisation, fossile) ou "neutre" (fonctionnement courant, social sans impact bâti). Par défaut, mets "neutre".
 - Le champ "is_substantial" doit être "true" uniquement si le document est dense (budget, DSP, projet structurant).
 - Séparation des préoccupations : Ne génère JAMAIS de balises HTML. Retourne uniquement du texte brut dans les champs.
 - Si le document ne mentionne pas de vote, "has_vote" doit être "false" et les compteurs à "null".
@@ -64,8 +66,10 @@ type GeminiResult struct {
 		Impacts        *string `json:"impacts"`
 		PointsDebattus *string `json:"points_debattus"`
 	} `json:"analysis_data"`
-	KeyPoints []string `json:"key_points"`
-	Vote      struct {
+	BudgetImpact  int64    `json:"budget_impact"`
+	ClimateImpact string   `json:"climate_impact"`
+	KeyPoints     []string `json:"key_points"`
+	Vote          struct {
 		HasVote    bool `json:"has_vote"`
 		Pour       *int `json:"pour"`
 		Contre     *int `json:"contre"`
@@ -79,8 +83,13 @@ type GeminiResult struct {
 }
 
 func analyzeWithGemini(ctx context.Context, apiKey string, pdfBytes []byte) (*GeminiResult, error) {
+	modelName := os.Getenv("GEMINI_MODEL")
+	if modelName == "" {
+		modelName = "gemini-2.5-pro"
+	}
+
 	client, err := genai.NewClient(ctx, &genai.ClientConfig{
-		APIKey:   apiKey,
+		APIKey:      apiKey,
 		HTTPOptions: genai.HTTPOptions{APIVersion: "v1"},
 	})
 	if err != nil {
@@ -106,7 +115,7 @@ func analyzeWithGemini(ctx context.Context, apiKey string, pdfBytes []byte) (*Ge
 
 	resp, err := client.Models.GenerateContent(
 		ctx,
-		geminiModel,
+		modelName,
 		contents,
 		nil,
 	)

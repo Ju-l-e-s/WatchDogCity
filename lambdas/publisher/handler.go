@@ -24,14 +24,24 @@ type PublisherEvent struct {
 }
 
 type CouncilRecord struct {
-	CouncilID string `dynamodbav:"council_id"`
-	Category  string `dynamodbav:"category"`
-	Date      string `dynamodbav:"date"`
-	Title     string `dynamodbav:"title"`
-	Summary   string `dynamodbav:"summary"`
-	SourceURL string `dynamodbav:"source_url"`
-	TotalPDFs int    `dynamodbav:"total_pdfs"`
-	Processed int    `dynamodbav:"processed_pdfs"`
+	CouncilID string          `dynamodbav:"council_id"`
+	Category  string          `dynamodbav:"category"`
+	Date      string          `dynamodbav:"date"`
+	Title     string          `dynamodbav:"title"`
+	Summary   string          `dynamodbav:"summary"`
+	SourceURL string          `dynamodbav:"source_url"`
+	TotalPDFs int             `dynamodbav:"total_pdfs"`
+	Processed int             `dynamodbav:"processed_pdfs"`
+	Analysis  CouncilAnalysis `dynamodbav:"analysis"`
+}
+
+type CouncilAnalysis struct {
+	BudgetImpact int64  `dynamodbav:"budget_impact" json:"budget_impact"`
+	BudgetLabel  string `dynamodbav:"budget_label" json:"budget_label"`
+	VoteClimat   string `dynamodbav:"vote_climat" json:"vote_climat"`
+	VoteSummary  string `dynamodbav:"vote_summary" json:"vote_summary"`
+	VotesPour    int    `dynamodbav:"votes_pour" json:"votes_pour"`
+	VotesContre  int    `dynamodbav:"votes_contre" json:"votes_contre"`
 }
 
 type DeliberationRecord struct {
@@ -67,6 +77,7 @@ type CouncilOutput struct {
 	Title         string               `json:"title"`
 	Summary       string               `json:"summary"`
 	SourceURL     string               `json:"source_url"`
+	Analysis      CouncilAnalysis      `json:"analysis"`
 	Deliberations []DeliberationOutput `json:"deliberations"`
 }
 
@@ -112,6 +123,7 @@ func buildDataJSON(ctx context.Context, ddb *dynamodb.Client, councils []Council
 			Title:     c.Title,
 			Summary:   c.Summary,
 			SourceURL: c.SourceURL,
+			Analysis:  c.Analysis,
 		}
 		for _, d := range delibs[c.CouncilID] {
 			co.Deliberations = append(co.Deliberations, DeliberationOutput{

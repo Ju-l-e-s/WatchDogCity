@@ -40,6 +40,7 @@ class WatchdogStack(Stack):
             partition_key=dynamodb.Attribute(name="id", type=dynamodb.AttributeType.STRING),
             billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
             removal_policy=RemovalPolicy.RETAIN,
+            stream=dynamodb.StreamViewType.NEW_IMAGE,
         )
         deliberations_table.add_global_secondary_index(
             index_name="council_id-index",
@@ -99,6 +100,10 @@ class WatchdogStack(Stack):
             ),
         )
 
+        # ── Gemini Models ────────────────────────────────────────────────
+        worker_model = "gemini-2.5-pro"
+        aggregator_model = "gemini-3.1-pro-preview"
+
         # ── Lambda common config ──────────────────────────────────────────
         common_env = {
             "COUNCILS_TABLE": councils_table.table_name,
@@ -130,7 +135,10 @@ class WatchdogStack(Stack):
             handler="bootstrap",
             code=lambda_.Code.from_asset("../dist/worker.zip"),
             timeout=Duration.minutes(5),
-            environment=common_env,
+            environment={
+                **common_env,
+                "GEMINI_MODEL": worker_model,
+            },
         )
         worker.add_event_source(lambda_events.SqsEventSource(
             pdf_queue,
@@ -163,7 +171,31 @@ class WatchdogStack(Stack):
             resources=["*"],
         ))
 
-        # Worker needs to invoke Publisher
+        # ── Lambda: Aggregator ───────────────────────────────────────────
+        aggregator = lambda_.Function(
+            self, "Aggregator",
+            runtime=lambda_.Runtime.PROVIDED_AL2023,
+            architecture=lambda_.Architecture.ARM_64,
+            handler="bootstrap",
+            code=lambda_.Code.from_asset("../dist/aggregator.zip"),
+            timeout=Duration.minutes(5),
+            environment={
+                **common_env,
+                "GEMINI_MODEL": aggregator_model,
+                "PUBLISHER_FUNCTION_NAME": publisher.function_name,
+            },
+        )
+        aggregator.add_event_source(lambda_events.DynamoEventSource(
+            deliberations_table,
+            starting_position=lambda_.StartingPosition.LATEST,
+            batch_size=1,
+            retry_attempts=2,
+        ))
+        councils_table.grant_read_write_data(aggregator)
+        deliberations_table.grant_read_data(aggregator)
+        publisher.grant_invoke(aggregator)
+
+        # Worker needs to invoke Publisher (keeping for backward compatibility or removing if not needed)
         publisher.grant_invoke(worker)
         worker.add_environment("PUBLISHER_FUNCTION_NAME", publisher.function_name)
 

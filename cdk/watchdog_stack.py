@@ -298,18 +298,16 @@ class WatchdogStack(Stack):
             cache_control=[s3_deploy.CacheControl.from_string("public, max-age=31536000, immutable")],
         )
 
-        # 2. Déploiement de la Configuration (HTML/CSS/JS) - AVEC Invalidation Chirurgicale
+        # 2. Déploiement de la Configuration (HTML) - AVEC Invalidation Chirurgicale
         deploy_config = s3_deploy.BucketDeployment(
             self, "DeployWebsiteConfig",
-            sources=[s3_deploy.Source.asset("../frontend", 
-                exclude=[
-                    "*.png", "*.svg", "*.webp", "fonts/*", "node_modules/*", 
-                    "data.json", "package.json", "package-lock.json", "input.css", "tailwind.config.js"
-                ])],
-            destination_bucket=website_bucket,
+            sources=[s3_deploy.Source.asset("../frontend",
+                exclude=["*", "!index.html", "!merci.html"]
+            )],
+            destination_bucket=website_bucket,            
             distribution=distribution,
             # ON NE PURGE QUE LES FICHIERS CRITIQUES (Très rapide : < 60s)
-            distribution_paths=["/index.html", "/app.js", "/style.css", "/merci.html"],
+            distribution_paths=["/index.html", "/merci.html"],
             cache_control=[s3_deploy.CacheControl.from_string("no-cache, no-store, must-revalidate")],
             prune=False,
         )

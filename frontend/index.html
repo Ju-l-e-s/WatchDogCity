@@ -38,6 +38,33 @@
 
 <body class="bg-[#F8FAFC] text-slate-900 min-h-screen overflow-x-hidden">
 
+  <style>
+    #global-loader {
+      position: fixed; inset: 0; z-index: 99999;
+      background-color: #F8FAFC;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      transition: opacity 0.5s ease-out;
+    }
+    .loader-spinner {
+      width: 48px; height: 48px;
+      border: 4px solid #e2e8f0; border-top-color: #0f172a;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-bottom: 16px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loader-text {
+      color: #0f172a; font-family: 'Outfit', 'Inter', system-ui, sans-serif;
+      font-weight: 500; letter-spacing: 0.025em; margin: 0;
+    }
+  </style>
+  
+  <!-- Global Loader -->
+  <div id="global-loader">
+    <div class="loader-spinner"></div>
+    <p class="loader-text">Chargement de l'Observatoire...</p>
+  </div>
+
   <!-- Navbar -->
   <nav class="glass sticky top-0 z-50 transition-all duration-300" role="navigation" aria-label="Navigation principale">
     <div class="max-w-5xl mx-auto px-6 h-16 flex items-center justify-between">

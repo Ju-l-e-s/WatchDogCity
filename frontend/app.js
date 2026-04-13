@@ -35,10 +35,11 @@ const COLORS = {
 
 function escapeRegExp(e) { return e.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") }
 function escapeHTML(e) { if (!e) return ""; const t = document.createElement("div"); return t.textContent = e, t.innerHTML }
-function toggleAboutModal(e) { document.getElementById("about-modal").classList.toggle("hidden", !e), document.body.classList.toggle("modal-open", e) }
-function toggleTeamModal(e) { const t = document.getElementById("team-modal"), n = document.getElementById("team-modal-body"), s = document.getElementById("team-scroll-indicator"); t.classList.toggle("hidden", !e), document.body.classList.toggle("modal-open", e), e && n && s && (n.scrollTop = 0, s.style.opacity = "1", n.dataset.hasScrollListener || (n.addEventListener("scroll", () => { n.scrollTop > 50 ? s.style.opacity = "0" : s.style.opacity = "1" }), n.dataset.hasScrollListener = "true")) }
-function toggleContactModal(e) { document.getElementById("contact-modal").classList.toggle("hidden", !e), document.body.classList.toggle("modal-open", e) }
-function toggleMobileMenu(e) { document.getElementById("mobile-menu").classList.toggle("hidden", !e), document.body.classList.toggle("modal-open", e), e ? setTimeout(() => { document.getElementById("mobile-search-input")?.focus() }, 100) : document.getElementById("mobile-search-input")?.blur() }
+let lastFocusedElement = null;
+function toggleAboutModal(e) { if (e) lastFocusedElement = document.activeElement; document.getElementById("about-modal").classList.toggle("hidden", !e), document.body.classList.toggle("modal-open", e); if (!e && lastFocusedElement) { lastFocusedElement.focus(); lastFocusedElement = null; } }
+function toggleTeamModal(e) { if (e) lastFocusedElement = document.activeElement; const t = document.getElementById("team-modal"), n = document.getElementById("team-modal-body"), s = document.getElementById("team-scroll-indicator"); t.classList.toggle("hidden", !e), document.body.classList.toggle("modal-open", e), e && n && s && (n.scrollTop = 0, s.style.opacity = "1", n.dataset.hasScrollListener || (n.addEventListener("scroll", () => { n.scrollTop > 50 ? s.style.opacity = "0" : s.style.opacity = "1" }), n.dataset.hasScrollListener = "true")); if (!e && lastFocusedElement) { lastFocusedElement.focus(); lastFocusedElement = null; } }
+function toggleContactModal(e) { if (e) lastFocusedElement = document.activeElement; document.getElementById("contact-modal").classList.toggle("hidden", !e), document.body.classList.toggle("modal-open", e); if (!e && lastFocusedElement) { lastFocusedElement.focus(); lastFocusedElement = null; } }
+function toggleMobileMenu(e) { if (e) lastFocusedElement = document.activeElement; document.getElementById("mobile-menu").classList.toggle("hidden", !e), document.body.classList.toggle("modal-open", e), e ? setTimeout(() => { document.getElementById("mobile-search-input")?.focus() }, 100) : (document.getElementById("mobile-search-input")?.blur(), lastFocusedElement && (lastFocusedElement.focus(), lastFocusedElement = null)) }
 function smartCapitalize(e) { if (!e) return ""; return e.split(" ").map((e, t) => { if (e.length > 1 && e === e.toUpperCase() && !/^[0-9]+$/.test(e)) return e; const n = e.toLowerCase(); return 0 === t ? n.charAt(0).toUpperCase() + n.slice(1) : n }).join(" ") }
 function applyAcronyms(e, t) { const n = { ...GLOBAL_GLOSSARY, ...t || {} }; if (0 === Object.keys(n).length) return e; let s = e; return Object.keys(n).sort((e, t) => t.length - e.length).forEach(e => { const t = escapeHTML(n[e]), a = new RegExp(`\\b${e}\\b`, "g"); s = s.replace(a, `<abbr title="${t}" class="cursor-help border-b border-dotted border-brand-300 decoration-brand-300 decoration-2 underline-offset-4" tabindex="0">${e}</abbr>`) }), s }
 function highlightText(e, t, n = null) { let s = escapeHTML(e); if (n && (s = applyAcronyms(s, n)), !t) return s; const a = escapeRegExp(escapeHTML(t)), r = new RegExp(`(${a})`, "gi"); return s.split(/(<[^>]+>)/g).map(e => e.startsWith("<") ? e : e.replace(r, '<mark class="bg-brand-100 text-brand-700 font-bold px-0.5 rounded">$1</mark>')).join("") }
@@ -50,25 +51,31 @@ async function init() {
         if (!e.ok) { throw new Error(`HTTP Error: ${e.status}`) }
         const t = await e.json();
         console.log("✅ Données reçues:", t);
-        
+
         if (t.next_council_date) {
             const e = document.getElementById("next-council-date");
             if(e) e.textContent = t.next_council_date;
             const n = document.getElementById("next-council-block");
             if(n) n.classList.remove("hidden");
         }
-        
+
         allCouncils = (t.councils || []).sort((e, t) => t.date.localeCompare(e.date));
         console.log("📊 Nombre de conseils:", allCouncils.length);
-        
+
         updateStats();
         renderDashboard();
         render();
     } catch (e) {
         console.error("❌ Erreur Init:", e);
+    } finally {
+        const loader = document.getElementById("global-loader");
+        if (loader) {
+            loader.style.opacity = "0";
+            loader.style.pointerEvents = "none";
+            setTimeout(() => loader.remove(), 500);
+        }
     }
 }
-
 function renderDashboard() {
     console.log("🎨 Rendu du Dashboard...");
     const container = document.getElementById('global-dashboard');
@@ -97,11 +104,11 @@ function renderDashboard() {
 
     const sortedCats = Object.entries(categories).sort((a, b) => b[1] - a[1]);
     
-    let ribbonHtml = '<div class="ribbon-bar flex h-3 bg-slate-100 rounded-full overflow-hidden mb-4 shadow-inner">';
+    let ribbonHtml = '<div class="ribbon-bar flex h-3 bg-slate-100 rounded-full overflow-hidden mb-4 shadow-inner" role="progressbar" aria-label="Répartition du budget">';
     sortedCats.forEach(([name, val]) => {
         const pct = totalBudget > 0 ? (val / totalBudget * 100).toFixed(1) : 0;
         const color = COLORS[name] || COLORS['Autres'];
-        ribbonHtml += `<div class="ribbon-segment" style="width: ${pct}%; background: ${color}" title="${name}: ${pct}%"></div>`;
+        ribbonHtml += `<div class="ribbon-segment" style="width: ${pct}%; background: ${color}" title="${name}: ${pct}%"><span class="sr-only">${name} : ${pct}%</span></div>`;
     });
     ribbonHtml += '</div>';
 
@@ -177,9 +184,10 @@ function render() {
     const visibleCouncils = filteredCouncils.slice(0, visibleCouncilsCount);
     container.innerHTML = "";
 
-    visibleCouncils.forEach(council => {
+    visibleCouncils.forEach((council, index) => {
         const section = document.createElement("section");
         section.className = "council-group animate-slide-up mb-20";
+        section.id = `council-group-${index}`;
         const dateStr = formatDate(council.date), delibCount = council.deliberations?.length || 0, title = escapeHTML(council.title);
         let rawSummary = (council.summary || "").replace(/\s+/g, " ").trim();
         if (!rawSummary || rawSummary === council.title || rawSummary.length < 10) rawSummary = `Ce conseil a traité ${delibCount} délibérations.`;
@@ -194,10 +202,10 @@ function render() {
                 if (d.budget_impact > 0) { const cat = d.topic_tag || 'Autres'; cats[cat] = (cats[cat] || 0) + d.budget_impact; }
             });
             const sortedCats = Object.entries(cats).sort((a, b) => b[1] - a[1]);
-            councilRibbonHtml = '<div class="flex rounded-full overflow-hidden mt-5 bg-slate-100" style="height: 10px;">';
+            councilRibbonHtml = '<div class="flex rounded-full overflow-hidden mt-5 bg-slate-100" style="height: 10px;" role="progressbar" aria-label="Répartition du budget">';
             sortedCats.forEach(([name, val]) => {
                 const pct = (val / councilTotal * 100).toFixed(1);
-                councilRibbonHtml += `<div style="width:${pct}%;background:${COLORS[name]||COLORS['Autres']}"></div>`;
+                councilRibbonHtml += `<div style="width:${pct}%;background:${COLORS[name]||COLORS['Autres']}" title="${name}: ${pct}%"><span class="sr-only">${name} : ${pct}%</span></div>`;
             });
             councilRibbonHtml += '</div>';
             councilLegendHtml = '<div class="flex flex-wrap mt-4 text-xs font-bold text-slate-500 leading-none" style="gap:20px;row-gap:12px;">';
@@ -222,7 +230,16 @@ function render() {
                     analysisHtml += `<div class="analysis-card bg-slate-50/50 border border-slate-100 rounded-2xl p-6"><span class="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">💰 Impact Financier</span><div class="text-2xl font-black text-slate-900">${council.analysis.budget_impact.toLocaleString("fr-FR")} €</div>${councilRibbonHtml}${councilLegendHtml}</div>`;
                 }
                 if (hasVotes) {
-                    analysisHtml += `<div class="analysis-card bg-slate-50/50 border border-slate-100 rounded-2xl p-6"><span class="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">⚖️ Climat des Votes</span><div class="vote-climat ${council.analysis.vote_climat === "consensus" ? "climat-consensus" : "climat-tensions"}">${council.analysis.vote_climat.toUpperCase()}</div><div class="mt-4 flex flex-col gap-2"><div class="flex justify-between text-[11px] font-bold text-slate-500"><span>Pour: ${council.analysis.votes_pour}</span><span>Contre: ${council.analysis.votes_contre}</span></div><div class="h-1.5 w-full bg-slate-100 rounded-full flex overflow-hidden"><div style="width: ${pourPct}%; background: #10b981;"></div><div style="width: ${contrePct}%; background: #ef4444;"></div></div></div></div>`;
+                    const isConsensus = council.analysis.vote_climat === "consensus";
+                    const badgeClasses = isConsensus 
+                        ? "bg-emerald-50 text-emerald-700 border-emerald-200" 
+                        : "bg-rose-50 text-rose-700 border-rose-200";
+                    const iconSvg = isConsensus 
+                        ? `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`
+                        : `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>`;
+                    const labelText = isConsensus ? "CONSENSUS" : "TENSIONS";
+
+                    analysisHtml += `<div class="analysis-card bg-slate-50/50 border border-slate-100 rounded-2xl p-6"><span class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">⚖️ Climat des Votes</span><div class="flex items-center gap-3 mb-5"><div class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border font-bold text-xs tracking-wide uppercase shadow-sm ${badgeClasses}">${iconSvg} ${labelText}</div><span class="text-[11px] font-medium text-slate-400">Tendance du conseil</span></div><div class="flex flex-col gap-2"><div class="flex justify-between text-[11px] font-bold uppercase tracking-wider text-slate-500"><span>Pour : <span class="text-emerald-600 font-black">${council.analysis.votes_pour}</span></span><span>Contre : <span class="text-rose-600 font-black">${council.analysis.votes_contre}</span></span></div><div class="h-2.5 w-full bg-slate-200 rounded-full flex overflow-hidden shadow-inner"><div style="width: ${pourPct}%;" class="bg-emerald-500"></div><div style="width: ${contrePct}%;" class="bg-rose-500"></div></div></div></div>`;
                 }
                 analysisHtml += `</div>`;
             }
@@ -252,7 +269,16 @@ function render() {
     if (filteredCouncils.length > visibleCouncilsCount) {
         const remaining = filteredCouncils.length - visibleCouncilsCount;
         const loadMoreBtn = document.createElement("button");
-        loadMoreBtn.onclick = loadMore;
+        loadMoreBtn.id = "btn-load-more";
+        loadMoreBtn.onclick = () => {
+            const oldCount = visibleCouncilsCount;
+            loadMore();
+            const firstNewCouncil = document.getElementById(`council-group-${oldCount}`);
+            if (firstNewCouncil) {
+                firstNewCouncil.setAttribute("tabindex", "-1");
+                firstNewCouncil.focus({ preventScroll: true });
+            }
+        };
         loadMoreBtn.className = "w-full py-5 bg-white rounded-2xl text-slate-600 hover:text-brand-600 font-medium text-sm tracking-wide transition-all shadow-micro group active:scale-[0.98] min-h-[44px] mb-12";
         loadMoreBtn.innerHTML = `<div class="flex items-center justify-center gap-2"><span>Charger les archives</span><span class="text-xs text-slate-500 font-normal">(${remaining} restants)</span><svg class="w-4 h-4 opacity-40 group-hover:translate-y-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg></div>`;
         container.appendChild(loadMoreBtn);

@@ -30,7 +30,12 @@
     href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Inter:wght@400;500&display=swap"
     rel="stylesheet">
 
-  <link rel="stylesheet" href="style.css" media="print" onload="this.media='all'">
+  <script>
+    const styleLink = document.createElement('link');
+    styleLink.rel = 'stylesheet';
+    styleLink.href = 'style.css?v=' + new Date().getTime();
+    document.head.appendChild(styleLink);
+  </script>
   <noscript>
     <link rel="stylesheet" href="style.css">
   </noscript>
@@ -586,7 +591,12 @@
     </div>
   </div>
 
-  <script src="app.js?v=2.1" defer></script>
+  <script>
+    const appScript = document.createElement('script');
+    appScript.src = 'app.js?v=' + new Date().getTime();
+    appScript.defer = true;
+    document.body.appendChild(appScript);
+  </script>
   
 </body>
 

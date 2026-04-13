@@ -2406,3 +2406,220 @@
     }
   }
 }
+
+/* --- Nouvelles Sections : Agenda & Analyses --- */
+.badge-agenda {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background-color: var(--color-brand-50);
+    color: var(--color-brand-700);
+    padding: 0.25rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    border: 1px solid var(--color-brand-100);
+    margin-bottom: 1rem;
+}
+
+.analysis-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+    margin-top: 1.5rem;
+}
+
+@media (min-width: 768px) {
+    .analysis-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+.analysis-card {
+    background-color: var(--color-slate-50);
+    border: 1px solid var(--color-slate-100);
+    border-radius: 1rem;
+    padding: 1.25rem;
+}
+
+.analysis-label {
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: var(--color-slate-500);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    display: block;
+    margin-bottom: 0.5rem;
+}
+
+.analysis-value {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--color-slate-900);
+}
+
+.progress-bar-bg {
+    width: 100%;
+    background-color: var(--color-slate-200);
+    height: 6px;
+    border-radius: 3px;
+    margin-top: 0.75rem;
+}
+
+.progress-bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    background-color: var(--color-brand-600);
+    transition: width 1s ease-out;
+}
+
+.vote-climat {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 24px;
+    border-radius: 4px;
+    font-size: 0.6rem;
+    font-weight: 800;
+    margin-top: 0.75rem;
+}
+
+.climat-consensus {
+    background-color: #ecfdf5;
+    color: #065f46;
+    border: 1px solid #d1fae5;
+}
+
+.climat-tensions {
+    background-color: #fef2f2;
+    color: #991b1b;
+    border: 1px solid #fee2e2;
+}
+
+.dashboard-link {
+    display: inline-block;
+    margin-top: 1.5rem;
+    font-size: 0.75rem;
+    color: var(--color-slate-500);
+    text-decoration: none;
+    padding: 0.5rem 1rem;
+    border: 1px dashed var(--color-slate-200);
+    border-radius: 0.75rem;
+    transition: all 0.2s;
+}
+
+.dashboard-link:hover {
+    color: var(--color-brand-700);
+    border-color: var(--color-brand-200);
+    background-color: var(--color-brand-50);
+}
+
+/* --- Dashboard Annuel (Ruban Budgétaire) --- */
+.dashboard-container {
+    background: white;
+    border-radius: 2.5rem;
+    padding: 2rem;
+    margin-bottom: 4rem;
+    box-shadow: var(--shadow-card);
+    border: 1px solid var(--color-slate-100);
+}
+
+.dashboard-title {
+    font-size: 0.75rem;
+    font-weight: 800;
+    color: var(--color-slate-500);
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    margin-bottom: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.budget-total-val {
+    font-size: 2.5rem;
+    font-weight: 900;
+    color: var(--color-slate-900);
+    margin-bottom: 2rem;
+    letter-spacing: -0.02em;
+}
+
+.ribbon-bar {
+    height: 32px;
+    width: 100%;
+    display: flex;
+    border-radius: 12px;
+    overflow: hidden;
+    background: var(--color-slate-50);
+    border: 1px solid var(--color-slate-100);
+    margin-bottom: 2.5rem;
+}
+
+.ribbon-segment {
+    height: 100%;
+    transition: width 1s ease-in-out;
+    border-right: 2px solid white;
+}
+
+.ribbon-segment:last-child {
+    border-right: none;
+}
+
+.categories-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+}
+
+@media (min-width: 768px) {
+    .categories-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+.category-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.category-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+}
+
+.category-name {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--color-slate-700);
+}
+
+.category-val {
+    font-size: 0.85rem;
+    font-weight: 800;
+}
+
+.proportion-bar-bg {
+    height: 8px;
+    width: 100%;
+    background: var(--color-slate-50);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.proportion-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 1s ease-out;
+}
+
+.dashboard-footer {
+    margin-top: 2rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--color-slate-50);
+    font-size: 0.75rem;
+    color: var(--color-slate-500);
+    font-style: italic;
+}

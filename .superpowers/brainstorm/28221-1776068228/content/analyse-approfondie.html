@@ -1,0 +1,50 @@
+<h2>Vers une Analyse Approfondie</h2>
+<p class="subtitle">Rendre les données intelligibles au premier coup d'œil.</p>
+
+<div class="options" data-multiselect>
+  <div class="option" data-choice="tactique" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>📊 Style "Dashboard Tactique"</h3>
+      <p>Utilise des graphiques circulaires (Donuts) pour le budget et des jauges de tension pour les votes. Très moderne, style SaaS/Finance.</p>
+      
+      <div style="margin-top: 15px; background: #f1f5f9; padding: 15px; border-radius: 8px;">
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+          <svg width="40" height="40" viewBox="0 0 40 40">
+            <circle cx="20" cy="20" r="15" fill="none" stroke="#e2e8f0" stroke-width="8" />
+            <circle cx="20" cy="20" r="15" fill="none" stroke="#3b82f6" stroke-width="8" stroke-dasharray="70 100" />
+          </svg>
+          <div style="font-size: 10px; font-weight: bold;">Répartition : 70% Écoles</div>
+        </div>
+        <div style="height: 4px; width: 100%; background: #ef4444; border-radius: 2px; position: relative;">
+          <div style="height: 100%; width: 80%; background: #10b981; border-radius: 2px;"></div>
+          <div style="position: absolute; left: 80%; top: -4px; width: 2px; height: 12px; background: black;"></div>
+        </div>
+        <div style="font-size: 8px; color: #64748b; margin-top: 5px;">Consensus : 80% Majorité / 20% Opposition</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="narratif" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>📖 Style "Décryptage Narratif"</h3>
+      <p>Priorise le texte mis en forme avec des badges et des citations. Ressemble à un article de presse enrichi.</p>
+      
+      <div style="margin-top: 15px; background: #fdf2f8; padding: 15px; border-radius: 8px; border-left: 4px solid #db2777;">
+        <span style="font-size: 9px; font-weight: bold; color: #db2777;">L'ENJEU CLÉ</span>
+        <p style="font-size: 11px; margin-top: 5px; color: #831843;"><b>"Une accélération sur le climat"</b> : 3 délibérations sur 5 concernent la rénovation énergétique ce soir.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>L'Analyse Approfondie (Dashboard Annuel) :</h3>
+  <p>En plus du rendu par conseil, je propose une page dédiée avec :</p>
+  <ul>
+    <li><b>Courbe de tendance</b> : L'évolution des dépenses cumulées sur l'année.</li>
+    <li><b>Nuage de thématiques</b> : Les sujets les plus discutés à Bègles.</li>
+    <li><b>Top Élus</b> : Qui propose le plus de délibérations / Qui s'oppose le plus.</li>
+  </ul>
+</div>

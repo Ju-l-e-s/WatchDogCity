@@ -1,0 +1,66 @@
+<h2>Prototype en ligne ! 🚀</h2>
+<p class="subtitle">Le site a été enrichi avec les nouvelles fonctionnalités d'analyse et d'agenda.</p>
+
+<div class="mockup">
+  <div class="mockup-header">Aperçu du site (Branche feat/prototype-analyses)</div>
+  <div class="mockup-body" style="background: #f8fafc; padding: 0; position: relative; overflow: hidden; height: 500px;">
+    
+    <!-- Simulation de la barre de navigation -->
+    <div style="background: white; height: 50px; border-bottom: 1px solid #e2e8f0; display: flex; items-center; padding: 0 20px; align-items: center; justify-content: justify-between;">
+      <div style="font-weight: bold; font-size: 14px; color: #1e293b;">L'Observatoire</div>
+    </div>
+
+    <div style="padding: 30px; overflow-y: auto; height: 450px;">
+      
+      <!-- Agenda Badge -->
+      <div style="display: inline-flex; align-items: center; gap: 8px; background: #eff6ff; color: #1e40af; padding: 4px 12px; border-radius: 20px; font-size: 10px; font-weight: bold; border: 1px solid #dbeafe; margin-bottom: 15px;">
+        📅 PROCHAIN CONSEIL DE QUARTIER : 25 JUILLET 2025
+      </div>
+
+      <!-- Titre du Conseil -->
+      <h3 style="margin: 0 0 10px 0; font-size: 1.5rem; font-weight: bold; color: #0f172a;">Conseil municipal du 1er juillet 2025</h3>
+      
+      <!-- Bloc Analyses -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin: 20px 0;">
+        <div style="background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 15px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+          <span style="font-size: 9px; font-weight: bold; color: #64748b; text-transform: uppercase;">💰 Impact Financier (Live)</span>
+          <div style="font-size: 1.25rem; font-weight: bold; color: #1e293b; margin-top: 5px;">2 450 000 €</div>
+          <div style="width: 100%; background: #f1f5f9; height: 6px; border-radius: 3px; margin-top: 10px;">
+            <div style="width: 70%; background: #3b82f6; height: 100%; border-radius: 3px;"></div>
+          </div>
+          <p style="font-size: 9px; color: #64748b; margin-top: 8px;">Priorité : Infrastructure & Écoles</p>
+        </div>
+
+        <div style="background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 15px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+          <span style="font-size: 9px; font-weight: bold; color: #64748b; text-transform: uppercase;">⚖️ Climat des Votes</span>
+          <div style="background: #ecfdf5; color: #065f46; border: 1px solid #d1fae5; border-radius: 4px; padding: 4px; text-align: center; font-size: 9px; font-weight: 800; margin-top: 10px;">
+            CONSENSUS
+          </div>
+          <p style="font-size: 9px; color: #64748b; margin-top: 8px;">92% de consensus : l'opposition a soutenu 11 délibérations sur 12.</p>
+        </div>
+      </div>
+
+      <!-- Dashboard Link -->
+      <div style="text-align: center; margin-bottom: 20px;">
+        <a href="#" style="font-size: 11px; color: #64748b; text-decoration: none; padding: 6px 12px; border: 1px dashed #cbd5e1; border-radius: 8px;">
+          Voir l'analyse budgétaire globale 2026 →
+        </a>
+      </div>
+
+      <!-- Résumé standard -->
+      <p style="font-size: 13px; color: #475569; line-height: 1.6;">
+        Le Conseil Municipal a voté une motion de soutien à la Fondation Maison de Santé Bordeaux Bagatelle...
+      </p>
+
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Détails techniques du prototype :</h3>
+  <ul>
+    <li><b>Données dynamiques</b> : Le script <code>proto-viz.js</code> lit les nouveaux champs <code>agenda</code> et <code>analysis</code> dans votre <code>data.json</code>.</li>
+    <li><b>Injection DOM</b> : Les composants s'insèrent automatiquement sous chaque conseil concerné dans la timeline.</li>
+    <li><b>Zéro impact main</b> : Toutes les modifications sont isolées sur la branche <code>feat/prototype-analyses</code>.</li>
+  </ul>
+</div>

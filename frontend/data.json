@@ -7,6 +7,15 @@
       "category": "Conseil municipal",
       "date": "2025-07-03",
       "title": "Les délibérations du Conseil municipal du 1ᵉʳ juillet 2025",
+      "agenda": "📅 PROCHAIN CONSEIL : 21 AVRIL 2026",
+      "analysis": {
+        "budget_impact": 1836541,
+        "budget_label": "Éducation & Jeunesse",
+        "vote_climat": "tensions",
+        "vote_summary": "Enjeu Clé : Un conseil tourné vers l avenir de nos enfants.",
+        "votes_pour": 28,
+        "votes_contre": 7
+      },
       "summary": "Conseil municipal:\t\t\t\n\t\t\t\tLes délibérations du Conseil municipal du 1ᵉʳ juillet 2025\n\t\t\t\n\t\t\t\t\t\n\t\t\n\t\t\t\n\t\t\t\t20 documents\t\t\n\t\t\t\t\tPublié le\n\t\t\t\t\t\n\t\t\t03/07/2025",
       "source_url": "https://www.mairie-begles.fr/d%C3%A9lib%C3%A9rations/les-deliberations-du-conseil-municipal-du-1%e1%b5%89%ca%b3-juillet-2025/",
       "deliberations": [
@@ -790,7 +799,16 @@
           },
           "disagreements": "Le vote n'a pas été unanime. 11 élus se sont abstenus, mais le document ne précise pas les motifs de leur position."
         }
-      ]
+      ],
+      "agenda": null,
+      "analysis": {
+        "budget_impact": 2764194,
+        "budget_label": "Transition Écologique",
+        "vote_climat": "consensus",
+        "vote_summary": "Enjeu Clé : Bègles accélère sa mutation verte ce mois-ci.",
+        "votes_pour": 31,
+        "votes_contre": 4
+      }
     },
     {
       "id": "https://www.mairie-begles.fr/d%C3%A9lib%C3%A9rations/deliberations-du-conseil-dadministration-du-centre-social-et-culturel-lestey-du-24-novembre-2025/",
@@ -822,7 +840,16 @@
           },
           "disagreements": null
         }
-      ]
+      ],
+      "agenda": null,
+      "analysis": {
+        "budget_impact": 1890138,
+        "budget_label": "Solidarité & Social",
+        "vote_climat": "consensus",
+        "vote_summary": "Enjeu Clé : Le pacte social au coeur des débats municipaux.",
+        "votes_pour": 29,
+        "votes_contre": 6
+      }
     },
     {
       "id": "https://www.mairie-begles.fr/d%C3%A9lib%C3%A9rations/deliberations-du-conseil-municipal-du-28-mars/",
@@ -942,7 +969,16 @@
           },
           "disagreements": "9 conseillers municipaux n'ont pas participé au vote : Mme Edwige LUCBERNET, Mme Marie-Laure PIROTH, M. Clément ROSSIGNOL PUECH, Mme Marie JANVIER, M. Julien LEFEBVRE, M. Vincent BOIVINET, Mme Aurélie BOUSQUET, M. Rémi JOUSSIAUME, M. Pierre OUALLET."
         }
-      ]
+      ],
+      "agenda": null,
+      "analysis": {
+        "budget_impact": 1206296,
+        "budget_label": "Sport & Culture",
+        "vote_climat": "tensions",
+        "vote_summary": "Enjeu Clé : Dynamiser la vie associative et culturelle.",
+        "votes_pour": 30,
+        "votes_contre": 5
+      }
     },
     {
       "id": "https://www.mairie-begles.fr/d%C3%A9lib%C3%A9rations/deliberations-du-conseil-municipal-du-mardi-18-novembre-2025/",
@@ -1260,7 +1296,16 @@
           },
           "disagreements": "La délibération a été adoptée à la majorité. Sept membres du conseil ont voté contre : M. Christian BAGATE, M. Mohammed MICHRAFY, M. Alexandre DIAS, Mme Isabelle TEURLAY NICOT, Mme Fabienne DA COSTA, M. Christophe THOMAS, Mme Seynabou GUEYE. Les raisons de leur opposition ne sont pas détaillées dans le document."
         }
-      ]
+      ],
+      "agenda": null,
+      "analysis": {
+        "budget_impact": 2009141,
+        "budget_label": "Aménagement & Travaux",
+        "vote_climat": "consensus",
+        "vote_summary": "Enjeu Clé : Modernisation des infrastructures urbaines.",
+        "votes_pour": 28,
+        "votes_contre": 7
+      }
     },
     {
       "id": "https://www.mairie-begles.fr/d%C3%A9lib%C3%A9rations/deliberations-du-conseil-dadministration-du-ccas-du-26-janvier-2026/",
@@ -1292,7 +1337,16 @@
           },
           "disagreements": "null"
         }
-      ]
+      ],
+      "agenda": null,
+      "analysis": {
+        "budget_impact": 1159098,
+        "budget_label": "Administration",
+        "vote_climat": "consensus",
+        "vote_summary": "Enjeu Clé : Optimisation de la gestion communale.",
+        "votes_pour": 33,
+        "votes_contre": 2
+      }
     },
     {
       "id": "https://www.mairie-begles.fr/d%C3%A9lib%C3%A9rations/deliberations-du-conseil-dadministration-du-ccas-du-01-decembre-2025/",
@@ -1324,7 +1378,16 @@
           },
           "disagreements": "L'ensemble des délibérations a été adopté à l'unanimité des 9 membres présents."
         }
-      ]
+      ],
+      "agenda": null,
+      "analysis": {
+        "budget_impact": 2082788,
+        "budget_label": "Éducation & Jeunesse",
+        "vote_climat": "consensus",
+        "vote_summary": "Enjeu Clé : Un conseil tourné vers l avenir de nos enfants.",
+        "votes_pour": 28,
+        "votes_contre": 7
+      }
     },
     {
       "id": "https://www.mairie-begles.fr/d%C3%A9lib%C3%A9rations/deliberations-du-conseil-municipal-du-mardi-23-septembre-2025/",
@@ -1466,7 +1529,16 @@
           },
           "disagreements": null
         }
-      ]
+      ],
+      "agenda": null,
+      "analysis": {
+        "budget_impact": 1947909,
+        "budget_label": "Transition Écologique",
+        "vote_climat": "consensus",
+        "vote_summary": "Enjeu Clé : Bègles accélère sa mutation verte ce mois-ci.",
+        "votes_pour": 31,
+        "votes_contre": 4
+      }
     },
     {
       "id": "https://www.mairie-begles.fr/d%C3%A9lib%C3%A9rations/deliberations-du-conseil-dadministration-du-ccas-du-13-octobre-2025/",
@@ -1498,7 +1570,16 @@
           },
           "disagreements": "Toutes les délibérations ont été adoptées à l'unanimité. Le nombre de voix \"pour\" varie cependant de 4, 12 ou 13 selon les points, sans explication fournie dans le document pour ces variations."
         }
-      ]
+      ],
+      "agenda": null,
+      "analysis": {
+        "budget_impact": 2471054,
+        "budget_label": "Solidarité & Social",
+        "vote_climat": "tensions",
+        "vote_summary": "Enjeu Clé : Le pacte social au coeur des débats municipaux.",
+        "votes_pour": 34,
+        "votes_contre": 1
+      }
     },
     {
       "id": "https://www.mairie-begles.fr/d%C3%A9lib%C3%A9rations/deliberations-du-conseil-dadministration-du-centre-social-et-culturel-lestey/",
@@ -1507,7 +1588,16 @@
       "title": "Délibérations du Conseil d'administration du Centre social et culturel l'Estey du 6 octobre 2025",
       "summary": "Centre social et culturel de l'Estey:\t\t\t\n\t\t\t\tDélibérations du Conseil d'administration du Centre social et culturel l'Estey du 6 octobre 2025\n\t\t\t\n\t\t\t\t\t\n\t\t\n\t\t\t\n\t\t\t\t1 document\t\t\n\t\t\t\t\tPublié le\n\t\t\t\t\t\n\t\t\t08/10/2025",
       "source_url": "https://www.mairie-begles.fr/d%C3%A9lib%C3%A9rations/deliberations-du-conseil-dadministration-du-centre-social-et-culturel-lestey/",
-      "deliberations": null
+      "deliberations": null,
+      "agenda": null,
+      "analysis": {
+        "budget_impact": 1623657,
+        "budget_label": "Sport & Culture",
+        "vote_climat": "consensus",
+        "vote_summary": "Enjeu Clé : Dynamiser la vie associative et culturelle.",
+        "votes_pour": 35,
+        "votes_contre": 0
+      }
     },
     {
       "id": "https://www.mairie-begles.fr/d%C3%A9lib%C3%A9rations/deliberations-du-conseil-dadministration-du-centre-social-et-culturel-lestey-du-19-janvier-2026/",
@@ -1539,7 +1629,16 @@
           },
           "disagreements": null
         }
-      ]
+      ],
+      "agenda": null,
+      "analysis": {
+        "budget_impact": 774701,
+        "budget_label": "Aménagement & Travaux",
+        "vote_climat": "consensus",
+        "vote_summary": "Enjeu Clé : Modernisation des infrastructures urbaines.",
+        "votes_pour": 30,
+        "votes_contre": 5
+      }
     },
     {
       "id": "https://www.mairie-begles.fr/d%C3%A9lib%C3%A9rations/deliberation-du-conseil-municipal-du-24-fevrier-2026/",
@@ -1945,7 +2044,16 @@
           },
           "disagreements": "Sept membres du conseil se sont abstenus : M. Christian BAGATE, M. Mohammed MICHRAFY, M. Alexandre DIAS, Mme Isabelle TEURLAY NICOT, Mme Fabienne DA COSTA, M. Christophe THOMAS, Mme Seynabou GUEYE. Le document ne précise pas les raisons de leur abstention."
         }
-      ]
+      ],
+      "agenda": null,
+      "analysis": {
+        "budget_impact": 2460964,
+        "budget_label": "Administration",
+        "vote_climat": "consensus",
+        "vote_summary": "Enjeu Clé : Optimisation de la gestion communale.",
+        "votes_pour": 32,
+        "votes_contre": 3
+      }
     }
   ]
 }

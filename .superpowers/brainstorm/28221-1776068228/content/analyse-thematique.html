@@ -1,0 +1,63 @@
+<h2>Dashboard : Évolution par Thématique</h2>
+<p class="subtitle">Visualisez la répartition réelle des investissements au fil de l'année.</p>
+
+<div class="mockup">
+  <div class="mockup-header">Dashboard Global — Focus Thématique</div>
+  <div class="mockup-body" style="background: white; padding: 25px;">
+    
+    <div style="margin-bottom: 30px;">
+      <h4 style="margin: 0 0 5px 0; font-size: 13px; font-weight: 800; color: #1e293b; text-transform: uppercase; letter-spacing: 0.05em;">📈 ÉVOLUTION DU BUDGET PAR PÔLE</h4>
+      <p style="font-size: 11px; color: #64748b; margin-bottom: 20px;">Cumul annuel des délibérations votées (en Millions d'Euros).</p>
+      
+      <!-- Graphique SVG Multicouches (Stacked Area) -->
+      <svg width="100%" height="200" viewBox="0 0 300 120" style="overflow: visible;">
+        <!-- Grille de fond -->
+        <line x1="0" y1="100" x2="300" y2="100" stroke="#f1f5f9" stroke-width="1" />
+        <line x1="0" y1="75" x2="300" y2="75" stroke="#f1f5f9" stroke-width="1" />
+        <line x1="0" y1="50" x2="300" y2="50" stroke="#f1f5f9" stroke-width="1" />
+        <line x1="0" y1="25" x2="300" y2="25" stroke="#f1f5f9" stroke-width="1" />
+
+        <!-- Zone : Éducation (Bleu) -->
+        <path d="M0,100 L50,90 L100,70 L150,65 L200,40 L250,30 L300,20 L300,100 L0,100 Z" fill="#3b82f6" opacity="0.8" />
+        
+        <!-- Zone : Écologie (Vert) - Empilée sur l'éducation -->
+        <path d="M0,90 L50,85 L100,60 L150,50 L200,25 L250,15 L300,5 L300,90 L50,90 Z" fill="#10b981" opacity="0.6" />
+        
+        <!-- Zone : Social & Autres (Gris/Violet) -->
+        <path d="M0,85 L50,82 L100,55 L150,45 L200,20 L250,10 L300,0 L300,85 L50,85 Z" fill="#6366f1" opacity="0.4" />
+
+        <!-- Axes -->
+        <line x1="0" y1="100" x2="300" y2="100" stroke="#e2e8f0" stroke-width="2" />
+        
+        <!-- Légende Axe X -->
+        <text x="0" y="115" font-size="8" fill="#94a3b8">Jan</text>
+        <text x="150" y="115" font-size="8" fill="#94a3b8">Juin</text>
+        <text x="275" y="115" font-size="8" fill="#94a3b8">Déc</text>
+      </svg>
+
+      <!-- Légende Interactive -->
+      <div style="display: flex; gap: 15px; margin-top: 20px; flex-wrap: wrap;">
+        <div style="display: flex; align-items: center; gap: 5px;">
+          <div style="width: 10px; height: 10px; border-radius: 2px; background: #3b82f6;"></div>
+          <span style="font-size: 10px; font-weight: 600; color: #475569;">Écoles & Jeunesse</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 5px;">
+          <div style="width: 10px; height: 10px; border-radius: 2px; background: #10b981;"></div>
+          <span style="font-size: 10px; font-weight: 600; color: #475569;">Transition Écologique</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 5px;">
+          <div style="width: 10px; height: 10px; border-radius: 2px; background: #6366f1;"></div>
+          <span style="font-size: 10px; font-weight: 600; color: #475569;">Social & Solidarité</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Analyse Textuelle -->
+    <div style="background: #f8fafc; padding: 15px; border-radius: 12px; border: 1px solid #f1f5f9;">
+      <p style="font-size: 12px; color: #1e293b; line-height: 1.5;">
+        🎯 <b>Observation IA</b> : On note une forte corrélation entre les conseils de printemps et l'investissement dans les <b>Écoles</b> (préparation de la rentrée), tandis que le <b>Budget Écologie</b> est réparti de manière plus constante sur toute l'année.
+      </p>
+    </div>
+
+  </div>
+</div>

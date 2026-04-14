@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-04-14T12:10:05Z",
+  "generated_at": "2026-04-14T12:21:35Z",
   "next_council_date": "Mardi 21 avril 2026, à 18h30",
   "councils": [
     {
@@ -1032,7 +1032,7 @@
             "points_debattus": null
           },
           "budget_impact": 0,
-          "budget_breakdown": null,
+          "budget_breakdown": [],
           "vote": {
             "has_vote": true,
             "pour": 39,
@@ -1817,7 +1817,7 @@
       "summary": "Conseil municipal:\t\t\t\n\t\t\t\tDélibérations du conseil municipal du 24 février 2026\n\t\t\t\n\t\t\t\t\t\n\t\t\n\t\t\t\n\t\t\t\t19 documents\t\t\n\t\t\t\t\tPublié le\n\t\t\t\t\t\n\t\t\t26/02/2026",
       "source_url": "https://www.mairie-begles.fr/d%C3%A9lib%C3%A9rations/deliberation-du-conseil-municipal-du-24-fevrier-2026/",
       "analysis": {
-        "budget_impact": 121450,
+        "budget_impact": 121451,
         "budget_label": "Administration",
         "vote_climat": "consensus",
         "vote_summary": "Enjeu Clé : Adoption du cadre éthique pour l’IA et dénominations d’équipements sportifs.",
@@ -1840,7 +1840,7 @@
             "points_debattus": null
           },
           "budget_impact": 0,
-          "budget_breakdown": null,
+          "budget_breakdown": [],
           "vote": {
             "has_vote": true,
             "pour": 33,
@@ -1936,7 +1936,7 @@
             "points_debattus": null
           },
           "budget_impact": 0,
-          "budget_breakdown": null,
+          "budget_breakdown": [],
           "vote": {
             "has_vote": true,
             "pour": 26,
@@ -1959,8 +1959,8 @@
             "impacts": "La nouvelle portion de la piste cyclable express sera éclairée, ce qui améliorera la sécurité et le confort des cyclistes, notamment en soirée et la nuit.",
             "points_debattus": null
           },
-          "budget_impact": 45450,
-          "budget_breakdown": null,
+          "budget_impact": 45451,
+          "budget_breakdown": [],
           "vote": {
             "has_vote": true,
             "pour": 26,
@@ -1984,7 +1984,7 @@
             "points_debattus": null
           },
           "budget_impact": 10000,
-          "budget_breakdown": null,
+          "budget_breakdown": [],
           "vote": {
             "has_vote": true,
             "pour": 26,
@@ -2008,7 +2008,7 @@
             "points_debattus": null
           },
           "budget_impact": 0,
-          "budget_breakdown": null,
+          "budget_breakdown": [],
           "vote": {
             "has_vote": true,
             "pour": 33,
@@ -2080,7 +2080,7 @@
             "points_debattus": null
           },
           "budget_impact": 0,
-          "budget_breakdown": null,
+          "budget_breakdown": [],
           "vote": {
             "has_vote": true,
             "pour": 33,
@@ -2176,7 +2176,7 @@
             "points_debattus": null
           },
           "budget_impact": 0,
-          "budget_breakdown": null,
+          "budget_breakdown": [],
           "vote": {
             "has_vote": true,
             "pour": 26,

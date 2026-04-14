@@ -217,29 +217,52 @@ function render() {
             councilLegendHtml += '</div>';
         }
 
-        const totalVotes = council.analysis ? (council.analysis.votes_pour + council.analysis.votes_contre) : 0;
-        const pourPct = totalVotes > 0 ? (council.analysis.votes_pour / totalVotes * 100).toFixed(0) : 0;
-        const contrePct = totalVotes > 0 ? (council.analysis.votes_contre / totalVotes * 100).toFixed(0) : 0;
+        // Calculate vote climate from individual deliberations (more accurate than council-level AI estimate)
+        const allDelibs = council.deliberations || [];
+        const votedDelibs = allDelibs.filter(d => d.vote && (d.vote.has_vote || d.vote.pour != null || d.vote.contre != null));
+        const unanimousDelibs = votedDelibs.filter(d => (d.vote.contre || 0) === 0 && (d.vote.abstention || 0) === 0);
+        const abstentionDelibs = votedDelibs.filter(d => (d.vote.contre || 0) === 0 && (d.vote.abstention || 0) > 0);
+        const oppositionDelibs = votedDelibs.filter(d => (d.vote.contre || 0) > 0);
+        const isConsensus = oppositionDelibs.length === 0;
+        const hasVotesFromDelibs = votedDelibs.length > 0;
 
         let analysisHtml = "";
         if (council.analysis) {
-            const hasFinancial = council.analysis.budget_impact > 0, hasVotes = totalVotes > 0;
-            if (hasFinancial || hasVotes) {
+            const hasFinancial = council.analysis.budget_impact > 0;
+            if (hasFinancial || hasVotesFromDelibs) {
                 analysisHtml = `<div class="analysis-grid grid grid-cols-1 gap-4 mt-6">`;
                 if (hasFinancial) {
                     analysisHtml += `<div class="analysis-card bg-slate-50/50 border border-slate-100 rounded-2xl p-6"><span class="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">💰 Impact Financier</span><div class="text-2xl font-black text-slate-900">${council.analysis.budget_impact.toLocaleString("fr-FR")} €</div>${councilRibbonHtml}${councilLegendHtml}</div>`;
                 }
-                if (hasVotes) {
-                    const isConsensus = council.analysis.vote_climat === "consensus";
-                    const badgeClasses = isConsensus 
-                        ? "bg-emerald-50 text-emerald-700 border-emerald-200" 
+                if (hasVotesFromDelibs) {
+                    const badgeClasses = isConsensus
+                        ? "bg-emerald-50 text-emerald-700 border-emerald-200"
                         : "bg-rose-50 text-rose-700 border-rose-200";
-                    const iconSvg = isConsensus 
+                    const iconSvg = isConsensus
                         ? `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`
                         : `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>`;
                     const labelText = isConsensus ? "CONSENSUS" : "TENSIONS";
 
-                    analysisHtml += `<div class="analysis-card bg-slate-50/50 border border-slate-100 rounded-2xl p-6"><span class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">⚖️ Climat des Votes</span><div class="flex items-center gap-3 mb-5"><div class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border font-bold text-xs tracking-wide uppercase shadow-sm ${badgeClasses}">${iconSvg} ${labelText}</div><span class="text-[11px] font-medium text-slate-400">Tendance du conseil</span></div><div class="flex flex-col gap-2"><div class="flex justify-between text-[11px] font-bold uppercase tracking-wider text-slate-500"><span>Pour : <span class="text-emerald-600 font-black">${council.analysis.votes_pour}</span></span><span>Contre : <span class="text-rose-600 font-black">${council.analysis.votes_contre}</span></span></div><div class="h-2.5 w-full bg-slate-200 rounded-full flex overflow-hidden shadow-inner"><div style="width: ${pourPct}%;" class="bg-emerald-500"></div><div style="width: ${contrePct}%;" class="bg-rose-500"></div></div></div></div>`;
+                    // Summary stats line
+                    let summaryParts = [`<span class="font-bold text-slate-700">${votedDelibs.length}</span> délibération${votedDelibs.length > 1 ? "s" : ""} votée${votedDelibs.length > 1 ? "s" : ""}`];
+                    if (unanimousDelibs.length > 0) summaryParts.push(`<span class="font-semibold text-emerald-600">${unanimousDelibs.length} unanime${unanimousDelibs.length > 1 ? "s" : ""}</span>`);
+                    if (abstentionDelibs.length > 0) summaryParts.push(`<span class="font-semibold text-amber-500">${abstentionDelibs.length} avec abstention${abstentionDelibs.length > 1 ? "s" : ""}</span>`);
+                    if (oppositionDelibs.length > 0) summaryParts.push(`<span class="font-semibold text-rose-600">${oppositionDelibs.length} avec opposition</span>`);
+                    const summaryLine = summaryParts.join(' · ');
+
+                    // Opposition detail rows
+                    let oppositionRows = "";
+                    if (oppositionDelibs.length > 0) {
+                        const rows = oppositionDelibs.map(d => {
+                            const totalD = (d.vote.pour || 0) + (d.vote.contre || 0) + (d.vote.abstention || 0);
+                            const absText = (d.vote.abstention || 0) > 0 ? ` · <span class="text-amber-500">${d.vote.abstention} abstention${d.vote.abstention > 1 ? "s" : ""}</span>` : "";
+                            const shortTitle = (d.title || "").length > 70 ? (d.title || "").substring(0, 70) + "…" : (d.title || "");
+                            return `<div class="flex flex-col gap-0.5 py-2 border-t border-slate-100/80 first:border-t-0"><div class="flex items-center gap-2 flex-wrap"><span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">${d.topic_tag || "Délibération"}</span><span class="text-[11px] font-bold text-rose-600">${d.vote.contre} contre</span><span class="text-[11px] text-slate-400">sur ${totalD}</span>${absText}</div><p class="text-[11px] text-slate-500 leading-snug">${shortTitle}</p></div>`;
+                        }).join("");
+                        oppositionRows = `<div class="mt-3 pt-1">${rows}</div>`;
+                    }
+
+                    analysisHtml += `<div class="analysis-card bg-slate-50/50 border border-slate-100 rounded-2xl p-6"><span class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">⚖️ Climat des Votes</span><div class="flex items-center gap-3 mb-4"><div class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border font-bold text-xs tracking-wide uppercase shadow-sm ${badgeClasses}">${iconSvg} ${labelText}</div><span class="text-[11px] font-medium text-slate-400">Tendance du conseil</span></div><p class="text-[11px] text-slate-500 leading-relaxed">${summaryLine}</p>${oppositionRows}</div>`;
                 }
                 analysisHtml += `</div>`;
             }

@@ -46,6 +46,7 @@ type CouncilAnalysis struct {
 
 type BudgetBreakdownItem struct {
 	TopicTag string `dynamodbav:"topic_tag" json:"topic_tag"`
+	Label    string `dynamodbav:"label"     json:"label"`
 	Amount   int64  `dynamodbav:"amount"    json:"amount"`
 }
 

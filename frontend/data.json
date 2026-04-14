@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-04-14T12:21:35Z",
+  "generated_at": "2026-04-14T13:58:30Z",
   "next_council_date": "Mardi 21 avril 2026, à 18h30",
   "councils": [
     {
@@ -388,7 +388,7 @@
       "summary": "Conseil municipal:\t\t\t\n\t\t\t\tDélibérations du Conseil municipal du 16 décembre 2025\n\t\t\t\n\t\t\t\t\t\n\t\t\n\t\t\t\n\t\t\t\t21 documents\t\t\n\t\t\t\t\tPublié le\n\t\t\t\t\t\n\t\t\t18/12/2025",
       "source_url": "https://www.mairie-begles.fr/d%C3%A9lib%C3%A9rations/deliberations-du-conseil-municipal-du-16-decembre-2025/",
       "analysis": {
-        "budget_impact": 3793141,
+        "budget_impact": 5822054,
         "budget_label": "",
         "vote_climat": "",
         "vote_summary": "",
@@ -482,8 +482,39 @@
             "impacts": "Ce financement permet aux associations de Bègles de maintenir et de développer leurs activités et services au bénéfice direct des habitants dans de multiples secteurs (sport, culture, éducation, social).",
             "points_debattus": null
           },
-          "budget_impact": 0,
-          "budget_breakdown": null,
+          "budget_impact": 2028913,
+          "budget_breakdown": [
+            {
+              "topic_tag": "Social",
+              "label": "Subventions action sociale, emploi et petite enfance (19 associations)",
+              "amount": 758578
+            },
+            {
+              "topic_tag": "Éducation",
+              "label": "Subventions éducation et jeunesse (11 associations)",
+              "amount": 531167
+            },
+            {
+              "topic_tag": "Sport",
+              "label": "Subventions sportives (13 associations)",
+              "amount": 407950
+            },
+            {
+              "topic_tag": "Administration",
+              "label": "Subventions comités de quartier et administration générale (14 associations)",
+              "amount": 156718
+            },
+            {
+              "topic_tag": "Culture",
+              "label": "Subventions culturelles (18 associations)",
+              "amount": 141200
+            },
+            {
+              "topic_tag": "Environnement",
+              "label": "Subventions environnement et mobilité (7 associations)",
+              "amount": 33300
+            }
+          ],
           "vote": {
             "has_vote": true,
             "pour": 33,
@@ -654,35 +685,98 @@
           "budget_breakdown": [
             {
               "topic_tag": "Administration",
-              "amount": 22398062
+              "label": "Dépenses de fonctionnement - Services généraux",
+              "amount": 9917922
             },
             {
               "topic_tag": "Sécurité",
-              "amount": 671650
+              "label": "Dépenses de fonctionnement - Sécurité",
+              "amount": 618650
             },
             {
               "topic_tag": "Éducation",
-              "amount": 18671120
+              "label": "Dépenses de fonctionnement - Enseignement, formation professionnelle",
+              "amount": 10072425
             },
             {
               "topic_tag": "Culture",
-              "amount": 14403212
+              "label": "Dépenses de fonctionnement - Culture, vie sociale, jeunesse, sports et loisirs",
+              "amount": 7004332
             },
             {
               "topic_tag": "Social",
-              "amount": 5261785
+              "label": "Dépenses de fonctionnement - Santé et action sociale",
+              "amount": 5149285
             },
             {
               "topic_tag": "Urbanisme",
-              "amount": 1652040
+              "label": "Dépenses de fonctionnement - Aménagement des territoires et habitat",
+              "amount": 329540
+            },
+            {
+              "topic_tag": "Administration",
+              "label": "Dépenses de fonctionnement - Action économique",
+              "amount": 427140
             },
             {
               "topic_tag": "Environnement",
-              "amount": 709310
+              "label": "Dépenses de fonctionnement - Environnement",
+              "amount": 602560
             },
             {
               "topic_tag": "Mobilité",
-              "amount": 41600
+              "label": "Dépenses de fonctionnement - Transports",
+              "amount": 1600
+            },
+            {
+              "topic_tag": "Administration",
+              "label": "Dépenses d'investissement - Services généraux",
+              "amount": 1756175
+            },
+            {
+              "topic_tag": "Sécurité",
+              "label": "Dépenses d'investissement - Sécurité",
+              "amount": 53000
+            },
+            {
+              "topic_tag": "Éducation",
+              "label": "Dépenses d'investissement - Enseignement, formation professionnelle",
+              "amount": 8598694
+            },
+            {
+              "topic_tag": "Culture",
+              "label": "Dépenses d'investissement - Culture, vie sociale, jeunesse, sports et loisirs",
+              "amount": 7398880
+            },
+            {
+              "topic_tag": "Social",
+              "label": "Dépenses d'investissement - Santé et action sociale",
+              "amount": 112500
+            },
+            {
+              "topic_tag": "Urbanisme",
+              "label": "Dépenses d'investissement - Aménagement des territoires et habitat",
+              "amount": 1322500
+            },
+            {
+              "topic_tag": "Administration",
+              "label": "Dépenses d'investissement - Action économique",
+              "amount": 21500
+            },
+            {
+              "topic_tag": "Environnement",
+              "label": "Dépenses d'investissement - Environnement",
+              "amount": 106750
+            },
+            {
+              "topic_tag": "Mobilité",
+              "label": "Dépenses d'investissement - Transports",
+              "amount": 40000
+            },
+            {
+              "topic_tag": "Budget",
+              "label": "Remboursement du capital de la dette",
+              "amount": 1860900
             }
           ],
           "vote": {

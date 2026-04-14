@@ -23,3 +23,6 @@ Thumbs.db
 # Project specifics
 dist/
 node_modules/
+bootstrap
+.claude/
+.superpowers/

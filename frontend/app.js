@@ -64,7 +64,6 @@ async function init() {
         console.log("📊 Nombre de conseils:", allCouncils.length);
 
         updateStats();
-        renderDashboard();
         render();
     } catch (e) {
         console.error("❌ Erreur Init:", e);
@@ -78,30 +77,31 @@ async function init() {
     }
 }
 function renderDashboard() {
-    console.log("🎨 Rendu du Dashboard...");
     const container = document.getElementById('global-dashboard');
-    if (!container) { console.warn("⚠️ Conteneur #global-dashboard introuvable"); return; }
-    
-    // Collect all deliberations with a verified budget_impact from 2026 councils
-    const delibs2026 = [];
-    allCouncils.filter(c => c.date && c.date.startsWith('2026')).forEach(c => {
-        (c.deliberations || []).forEach(d => { if (d.budget_impact > 0) delibs2026.push(d); });
-    });
+    if (!container) return;
 
-    if (delibs2026.length === 0) {
-        console.log("ℹ️ Pas encore de montants vérifiés 2026, dashboard masqué.");
-        container.classList.add('hidden');
-        return;
-    }
-
-    container.classList.remove('hidden');
     let totalBudget = 0;
     const categories = {};
-    delibs2026.forEach(d => {
-        totalBudget += d.budget_impact;
-        const cat = d.topic_tag || 'Autres';
-        categories[cat] = (categories[cat] || 0) + d.budget_impact;
+
+    allCouncils.forEach(c => {
+        (c.deliberations || []).forEach(d => {
+            if (d.budget_impact > 0) {
+                totalBudget += d.budget_impact;
+                const cat = d.topic_tag || 'Administration';
+                categories[cat] = (categories[cat] || 0) + d.budget_impact;
+            }
+            (d.budget_breakdown || []).forEach(item => {
+                if (item.amount > 0) {
+                    totalBudget += item.amount;
+                    const cat = item.topic_tag || 'Administration';
+                    categories[cat] = (categories[cat] || 0) + item.amount;
+                }
+            });
+        });
     });
+
+    if (totalBudget === 0) { container.classList.add('hidden'); return; }
+    container.classList.remove('hidden');
 
     const sortedCats = Object.entries(categories).sort((a, b) => b[1] - a[1]);
     
@@ -348,15 +348,13 @@ function toggleDelib(e) { const t = document.getElementById(`content-${e}`), n =
 function toggleView(viewName) {
     const timelineView = document.getElementById("timeline");
     const budgetView = document.getElementById("budget-view");
-    const globalDashboard = document.getElementById("global-dashboard");
     const navBudgetBtn = document.getElementById("nav-budget-btn");
     const navTimelineBtn = document.getElementById("nav-timeline-btn");
 
     if (viewName === 'budget') {
         if(timelineView) timelineView.classList.add("hidden");
-        if(globalDashboard) globalDashboard.classList.add("hidden");
         if(budgetView) budgetView.classList.remove("hidden");
-        
+
         if(navBudgetBtn) {
             navBudgetBtn.classList.add("text-brand-700", "font-bold");
             navBudgetBtn.classList.remove("text-slate-500", "font-medium");
@@ -365,13 +363,12 @@ function toggleView(viewName) {
             navTimelineBtn.classList.remove("text-brand-700", "font-bold");
             navTimelineBtn.classList.add("text-slate-500", "font-medium");
         }
-        
+
         renderBudgetView();
     } else {
         if(timelineView) timelineView.classList.remove("hidden");
-        if(globalDashboard) globalDashboard.classList.remove("hidden");
         if(budgetView) budgetView.classList.add("hidden");
-        
+
         if(navTimelineBtn) {
             navTimelineBtn.classList.add("text-brand-700", "font-bold");
             navTimelineBtn.classList.remove("text-slate-500", "font-medium");
@@ -384,7 +381,8 @@ function toggleView(viewName) {
 }
 
 function renderBudgetView() {
-    const container = document.getElementById("budget-view");
+    renderDashboard();
+    const container = document.getElementById("budget-detail");
     if (!container) return;
 
     let totalBudget = 0;
@@ -393,34 +391,32 @@ function renderBudgetView() {
 
     allCouncils.forEach(council => {
         (council.deliberations || []).forEach(d => {
-            // Source 1 : montant individuel vérifié par l'IA
-            if (d.budget_impact && d.budget_impact > 0) {
-                totalBudget += d.budget_impact;
-                financialDelibsCount++;
-                const theme = d.topic_tag || 'Administration';
-                if (!thematicData[theme]) thematicData[theme] = { total: 0, delibs: [] };
-                thematicData[theme].total += d.budget_impact;
-                thematicData[theme].delibs.push({ ...d, council_date: council.date });
-            }
-            // Source 2 : ventilation thématique du budget global (budget primitif)
+            // Source 2 prioritaire : ventilation thématique (budget primitif ou subventions avec tableau)
+            // Si un breakdown existe, il prend le pas sur budget_impact pour éviter le double-comptage
             if (d.budget_breakdown && d.budget_breakdown.length > 0) {
                 d.budget_breakdown.forEach(item => {
                     if (!item.amount || item.amount <= 0) return;
                     totalBudget += item.amount;
                     financialDelibsCount++;
                     const theme = item.topic_tag || 'Administration';
-                    if (!thematicData[theme]) thematicData[theme] = { total: 0, delibs: [] };
+                    if (!thematicData[theme]) thematicData[theme] = { total: 0, delibs: [], breakdowns: [] };
                     thematicData[theme].total += item.amount;
-                    // Représente comme une délibération virtuelle pour l'affichage
-                    thematicData[theme].delibs.push({
-                        ...d,
+                    thematicData[theme].breakdowns.push({
+                        label: item.label || item.topic_tag,
+                        amount: item.amount,
                         council_date: council.date,
-                        budget_impact: item.amount,
-                        topic_tag: item.topic_tag,
-                        title: d.title + ` — ${item.topic_tag}`,
-                        _is_breakdown: true,
+                        source_title: d.title,
+                        source_pdf: d.pdf_url,
                     });
                 });
+            } else if (d.budget_impact && d.budget_impact > 0) {
+                // Source 1 : montant individuel vérifié par l'IA (délibération ordinaire sans tableau)
+                totalBudget += d.budget_impact;
+                financialDelibsCount++;
+                const theme = d.topic_tag || 'Administration';
+                if (!thematicData[theme]) thematicData[theme] = { total: 0, delibs: [], breakdowns: [] };
+                thematicData[theme].total += d.budget_impact;
+                thematicData[theme].delibs.push({ ...d, council_date: council.date });
             }
         });
     });
@@ -432,23 +428,11 @@ function renderBudgetView() {
 
     const sortedThemes = Object.entries(thematicData).sort((a, b) => b[1].total - a[1].total);
 
-    generateBudgetHTML(container, totalBudget, financialDelibsCount, sortedThemes);
+    generateBudgetHTML(container, totalBudget, sortedThemes);
 }
 
-function generateBudgetHTML(container, totalBudget, count, sortedThemes) {
-    let html = `
-        <div class="dashboard-container animate-fade-in mb-12">
-            <div class="mb-8">
-                <span class="dashboard-title flex items-center gap-2 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">
-                    💰 Synthèse des dépenses votées
-                </span>
-                <div class="flex flex-col md:flex-row md:items-end gap-4">
-                    <div class="text-4xl md:text-5xl font-black text-slate-900 tracking-tight">${formatBudget(totalBudget)}</div>
-                    <div class="text-sm font-semibold text-slate-500 mb-2">${count} délibérations financées</div>
-                </div>
-            </div>
-        </div>
-    `;
+function generateBudgetHTML(container, totalBudget, sortedThemes) {
+    let html = ``;
 
     sortedThemes.forEach(([themeName, themeData]) => {
         const themeColor = COLORS[themeName] || COLORS['Autres'];
@@ -469,13 +453,42 @@ function generateBudgetHTML(container, totalBudget, count, sortedThemes) {
         `;
 
         themeData.delibs.sort((a, b) => b.council_date.localeCompare(a.council_date));
-
         themeData.delibs.forEach(delib => {
             const originalTag = delib.topic_tag;
             delib.topic_tag = formatDate(delib.council_date);
             html += renderDeliberationRow(delib);
             delib.topic_tag = originalTag;
         });
+
+        // Carte budget primitif — une seule carte avec tableau de lignes
+        if (themeData.breakdowns && themeData.breakdowns.length > 0) {
+            const breakdownsBySource = {};
+            themeData.breakdowns.forEach(b => {
+                const key = b.source_title + '|' + b.council_date;
+                if (!breakdownsBySource[key]) breakdownsBySource[key] = { title: b.source_title, date: b.council_date, pdf: b.source_pdf, lines: [] };
+                breakdownsBySource[key].lines.push(b);
+            });
+            Object.values(breakdownsBySource).forEach(src => {
+                src.lines.sort((a, b) => b.amount - a.amount);
+                const srcTotal = src.lines.reduce((s, l) => s + l.amount, 0);
+                const linesHtml = src.lines.map(l => `
+                    <div class="flex items-center justify-between py-2 border-b border-slate-100/60 last:border-0">
+                        <span class="text-[13px] text-slate-600 leading-snug flex-1 pr-4">${escapeHTML(l.label)}</span>
+                        <span class="text-[13px] font-semibold text-slate-800 shrink-0">${l.amount.toLocaleString('fr-FR')} €</span>
+                    </div>`).join('');
+                html += `
+                    <div class="px-4 py-5 md:px-8 md:py-6">
+                        <div class="flex items-center gap-2.5 mb-3">
+                            <span class="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0"></span>
+                            <span class="text-[11px] font-medium text-slate-600 uppercase tracking-widest">${formatDate(src.date)}</span>
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-100 ml-2 shadow-sm">💰 ${srcTotal.toLocaleString('fr-FR')} €</span>
+                        </div>
+                        <h4 class="text-base font-semibold text-slate-800 mb-4">${escapeHTML(src.title)}</h4>
+                        <div class="bg-slate-50/60 rounded-xl px-4 py-1">${linesHtml}</div>
+                        ${src.pdf ? `<div class="mt-4"><a href="${src.pdf}" target="_blank" class="inline-flex items-center gap-2 text-xs font-bold text-brand-600 hover:text-brand-700 bg-brand-50 px-4 py-2 rounded-lg transition-all border border-brand-100 hover:shadow-sm"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>Consulter le PDF officiel</a></div>` : ''}
+                    </div>`;
+            });
+        }
 
         html += `
                     </div>

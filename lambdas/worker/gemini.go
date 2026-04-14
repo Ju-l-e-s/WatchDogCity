@@ -5,10 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 
 	"google.golang.org/genai"
 )
+
+var budgetImpactFloatRe = regexp.MustCompile(`("budget_impact"\s*:\s*)(\d+)\.\d+`)
 
 const deliberationPrompt = `Tu es un analyste de données factuel et neutre spécialisé dans les affaires publiques locales. 
 Analyse ce document PDF de délibération du conseil municipal de Bègles.
@@ -53,10 +56,13 @@ Règles d'exécution strictes :
   * Si plusieurs montants sont cités (ex: coût total vs subvention attendue), prends le coût total de l'action municipale.
   * Cherche aussi dans les tableaux financiers s'ils existent.
   * Si aucun montant n'est mentionné, mets 0. Ne mets jamais null.
-  * EXCEPTION IMPORTANTE : Si la délibération est un vote d'approbation du budget global annuel (ex: "vote du budget primitif", "budget supplémentaire", "décision modificative") alors mets budget_impact = 0 et remplis le champ "budget_breakdown" à la place. Ces votes approuvent l'enveloppe globale de la commune mais ne représentent pas une dépense spécifique — cela évite de doubler les sommes avec les délibérations individuelles.
-- Le champ "budget_breakdown" est un tableau de ventilation thématique. Règles :
-  * Pour les délibérations ordinaires : laisse le tableau vide [].
-  * Pour un "VOTE DU BUDGET PRIMITIF" ou document budgétaire global (maquette, annexe budgétaire) : extrait la répartition des dépenses par grande thématique depuis les tableaux ou chapitres du document. Chaque entrée : {"topic_tag": "...", "amount": entier_en_euros}. Utilise uniquement ces topic_tag : Budget, Urbanisme, Social, Culture, Environnement, Éducation, Sport, Sécurité, Mobilité, Administration. Regroupe les chapitres budgétaires similaires sous le même topic_tag. Ne double pas les montants : si un chapitre est un sous-total d'un autre, ne prends que le plus détaillé.
+  * budget_impact doit toujours être un entier (arrondi à l'euro inférieur, sans décimale). Exemple : 2028913, pas 2028913.40.
+  * EXCEPTION BUDGET GLOBAL UNIQUEMENT : Si la délibération est un "VOTE DU BUDGET PRIMITIF", "BUDGET SUPPLÉMENTAIRE" ou "DÉCISION MODIFICATIVE" — c'est-à-dire un document qui présente l'enveloppe budgétaire globale de la commune avec des lignes par fonction — alors mets budget_impact = 0 et remplis budget_breakdown. ATTENTION : une délibération d'attribution de subventions aux associations n'est PAS un vote de budget global, même si elle mentionne "lors du vote du budget" en introduction. Dans ce dernier cas, mets budget_impact = montant total du tableau.
+- Le champ "budget_breakdown" est un tableau de ventilation détaillée des dépenses. Règles selon le type de délibération :
+  * Pour les délibérations ordinaires sans tableau de bénéficiaires multiples : laisse le tableau vide [].
+  * Pour un VOTE DU BUDGET PRIMITIF ou document budgétaire global (maquette, annexe budgétaire avec lignes fonctionnelles) : extrait TOUTES les lignes de dépenses identifiables. Objectif : 15 à 40 entrées précises, pas de regroupement grossier. Chaque entrée : {"topic_tag": "...", "label": "libellé exact de la ligne budgétaire", "amount": entier_en_euros}. Pour label : copie le libellé exact de la ligne du tableau (ex: "Personnel enseignant", "Entretien voirie", "Subvention CCAS"). Ne double pas les montants : si une ligne est un sous-total d'une autre déjà présente, ne prends que le détail le plus fin.
+  * Pour les délibérations d'ATTRIBUTION DE SUBVENTIONS aux associations (tableau listant des associations bénéficiaires avec leurs montants individuels) : agrège par thématique en 5 à 10 entrées. Chaque entrée : {"topic_tag": "...", "label": "Subventions [thème] (N associations)", "amount": somme_en_euros}. Exemple : {"topic_tag": "Sport", "label": "Subventions sportives (12 associations)", "amount": 407950}. budget_impact = montant total du tableau (PAS 0).
+  Règles pour topic_tag (tous cas) : utilise uniquement Budget, Urbanisme, Social, Culture, Environnement, Éducation, Sport, Sécurité, Mobilité, Administration.
 - Le champ "climate_impact" doit être "positif" (investissement vert, nature en ville, isolation), "negatif" (artificialisation, fossile) ou "neutre" (fonctionnement courant, social sans impact bâti). Par défaut, mets "neutre".
 - Le champ "is_substantial" doit être "true" uniquement si le document est dense (budget, DSP, projet structurant).
 - Séparation des préoccupations : Ne génère JAMAIS de balises HTML. Retourne uniquement du texte brut dans les champs.
@@ -66,6 +72,7 @@ Règles d'exécution strictes :
 
 type BudgetBreakdownItem struct {
 	TopicTag string `json:"topic_tag" dynamodbav:"topic_tag"`
+	Label    string `json:"label"     dynamodbav:"label"`
 	Amount   int64  `json:"amount"    dynamodbav:"amount"`
 }
 
@@ -164,6 +171,10 @@ func parseGeminiResponse(raw string) (*GeminiResult, error) {
 	raw = strings.TrimPrefix(raw, "```")
 	raw = strings.TrimSuffix(raw, "```")
 	raw = strings.TrimSpace(raw)
+
+	// Normalize: Gemini sometimes returns budget_impact as a float (e.g. 2028913.40)
+	// but our struct expects int64 — truncate the decimal part.
+	raw = budgetImpactFloatRe.ReplaceAllString(raw, "${1}${2}")
 
 	var res GeminiResult
 	if err := json.Unmarshal([]byte(raw), &res); err != nil {

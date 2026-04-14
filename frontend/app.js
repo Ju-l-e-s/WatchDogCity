@@ -330,7 +330,7 @@ function renderDeliberationRow(e) {
     if (e.analysis_data) {
         // Détail budgétaire dans Éclairage pour Option C
         const budgetDetail = e.budget_impact > 0 
-            ? `<div class="mb-6"><p class="text-[11px] font-semibold text-amber-600 uppercase tracking-widest mb-1.5">Impact Financier</p><p class="text-[15px] text-slate-600 font-bold">Le montant alloué pour cette délibération est de ${e.budget_impact.toLocaleString('fr-FR')} € HT.</p></div>`
+            ? `<div class="mb-6"><p class="text-[11px] font-semibold text-amber-600 uppercase tracking-widest mb-1.5">Impact Financier</p><p class="text-[15px] text-slate-600 font-bold">Le montant alloué pour cette délibération est de ${e.budget_impact.toLocaleString('fr-FR')} €.</p></div>`
             : "";
 
         const sections = [{ label: "Contexte", content: e.analysis_data.contexte }, { label: "Décision prise", content: e.analysis_data.decision }, { label: "Impacts concrets", content: e.analysis_data.impacts }, { label: "Points de controverse", content: e.analysis_data.points_debattus }].filter(e => e.content && "null" !== e.content).map(t => `<div class="mb-6 last:mb-0"><p class="text-[11px] font-semibold text-brand-600 uppercase tracking-widest mb-1.5">${escapeHTML(t.label)}</p><p class="text-[15px] text-slate-500 leading-relaxed">${highlightText(t.content, searchQuery, e.acronyms)}</p></div>`).join("");

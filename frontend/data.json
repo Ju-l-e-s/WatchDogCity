@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-04-05T18:06:58Z",
+  "generated_at": "2026-04-14T12:10:05Z",
   "next_council_date": "Mardi 21 avril 2026, à 18h30",
   "councils": [
     {
@@ -7,17 +7,16 @@
       "category": "Conseil municipal",
       "date": "2025-07-03",
       "title": "Les délibérations du Conseil municipal du 1ᵉʳ juillet 2025",
-      "agenda": "📅 PROCHAIN CONSEIL : 21 AVRIL 2026",
-      "analysis": {
-        "budget_impact": 1836541,
-        "budget_label": "Éducation & Jeunesse",
-        "vote_climat": "tensions",
-        "vote_summary": "Enjeu Clé : Un conseil tourné vers l avenir de nos enfants.",
-        "votes_pour": 28,
-        "votes_contre": 7
-      },
       "summary": "Conseil municipal:\t\t\t\n\t\t\t\tLes délibérations du Conseil municipal du 1ᵉʳ juillet 2025\n\t\t\t\n\t\t\t\t\t\n\t\t\n\t\t\t\n\t\t\t\t20 documents\t\t\n\t\t\t\t\tPublié le\n\t\t\t\t\t\n\t\t\t03/07/2025",
       "source_url": "https://www.mairie-begles.fr/d%C3%A9lib%C3%A9rations/les-deliberations-du-conseil-municipal-du-1%e1%b5%89%ca%b3-juillet-2025/",
+      "analysis": {
+        "budget_impact": 0,
+        "budget_label": "",
+        "vote_climat": "",
+        "vote_summary": "",
+        "votes_pour": 0,
+        "votes_contre": 0
+      },
       "deliberations": [
         {
           "id": "D06-2025_056.pdf",
@@ -33,6 +32,8 @@
             "impacts": "Le Parc Paty devient un parc public municipal de façon permanente, ce qui garantit son entretien par la Ville et son accessibilité pour tous les Béglais, tout en renforçant la trame verte communale.",
             "points_debattus": null
           },
+          "budget_impact": 0,
+          "budget_breakdown": null,
           "vote": {
             "has_vote": true,
             "pour": 35,
@@ -55,6 +56,8 @@
             "impacts": "Cette motion vise à préserver une offre de soins de proximité cruciale (urgences, maternité, etc.) sans dépassement d'honoraires pour les habitants du sud de l'agglomération bordelaise et à éviter la création d'un \"désert hospitalier\".",
             "points_debattus": null
           },
+          "budget_impact": 0,
+          "budget_breakdown": null,
           "vote": {
             "has_vote": true,
             "pour": 35,
@@ -77,6 +80,8 @@
             "impacts": "L'avis de la commune, qu'il soit favorable ou défavorable, est une étape clé qui conditionne la poursuite de ce projet d'urbanisation majeur pour la ville.",
             "points_debattus": null
           },
+          "budget_impact": 0,
+          "budget_breakdown": null,
           "vote": {
             "has_vote": true,
             "pour": null,
@@ -99,6 +104,8 @@
             "impacts": "Cette décision sécurise une source de financement pour les projets de la ville. En contrepartie, la commune devient solidairement responsable des engagements financiers de l'agence avec les autres collectivités membres.",
             "points_debattus": null
           },
+          "budget_impact": 0,
+          "budget_breakdown": null,
           "vote": {
             "has_vote": true,
             "pour": 35,
@@ -119,8 +126,10 @@
             "contexte": "Le Trésorier principal a identifié des créances dues à la ville entre 2016 et 2024 qui sont impossibles à recouvrer. Cette délibération est une régularisation comptable nécessaire pour apurer les comptes de la Ville.",
             "decision": "Le Conseil a voté l'admission en non-valeur de 13 470,07 € et l'annulation de 16 420,90 € de créances éteintes.",
             "impacts": "Il s'agit d'une écriture comptable qui n'a pas d'impact direct sur les services aux citoyens. Elle formalise la perte de recettes anciennes et irrécouvrables pour la Ville.",
-            "points_debattus": "La décision n'a pas été unanime, un groupe de 7 élus s'est abstenu sans que les raisons de leur position ne soient détaillées dans le document."
+            "points_debattus": null
           },
+          "budget_impact": 0,
+          "budget_breakdown": null,
           "vote": {
             "has_vote": true,
             "pour": 28,
@@ -143,6 +152,8 @@
             "impacts": "Si elle est accordée, cette aide financière soutiendra la création de 287 logements, dont une partie de logements sociaux, répondant ainsi à la demande locale sans consommer d'espaces naturels.",
             "points_debattus": null
           },
+          "budget_impact": 0,
+          "budget_breakdown": null,
           "vote": {
             "has_vote": true,
             "pour": 35,
@@ -163,8 +174,10 @@
             "contexte": "Ce projet s'inscrit dans l'Opération d'Intérêt National Bordeaux Euratlantique. Le conseil municipal est sollicité pour donner son avis sur le volet environnemental du dossier de création de la ZAC, une étape légale avant la validation finale par le Préfet.",
             "decision": "Un avis favorable a été donné au dossier de création de la ZAC Bègles Garonne, incluant l'étude d'impact environnemental du projet.",
             "impacts": "Ce projet va lancer la transformation d'une large zone de Bègles sur plusieurs années, avec la construction d'un maximum de 500 000 m² de surfaces nouvelles. Cela va significativement augmenter l'offre de logements et d'activités économiques dans la commune.",
-            "points_debattus": "Le projet n'a pas fait l'unanimité, une opposition de 7 élus a été enregistrée lors du vote, sans que les motifs de ce désaccord ne soient détaillés dans la délibération."
+            "points_debattus": null
           },
+          "budget_impact": 0,
+          "budget_breakdown": null,
           "vote": {
             "has_vote": true,
             "pour": 28,
@@ -187,6 +200,8 @@
             "impacts": "Les habitants du Dorat disposeront d'un lieu physique pour s'informer sur le projet de rénovation, rencontrer les acteurs du projet et participer à des activités sociales et culturelles.",
             "points_debattus": null
           },
+          "budget_impact": 0,
+          "budget_breakdown": null,
           "vote": {
             "has_vote": true,
             "pour": 35,
@@ -209,6 +224,8 @@
             "impacts": "Cette décision facilite la réalisation de travaux sur le réseau public d'électricité, contribuant potentiellement à sa modernisation et à sa fiabilité pour les usagers.",
             "points_debattus": null
           },
+          "budget_impact": 0,
+          "budget_breakdown": null,
           "vote": {
             "has_vote": true,
             "pour": 35,
@@ -231,6 +248,8 @@
             "impacts": "Cet accord-cadre vise à encourager et pérenniser les échanges culturels, sportifs et associatifs entre les habitants des deux villes, valorisant ainsi le multiculturalisme local.",
             "points_debattus": null
           },
+          "budget_impact": 0,
+          "budget_breakdown": null,
           "vote": {
             "has_vote": true,
             "pour": 35,
@@ -253,6 +272,8 @@
             "impacts": "Ce raccordement permettra de chauffer les bâtiments publics de manière plus écologique, avec un objectif de décarbonation de 45% de la consommation de gaz du patrimoine municipal. Des travaux seront nécessaires en deux phases à partir de 2026.",
             "points_debattus": null
           },
+          "budget_impact": 0,
+          "budget_breakdown": null,
           "vote": {
             "has_vote": true,
             "pour": 35,
@@ -275,6 +296,8 @@
             "impacts": "Les spectateurs peuvent acheter leurs billets pour l'ensemble de la saison 2025-2026 de la CitéCirque sans interruption, selon une nouvelle grille de tarifs. Le changement de gestion sera transparent pour le public.",
             "points_debattus": null
           },
+          "budget_impact": 0,
+          "budget_breakdown": null,
           "vote": {
             "has_vote": true,
             "pour": 35,
@@ -297,6 +320,8 @@
             "impacts": "Les Béglaises et Béglais pourront contribuer financièrement et de manière transparente à la réalisation de projets municipaux spécifiques via une plateforme en ligne dédiée.",
             "points_debattus": null
           },
+          "budget_impact": 0,
+          "budget_breakdown": null,
           "vote": {
             "has_vote": true,
             "pour": 35,
@@ -317,8 +342,10 @@
             "contexte": "Conformément à la loi du 11 février 2005, la ville doit présenter chaque année le rapport de sa Commission Communale pour l'Accessibilité (CCA) qui dresse le constat des actions menées et à venir.",
             "decision": "Le Conseil municipal a pris acte de la présentation du rapport annuel 2025 de la commission communale pour l'accessibilité.",
             "impacts": "Les citoyens sont informés des progrès et des chantiers futurs visant à rendre la ville plus accessible, notamment la mise en accessibilité complète du complexe Langevin d'ici 2026 et la révision du Plan de mise en Accessibilité de la Voirie et des Espaces publics (PAVE).",
-            "points_debattus": "La délibération n'a pas été adoptée à l'unanimité, un groupe de 7 élus ayant voté contre."
+            "points_debattus": null
           },
+          "budget_impact": 0,
+          "budget_breakdown": null,
           "vote": {
             "has_vote": true,
             "pour": 28,
@@ -339,8 +366,10 @@
             "contexte": "L'Association Béglaise de Bon Secours souhaite créer une crèche sur le site de son EHPAD, mais le bail initial de 1998 avec la ville n'autorisait qu'un usage de maison de retraite.",
             "decision": "Le conseil a autorisé la modification de la clause de destination du bail pour y inclure l'accueil de jeunes enfants.",
             "impacts": "Ce vote permet la création d'une nouvelle crèche à Bègles et promeut un projet d'innovation sociale visant à renforcer les liens entre générations et améliorer la qualité de vie des résidents de l'EHPAD.",
-            "points_debattus": "null"
+            "points_debattus": null
           },
+          "budget_impact": 0,
+          "budget_breakdown": null,
           "vote": {
             "has_vote": true,
             "pour": 35,
@@ -358,6 +387,14 @@
       "title": "Délibérations du Conseil municipal du 16 décembre 2025",
       "summary": "Conseil municipal:\t\t\t\n\t\t\t\tDélibérations du Conseil municipal du 16 décembre 2025\n\t\t\t\n\t\t\t\t\t\n\t\t\n\t\t\t\n\t\t\t\t21 documents\t\t\n\t\t\t\t\tPublié le\n\t\t\t\t\t\n\t\t\t18/12/2025",
       "source_url": "https://www.mairie-begles.fr/d%C3%A9lib%C3%A9rations/deliberations-du-conseil-municipal-du-16-decembre-2025/",
+      "analysis": {
+        "budget_impact": 3793141,
+        "budget_label": "",
+        "vote_climat": "",
+        "vote_summary": "",
+        "votes_pour": 0,
+        "votes_contre": 0
+      },
       "deliberations": [
         {
           "id": "D08-2025_107.pdf",
@@ -371,8 +408,10 @@
             "contexte": "La commune souhaite raccorder 22 bâtiments tertiaires au réseau de chaleur, une opération qui génère des Certificats d'Économies d'Énergie (CEE) pouvant être monétisés pour cofinancer le projet.",
             "decision": "Le conseil municipal a autorisé le Maire à signer une convention avec la société SIPLEC pour la valorisation de ces CEE, pour un montant total de 1 984 000 euros.",
             "impacts": "Cette opération apporte un financement externe significatif pour la transition énergétique des bâtiments municipaux, accélérant ainsi le raccordement à un mode de chauffage plus durable sans peser entièrement sur les finances de la ville.",
-            "points_debattus": "null"
+            "points_debattus": null
           },
+          "budget_impact": 2057000,
+          "budget_breakdown": null,
           "vote": {
             "has_vote": true,
             "pour": 33,
@@ -393,8 +432,10 @@
             "contexte": "La loi autorise les maires à déroger à la règle du repos dominical jusqu'à 12 dimanches par an. La ville de Bègles, sollicitée par des enseignes, établit un calendrier pour 2026 afin de concilier l'activité économique et le repos des salariés.",
             "decision": "Il a été voté d'autoriser l'ouverture pour sept dimanches en 2026 pour le commerce de détail et cinq dimanches pour les commerces automobiles.",
             "impacts": "Les habitants pourront faire leurs achats dans les commerces de Bègles certains dimanches de 2026, notamment les 11 janvier, 30 août, 29 novembre et les quatre dimanches de décembre.",
-            "points_debattus": "Le vote n'a pas été unanime, indiquant une absence de consensus sur la question, comme en témoignent les cinq abstentions."
+            "points_debattus": null
           },
+          "budget_impact": 0,
+          "budget_breakdown": [],
           "vote": {
             "has_vote": true,
             "pour": 28,
@@ -415,8 +456,10 @@
             "contexte": "La loi impose aux communes de plus de 20 000 habitants de présenter chaque année un rapport sur l'égalité femmes-hommes avant le débat sur le budget. Cette délibération répond à cette obligation légale pour l'année 2025.",
             "decision": "Le conseil municipal a pris acte de la présentation du rapport sur la situation en matière d'égalité Femmes / Hommes et a voté les crédits pour mettre en œuvre les actions prévues.",
             "impacts": "Les actions découlant de ce rapport visent à réduire les inégalités professionnelles au sein des services municipaux et à soutenir les initiatives en faveur de l'égalité pour tous les habitants de Bègles, notamment via des partenariats associatifs.",
-            "points_debattus": "null"
+            "points_debattus": null
           },
+          "budget_impact": 10800,
+          "budget_breakdown": [],
           "vote": {
             "has_vote": true,
             "pour": 33,
@@ -437,8 +480,10 @@
             "contexte": "Dans le cadre de son budget annuel, la Ville de Bègles doit répartir l'enveloppe globale destinée aux subventions entre les différentes associations qui en ont fait la demande.",
             "decision": "La répartition des crédits de subvention d'un montant total de 2 028 913,40 € aux associations pour l'année 2026 a été approuvée conformément au tableau annexé.",
             "impacts": "Ce financement permet aux associations de Bègles de maintenir et de développer leurs activités et services au bénéfice direct des habitants dans de multiples secteurs (sport, culture, éducation, social).",
-            "points_debattus": "La délibération a été adoptée à l'unanimité, sans débat ou opposition mentionné dans le document."
+            "points_debattus": null
           },
+          "budget_impact": 0,
+          "budget_breakdown": null,
           "vote": {
             "has_vote": true,
             "pour": 33,
@@ -459,8 +504,10 @@
             "contexte": "Les tarifs des droits de place sont révisés annuellement pour tenir compte de l'évolution de l'Indice des Prix à la Consommation (INSEE). Cette délibération acte la revalorisation pour l'année 2026.",
             "decision": "La modification des tarifs applicables aux droits de place sur la station de taxis et sur les marchés forains a été approuvée, avec une augmentation de 1,1% à compter du 1er janvier 2026.",
             "impacts": "Les taxis et les commerçants des marchés de Bègles paieront une redevance légèrement plus élevée pour leur emplacement à partir de 2026.",
-            "points_debattus": "La délibération n'a pas été adoptée à l'unanimité, six conseillers municipaux se sont abstenus lors du vote."
+            "points_debattus": null
           },
+          "budget_impact": 0,
+          "budget_breakdown": [],
           "vote": {
             "has_vote": true,
             "pour": 27,
@@ -481,8 +528,10 @@
             "contexte": "Le processus de mutualisation des services entre les communes et Bordeaux Métropole, initié en 2016, nécessite des ajustements financiers périodiques pour correspondre aux évolutions réelles des niveaux de service et du matériel utilisé.",
             "decision": "Le conseil a acté un remboursement net de 196 716 € à Bordeaux Métropole pour l'exercice 2025 et une majoration pérenne de la contribution annuelle de 241 790 € à compter de 2026.",
             "impacts": "Il s'agit d'une régularisation financière et administrative entre la Ville et la Métropole pour assurer le juste financement des services publics partagés. Il n'y a pas d'impact direct identifiable pour les citoyens.",
-            "points_debattus": "La délibération ayant été adoptée à l'unanimité, le document ne fait état d'aucun débat ou point de désaccord."
+            "points_debattus": null
           },
+          "budget_impact": 196716,
+          "budget_breakdown": [],
           "vote": {
             "has_vote": true,
             "pour": 33,
@@ -505,6 +554,8 @@
             "impacts": "Les 30 premiers ménages béglais respectant le plafond de revenus (revenu fiscal de référence par part inférieur à 24 900€) pourront bénéficier d'une réduction de 60 euros sur l'achat d'un vélo en 2026.",
             "points_debattus": null
           },
+          "budget_impact": 1800,
+          "budget_breakdown": null,
           "vote": {
             "has_vote": true,
             "pour": 33,
@@ -525,8 +576,10 @@
             "contexte": "Le contrat de co-développement avec Bordeaux Métropole, qui finance des projets locaux, nécessite une mise à jour annuelle pour s'adapter à l'évolution opérationnelle et financière des opérations prévues.",
             "decision": "Le conseil a approuvé l'avenant n°2 au contrat de co-développement et a autorisé le Maire à signer les documents correspondants avec Bordeaux Métropole.",
             "impacts": "Cette décision officialise la création ou la modification de plusieurs projets sur le territoire, notamment le lancement de la ZAC Bègles Garonne, la modification du projet de ponton \"Terre Neuvas\", et l'ajout d'études sur la logistique fluviale ou la prévention des déchets.",
-            "points_debattus": "null"
+            "points_debattus": null
           },
+          "budget_impact": 0,
+          "budget_breakdown": [],
           "vote": {
             "has_vote": true,
             "pour": 33,
@@ -547,8 +600,10 @@
             "contexte": "La Ville de Bègles collabore depuis 2019 avec le G.I.P Médiation pour des missions de médiation sociale, et souhaite poursuivre et étendre ce partenariat pour l'année 2026.",
             "decision": "Le conseil a approuvé la convention de partenariat pour 2026, autorisant le Maire à la signer et à prévoir les crédits correspondants, soit 29 825,18 €.",
             "impacts": "Les habitants des quartiers des Terres Neuves, Maurice Thorez-les Goélands et du Dorat continueront de bénéficier d'un service de médiation pour les conflits de voisinage et l'accès aux droits.",
-            "points_debattus": "null"
+            "points_debattus": null
           },
+          "budget_impact": 29825,
+          "budget_breakdown": [],
           "vote": {
             "has_vote": true,
             "pour": 33,
@@ -569,8 +624,10 @@
             "contexte": "La présentation du Rapport Social Unique est une obligation légale annuelle qui a remplacé le Rapport sur l'État de la Collectivité (REC) depuis 2021. Il dresse un état des lieux de la situation du personnel de la collectivité.",
             "decision": "Le Conseil municipal a formellement pris acte de la présentation du Rapport Social Unique pour l'année 2024.",
             "impacts": "Ce rapport est un outil de gestion interne des ressources humaines et n'a pas d'impact direct identifiable pour les habitants de Bègles.",
-            "points_debattus": "null"
+            "points_debattus": null
           },
+          "budget_impact": 0,
+          "budget_breakdown": [],
           "vote": {
             "has_vote": true,
             "pour": 33,
@@ -591,8 +648,43 @@
             "contexte": "La délibération concerne le vote annuel du budget primitif, une étape légale obligatoire qui autorise l'engagement des dépenses et la perception des recettes pour l'année à venir.",
             "decision": "Le budget primitif pour l'exercice 2026, s'équilibrant à 68 479 532,99 €, a été voté et approuvé par le conseil municipal.",
             "impacts": "Ce budget définit les moyens financiers alloués à l'ensemble des services publics (écoles, social, culture, voirie, etc.) et aux nouveaux projets d'investissement, influençant directement le cadre de vie des habitants pour l'année 2026.",
-            "points_debattus": "L'opposition a voté contre ce budget, marquant un désaccord sur les orientations financières et les priorités établies par la majorité municipale."
+            "points_debattus": null
           },
+          "budget_impact": 0,
+          "budget_breakdown": [
+            {
+              "topic_tag": "Administration",
+              "amount": 22398062
+            },
+            {
+              "topic_tag": "Sécurité",
+              "amount": 671650
+            },
+            {
+              "topic_tag": "Éducation",
+              "amount": 18671120
+            },
+            {
+              "topic_tag": "Culture",
+              "amount": 14403212
+            },
+            {
+              "topic_tag": "Social",
+              "amount": 5261785
+            },
+            {
+              "topic_tag": "Urbanisme",
+              "amount": 1652040
+            },
+            {
+              "topic_tag": "Environnement",
+              "amount": 709310
+            },
+            {
+              "topic_tag": "Mobilité",
+              "amount": 41600
+            }
+          ],
           "vote": {
             "has_vote": true,
             "pour": 27,
@@ -615,6 +707,8 @@
             "impacts": "Les 35 premiers ménages éligibles (revenu fiscal de référence par part inférieur à 24 900€) pourront bénéficier d'une réduction de 200€ sur l'achat d'un vélo en 2026.",
             "points_debattus": null
           },
+          "budget_impact": 7000,
+          "budget_breakdown": null,
           "vote": {
             "has_vote": true,
             "pour": 33,
@@ -635,8 +729,10 @@
             "contexte": "Cette délibération s'inscrit dans le cadre de l'ajustement annuel des attributions de compensation, le mécanisme financier qui équilibre les transferts de compétences entre les communes et Bordeaux Métropole.",
             "decision": "Le rapport de la Commission locale d'évaluation des charges transférées (CLECT) a été approuvé, fixant ainsi les montants de compensation à verser par Bègles à Bordeaux Métropole pour 2026.",
             "impacts": "Pour 2026, la contribution financière de la ville de Bègles à Bordeaux Métropole augmentera de 235 138 € en fonctionnement (ACF) et de 6 652 € en investissement (ACI), en raison de révisions de niveaux de services.",
-            "points_debattus": "La délibération a été adoptée à l'unanimité, ce qui indique qu'aucun débat ou opposition n'a été consigné dans le document."
+            "points_debattus": null
           },
+          "budget_impact": 0,
+          "budget_breakdown": null,
           "vote": {
             "has_vote": true,
             "pour": 33,
@@ -657,8 +753,10 @@
             "contexte": "Conformément à la loi, la ville doit fixer le montant des redevances pour l'utilisation privative de son domaine public. Cette délibération met à jour la grille tarifaire pour l'année 2026.",
             "decision": "La nouvelle grille tarifaire pour l'occupation temporaire du domaine public pour l'année 2026 a été adoptée.",
             "impacts": "Les entreprises du BTP, les artisans ou les particuliers réalisant des travaux nécessitant d'occuper l'espace public paieront des redevances basées sur ces nouveaux tarifs à partir du 1er janvier 2026.",
-            "points_debattus": "La décision n'a pas été unanime, six élus se sont abstenus, signalant un manque de consensus sur la proposition."
+            "points_debattus": null
           },
+          "budget_impact": 0,
+          "budget_breakdown": [],
           "vote": {
             "has_vote": true,
             "pour": 27,
@@ -681,6 +779,8 @@
             "impacts": "Ce financement garantit la continuité des actions du centre en faveur des habitants, notamment l'accompagnement des publics vulnérables, l'animation des quartiers et la promotion de la participation citoyenne.",
             "points_debattus": null
           },
+          "budget_impact": 0,
+          "budget_breakdown": null,
           "vote": {
             "has_vote": true,
             "pour": 26,
@@ -701,8 +801,10 @@
             "contexte": "Une loi de 2021 a élargi les missions des Centres de Gestion (CDG) pour inclure la médiation à l'initiative du juge ou des parties, en plus de la médiation déjà obligatoire pour certains litiges. La commune met en place ce nouveau dispositif.",
             "decision": "Le conseil municipal a approuvé l'adhésion de la Ville aux missions de médiation proposées par le CDG 33 et a autorisé le Maire à signer la convention nécessaire.",
             "impacts": "Ce service offre une nouvelle voie, plus rapide et moins conflictuelle, pour régler les litiges professionnels entre la municipalité et ses employés. Il n'y a pas d'impact direct identifiable pour les habitants.",
-            "points_debattus": "Le vote n'a pas été unanime, indiquant un désaccord ou des réserves, mais le document ne précise pas les raisons des six abstentions."
+            "points_debattus": null
           },
+          "budget_impact": 0,
+          "budget_breakdown": [],
           "vote": {
             "has_vote": true,
             "pour": 27,
@@ -723,8 +825,10 @@
             "contexte": "Dans le cadre de la préparation du budget 2026, la Ville de Bègles doit fixer le montant de la subvention annuelle de fonctionnement versée au CCAS pour lui permettre de mener ses missions sociales.",
             "decision": "Le versement d'une subvention de 1 490 000 € au CCAS pour l'exercice 2026 a été autorisé, payable en deux fois.",
             "impacts": "Ce financement assure la continuité des services d'action sociale du CCAS pour les habitants de Bègles, en particulier les populations les plus fragiles.",
-            "points_debattus": "La délibération a été adoptée à l'unanimité des membres votants, sans débat ou opposition mentionné dans le document."
+            "points_debattus": null
           },
+          "budget_impact": 1490000,
+          "budget_breakdown": [],
           "vote": {
             "has_vote": true,
             "pour": 25,
@@ -745,8 +849,10 @@
             "contexte": "Cette délibération fait suite à la présentation du Rapport d'Orientations Budgétaires en novembre 2025 et constitue l'étape légale d'approbation des prévisions financières de la ville pour l'année à venir.",
             "decision": "Le budget principal de la ville de Bègles pour l'exercice 2026 a été adopté chapitre par chapitre.",
             "impacts": "Ce budget détermine les moyens alloués à l'ensemble des services publics municipaux (écoles, entretien, culture, etc.) et aux investissements (travaux, nouveaux équipements) pour l'année 2026, ce qui affecte directement le cadre de vie des habitants.",
-            "points_debattus": "Le budget a été adopté à la majorité mais a fait l'objet d'une opposition d'une partie du conseil, qui a voté contre."
+            "points_debattus": null
           },
+          "budget_impact": 0,
+          "budget_breakdown": null,
           "vote": {
             "has_vote": true,
             "pour": 27,
@@ -769,6 +875,8 @@
             "impacts": "Les habitants et les associations de Bègles pourront continuer à utiliser ces installations sportives. A terme, le site intégrera le patrimoine public de la ville, renforçant l'offre sportive locale.",
             "points_debattus": null
           },
+          "budget_impact": 0,
+          "budget_breakdown": null,
           "vote": {
             "has_vote": true,
             "pour": 33,
@@ -789,8 +897,10 @@
             "contexte": "La ville a besoin de renforcer son équipe de police municipale et de mettre à jour son tableau des emplois suite à des départs, des changements de filière et des régularisations de postes.",
             "decision": "La création de 2 postes de policier municipal et la suppression de 17 postes permanents dans différents services ont été actées à compter du 1er janvier 2026.",
             "impacts": "Les effectifs de la police municipale seront augmentés. La réorganisation interne des services se poursuit sans impact direct identifiable pour les citoyens sur les autres postes supprimés.",
-            "points_debattus": "La délibération a été adoptée à la majorité mais a fait l'objet de 11 abstentions, indiquant un désaccord ou des réserves d'une partie des élus, sans que les raisons ne soient détaillées dans le document."
+            "points_debattus": null
           },
+          "budget_impact": 0,
+          "budget_breakdown": [],
           "vote": {
             "has_vote": true,
             "pour": 22,
@@ -799,16 +909,7 @@
           },
           "disagreements": "Le vote n'a pas été unanime. 11 élus se sont abstenus, mais le document ne précise pas les motifs de leur position."
         }
-      ],
-      "agenda": null,
-      "analysis": {
-        "budget_impact": 2764194,
-        "budget_label": "Transition Écologique",
-        "vote_climat": "consensus",
-        "vote_summary": "Enjeu Clé : Bègles accélère sa mutation verte ce mois-ci.",
-        "votes_pour": 31,
-        "votes_contre": 4
-      }
+      ]
     },
     {
       "id": "https://www.mairie-begles.fr/d%C3%A9lib%C3%A9rations/deliberations-du-conseil-dadministration-du-centre-social-et-culturel-lestey-du-24-novembre-2025/",
@@ -817,6 +918,14 @@
       "title": "Délibérations du Conseil d’administration du Centre social et culturel l’Estey du 24 novembre 2025",
       "summary": "Centre social et culturel de l'Estey:\t\t\t\n\t\t\t\tDélibérations du Conseil d’administration du Centre social et culturel l’Estey du 24 novembre 2025\n\t\t\t\n\t\t\t\t\t\n\t\t\n\t\t\t\n\t\t\t\t1 document\t\t\n\t\t\t\t\tPublié le\n\t\t\t\t\t\n\t\t\t26/11/2025",
       "source_url": "https://www.mairie-begles.fr/d%C3%A9lib%C3%A9rations/deliberations-du-conseil-dadministration-du-centre-social-et-culturel-lestey-du-24-novembre-2025/",
+      "analysis": {
+        "budget_impact": 0,
+        "budget_label": "",
+        "vote_climat": "",
+        "vote_summary": "",
+        "votes_pour": 0,
+        "votes_contre": 0
+      },
       "deliberations": [
         {
           "id": "Liste-des-Deliberations-1.pdf",
@@ -832,6 +941,8 @@
             "impacts": "Ces décisions permettent au centre social de poursuivre ses missions, notamment en renforçant ses effectifs et en sécurisant des financements pour ses projets.",
             "points_debattus": null
           },
+          "budget_impact": 0,
+          "budget_breakdown": null,
           "vote": {
             "has_vote": true,
             "pour": 13,
@@ -840,16 +951,7 @@
           },
           "disagreements": null
         }
-      ],
-      "agenda": null,
-      "analysis": {
-        "budget_impact": 1890138,
-        "budget_label": "Solidarité & Social",
-        "vote_climat": "consensus",
-        "vote_summary": "Enjeu Clé : Le pacte social au coeur des débats municipaux.",
-        "votes_pour": 29,
-        "votes_contre": 6
-      }
+      ]
     },
     {
       "id": "https://www.mairie-begles.fr/d%C3%A9lib%C3%A9rations/deliberations-du-conseil-municipal-du-28-mars/",
@@ -858,6 +960,14 @@
       "title": "Délibérations du conseil municipal du 28 mars 2026",
       "summary": "Délibérations du conseil municipal du 28 mars 2026\n\t\t\t\n\t\t\t\t\t\n\t\t\n\t\t\t\n\t\t\t\t5 documents\t\t\n\t\t\t\t\tPublié le\n\t\t\t\t\t\n\t\t\t30/03/2026",
       "source_url": "https://www.mairie-begles.fr/d%C3%A9lib%C3%A9rations/deliberations-du-conseil-municipal-du-28-mars/",
+      "analysis": {
+        "budget_impact": 0,
+        "budget_label": "Administration",
+        "vote_climat": "consensus",
+        "vote_summary": "Enjeu Clé : Séance d’installation du nouveau conseil municipal et élection du Maire Christian Bagate (Conseil Institutionnel).",
+        "votes_pour": 33,
+        "votes_contre": 0
+      },
       "deliberations": [
         {
           "id": "D02-2026_021.pdf",
@@ -871,8 +981,10 @@
             "contexte": "En début de mandat ou suite à une réorganisation, la loi impose au Conseil Municipal de déterminer le nombre de ses adjoints, dans la limite de 30% de l'effectif total pour les adjoints au maire et 10% pour les adjoints de quartier.",
             "decision": "Le nombre d'adjoints au Maire a été fixé à 11 et celui des adjoints de quartier à 1.",
             "impacts": "Cette décision administrative organise le fonctionnement interne de la municipalité. Elle n'a pas d'impact direct sur les services rendus aux citoyens, mais définit qui sera en charge des différentes délégations.",
-            "points_debattus": "Le vote n'a pas été unanime, comme en témoignent les 9 abstentions, mais les raisons de ce positionnement ne sont pas explicitées dans le document."
+            "points_debattus": null
           },
+          "budget_impact": 0,
+          "budget_breakdown": null,
           "vote": {
             "has_vote": true,
             "pour": 30,
@@ -895,6 +1007,8 @@
             "impacts": "Ce texte n'a pas d'impact matériel direct pour les habitants, mais il formalise l'engagement des élus à agir de manière éthique et dans le seul intérêt général de la commune.",
             "points_debattus": null
           },
+          "budget_impact": 0,
+          "budget_breakdown": null,
           "vote": {
             "has_vote": true,
             "pour": 39,
@@ -917,6 +1031,8 @@
             "impacts": "Cette délégation permet une plus grande réactivité de l'administration municipale pour les décisions quotidiennes, accélérant ainsi les procédures administratives et la mise en œuvre de certains projets.",
             "points_debattus": null
           },
+          "budget_impact": 0,
+          "budget_breakdown": null,
           "vote": {
             "has_vote": true,
             "pour": 39,
@@ -937,8 +1053,10 @@
             "contexte": "Cette délibération correspond à la première séance du conseil municipal nouvellement élu, dont l'objet principal est la désignation du maire pour la mandature.",
             "decision": "Monsieur Christian BAGATE est élu Maire de la Ville de Bègles et est immédiatement installé dans ses fonctions.",
             "impacts": "Cette élection établit le nouveau chef de l'exécutif municipal, qui dirigera l'administration de la ville pour la durée du mandat.",
-            "points_debattus": "Une opposition s'est manifestée par la non-participation au vote de 9 des 39 conseillers, indiquant que l'élection n'a pas été consensuelle."
+            "points_debattus": null
           },
+          "budget_impact": 0,
+          "budget_breakdown": null,
           "vote": {
             "has_vote": true,
             "pour": 30,
@@ -959,8 +1077,10 @@
             "contexte": "Suite à la réunion du conseil municipal du 28 mars 2026, il était nécessaire de procéder à l'élection formelle des adjoints au maire, comme l'exige le code général des collectivités territoriales.",
             "decision": "La liste « Espoir Béglais » a été élue à la majorité absolue, et ses 12 membres ont été proclamés adjoints au maire.",
             "impacts": "Cette élection officialise la composition de l'équipe dirigeante de la municipalité, qui mettra en œuvre la politique de la ville. Les citoyens connaissent désormais les noms et l'ordre des adjoints au maire.",
-            "points_debattus": "Le document n'indique pas de débat, mais signale que 9 conseillers municipaux n'ont pas participé au vote."
+            "points_debattus": null
           },
+          "budget_impact": 0,
+          "budget_breakdown": null,
           "vote": {
             "has_vote": true,
             "pour": 30,
@@ -969,16 +1089,7 @@
           },
           "disagreements": "9 conseillers municipaux n'ont pas participé au vote : Mme Edwige LUCBERNET, Mme Marie-Laure PIROTH, M. Clément ROSSIGNOL PUECH, Mme Marie JANVIER, M. Julien LEFEBVRE, M. Vincent BOIVINET, Mme Aurélie BOUSQUET, M. Rémi JOUSSIAUME, M. Pierre OUALLET."
         }
-      ],
-      "agenda": null,
-      "analysis": {
-        "budget_impact": 1206296,
-        "budget_label": "Sport & Culture",
-        "vote_climat": "tensions",
-        "vote_summary": "Enjeu Clé : Dynamiser la vie associative et culturelle.",
-        "votes_pour": 30,
-        "votes_contre": 5
-      }
+      ]
     },
     {
       "id": "https://www.mairie-begles.fr/d%C3%A9lib%C3%A9rations/deliberations-du-conseil-municipal-du-mardi-18-novembre-2025/",
@@ -987,6 +1098,14 @@
       "title": "Délibérations du Conseil municipal du mardi 18 novembre 2025",
       "summary": "Conseil municipal:\t\t\t\n\t\t\t\tDélibérations du Conseil municipal du mardi 18 novembre 2025\n\t\t\t\n\t\t\t\t\t\n\t\t\n\t\t\t\n\t\t\t\t21 documents\t\t\n\t\t\t\t\tPublié le\n\t\t\t\t\t\n\t\t\t21/11/2025",
       "source_url": "https://www.mairie-begles.fr/d%C3%A9lib%C3%A9rations/deliberations-du-conseil-municipal-du-mardi-18-novembre-2025/",
+      "analysis": {
+        "budget_impact": 0,
+        "budget_label": "",
+        "vote_climat": "",
+        "vote_summary": "",
+        "votes_pour": 0,
+        "votes_contre": 0
+      },
       "deliberations": [
         {
           "id": "D14-2025_092.pdf",
@@ -1002,6 +1121,8 @@
             "impacts": "Les enfants de la commune pourront bénéficier de cours de natation gratuits ou à faible coût durant l'été 2026 pour apprendre à nager et améliorer leur sécurité en milieu aquatique.",
             "points_debattus": null
           },
+          "budget_impact": 0,
+          "budget_breakdown": null,
           "vote": {
             "has_vote": true,
             "pour": 35,
@@ -1024,6 +1145,8 @@
             "impacts": "Ce rapport confirme la poursuite des grands projets d'investissement (écoles, complexe sportif, musée) et l'engagement de ne pas augmenter les taux d'imposition locaux, malgré un contexte financier national qui pèse sur les finances de la ville.",
             "points_debattus": null
           },
+          "budget_impact": 0,
+          "budget_breakdown": null,
           "vote": {
             "has_vote": true,
             "pour": 35,
@@ -1046,6 +1169,8 @@
             "impacts": "La décision permettra la création d'une place supplémentaire en crèche pour une famille béglaise au 196 avenue Salvador Allende.",
             "points_debattus": null
           },
+          "budget_impact": 0,
+          "budget_breakdown": null,
           "vote": {
             "has_vote": true,
             "pour": 35,
@@ -1068,6 +1193,8 @@
             "impacts": "La convention formalise les créneaux d'entraînement et de compétition pour les différents clubs de rugby de la ville, assurant une répartition claire des équipements sportifs.",
             "points_debattus": null
           },
+          "budget_impact": 0,
+          "budget_breakdown": null,
           "vote": {
             "has_vote": true,
             "pour": 35,
@@ -1090,6 +1217,8 @@
             "impacts": "Les forains souhaitant participer devront payer un droit de place de 20€, auxquels s'ajoute un forfait fluides de 3,19€ pour les stands fixes, et s'inscrire en amont de l'événement.",
             "points_debattus": null
           },
+          "budget_impact": 0,
+          "budget_breakdown": null,
           "vote": {
             "has_vote": true,
             "pour": 35,
@@ -1110,8 +1239,10 @@
             "contexte": "Un bâtiment annexe (garage, sanitaires) situé sur la parcelle du Tiers-Lieu a présenté des fissures structurelles graves, le rendant dangereux et nécessitant sa démolition.",
             "decision": "Le Conseil municipal a autorisé la signature d'un avenant au bail pour intégrer ces travaux de démolition et a accordé une subvention de 50 000 € à l'association pour les financer.",
             "impacts": "Le site dangereux sera sécurisé par la démolition du bâtiment, et le projet de réhabilitation du Tiers-Lieu pourra se poursuivre en intégrant cet espace.",
-            "points_debattus": "Le vote n'a pas été unanime, sept élus se sont abstenus sans que les raisons de leur position ne soient précisées dans le document."
+            "points_debattus": null
           },
+          "budget_impact": 0,
+          "budget_breakdown": null,
           "vote": {
             "has_vote": true,
             "pour": 28,
@@ -1134,6 +1265,8 @@
             "impacts": "Les membres de l'association Dojo Béglais peuvent continuer à pratiquer leurs activités sportives (judo, forme, entretien) dans les mêmes locaux, assurant une continuité pour les usagers.",
             "points_debattus": null
           },
+          "budget_impact": 0,
+          "budget_breakdown": null,
           "vote": {
             "has_vote": true,
             "pour": 35,
@@ -1154,8 +1287,10 @@
             "contexte": "Dans le cadre de la deuxième décision modificative du budget 2025, la ville doit ajuster la répartition annuelle des crédits de paiement (CP) pour ses grands projets pluriannuels (Autorisations de Programme - AP) afin de l'aligner sur l'avancement réel des travaux.",
             "decision": "Le Conseil a approuvé la nouvelle répartition des crédits de paiement pour l'exercice 2025, actant une modification de l'échéancier des dépenses pour quatre autorisations de programme.",
             "impacts": "Cette décision, d'ordre financier et technique, assure la bonne gestion et le financement des chantiers majeurs de la ville (écoles, cuisine centrale, complexe sportif) sans impact direct immédiat pour les habitants.",
-            "points_debattus": "La délibération a été adoptée à la majorité, avec une opposition de sept conseillers municipaux."
+            "points_debattus": null
           },
+          "budget_impact": 0,
+          "budget_breakdown": null,
           "vote": {
             "has_vote": true,
             "pour": 28,
@@ -1178,6 +1313,8 @@
             "impacts": "Les Béglaises et Béglais bénéficieront d'un programme d'activités sportives et culturelles sur toutes les périodes de vacances scolaires de l'année 2026.",
             "points_debattus": null
           },
+          "budget_impact": 0,
+          "budget_breakdown": null,
           "vote": {
             "has_vote": true,
             "pour": 35,
@@ -1200,6 +1337,8 @@
             "impacts": "Pour les usagers, cela assure la continuité et la régulation de l'offre de vélos et trottinettes en libre-service. Pour la commune, cela génère une nouvelle recette budgétaire et permet un meilleur contrôle de l'occupation du domaine public par ces services.",
             "points_debattus": null
           },
+          "budget_impact": 0,
+          "budget_breakdown": null,
           "vote": {
             "has_vote": true,
             "pour": 35,
@@ -1220,8 +1359,10 @@
             "contexte": "L'activité CitéCirque, auparavant gérée par l'association CREAC, est reprise en régie municipale à partir du 1er janvier 2026. Pour garantir une transition sans heurt, il est nécessaire de mettre en place une solution pour l'encaissement des recettes de billetterie.",
             "decision": "Le conseil a approuvé la signature d'un mandat avec la société See Tickets pour qu'elle encaisse les recettes de la billetterie de la CitéCirque au nom de la Ville à compter du 1er janvier 2026.",
             "impacts": "Les spectateurs pourront continuer à acheter leurs billets pour les spectacles de la CitéCirque via la plateforme See Tickets, sans interruption de service.",
-            "points_debattus": "La délibération n'a pas été adoptée à l'unanimité, un groupe de 7 conseillers s'est abstenu sans que les raisons de cette position ne soient précisées dans le document."
+            "points_debattus": null
           },
+          "budget_impact": 0,
+          "budget_breakdown": null,
           "vote": {
             "has_vote": true,
             "pour": 28,
@@ -1244,6 +1385,8 @@
             "impacts": "Cette mesure va générer de nouvelles recettes pour la ville tout en offrant un outil de formation moderne aux acteurs locaux de l'insertion et de l'enseignement professionnel culinaire.",
             "points_debattus": null
           },
+          "budget_impact": 0,
+          "budget_breakdown": null,
           "vote": {
             "has_vote": true,
             "pour": 35,
@@ -1266,6 +1409,8 @@
             "impacts": "Les différents clubs sportifs utilisateurs du stade, comme l'UBB, le CAB et le CABBG, bénéficieront de meilleures conditions de pratique et d'accueil.",
             "points_debattus": null
           },
+          "budget_impact": 0,
+          "budget_breakdown": null,
           "vote": {
             "has_vote": true,
             "pour": 35,
@@ -1286,8 +1431,10 @@
             "contexte": "Suite au budget primitif et à une première modification, des impératifs comptables, économiques et sociaux ont rendu nécessaire un nouvel ajustement des prévisions budgétaires pour l'exercice 2025.",
             "decision": "La décision modificative n°2 du budget 2025, qui s'équilibre en recettes et en dépenses, a été approuvée par le conseil municipal.",
             "impacts": "Cette modification permet de réallouer des fonds entre différents postes budgétaires pour garantir le bon financement des services publics et des projets d'investissement de la ville jusqu'à la fin de l'année.",
-            "points_debattus": "La délibération n'a pas fait l'unanimité, un groupe de sept élus a voté contre la proposition d'ajustement budgétaire."
+            "points_debattus": null
           },
+          "budget_impact": 0,
+          "budget_breakdown": null,
           "vote": {
             "has_vote": true,
             "pour": 28,
@@ -1296,16 +1443,7 @@
           },
           "disagreements": "La délibération a été adoptée à la majorité. Sept membres du conseil ont voté contre : M. Christian BAGATE, M. Mohammed MICHRAFY, M. Alexandre DIAS, Mme Isabelle TEURLAY NICOT, Mme Fabienne DA COSTA, M. Christophe THOMAS, Mme Seynabou GUEYE. Les raisons de leur opposition ne sont pas détaillées dans le document."
         }
-      ],
-      "agenda": null,
-      "analysis": {
-        "budget_impact": 2009141,
-        "budget_label": "Aménagement & Travaux",
-        "vote_climat": "consensus",
-        "vote_summary": "Enjeu Clé : Modernisation des infrastructures urbaines.",
-        "votes_pour": 28,
-        "votes_contre": 7
-      }
+      ]
     },
     {
       "id": "https://www.mairie-begles.fr/d%C3%A9lib%C3%A9rations/deliberations-du-conseil-dadministration-du-ccas-du-26-janvier-2026/",
@@ -1314,6 +1452,14 @@
       "title": "Délibérations du conseil d'administration du CCAS du 26 janvier 2026",
       "summary": "Centre communal d'action sociale:\t\t\t\n\t\t\t\tDélibérations du conseil d'administration du CCAS du 26 janvier 2026\n\t\t\t\n\t\t\t\t\t\n\t\t\n\t\t\t\n\t\t\t\t1 document\t\t\n\t\t\t\t\tPublié le\n\t\t\t\t\t\n\t\t\t30/01/2026",
       "source_url": "https://www.mairie-begles.fr/d%C3%A9lib%C3%A9rations/deliberations-du-conseil-dadministration-du-ccas-du-26-janvier-2026/",
+      "analysis": {
+        "budget_impact": 0,
+        "budget_label": "Solidarité \u0026 Social",
+        "vote_climat": "consensus",
+        "vote_summary": "Enjeu Clé : Vote du budget primitif 2026 pour l’action sociale municipale.",
+        "votes_pour": 15,
+        "votes_contre": 0
+      },
       "deliberations": [
         {
           "id": "Liste-des-Deliberations-26-janvier-2026.pdf",
@@ -1327,8 +1473,10 @@
             "contexte": "Le vote du budget primitif est une étape légale et obligatoire en début d'année, permettant de fixer les prévisions de dépenses et de recettes du C.C.A.S. pour l'exercice à venir.",
             "decision": "Le budget primitif 2026 du C.C.A.S. et celui de son service d'autonomie à domicile ont été adoptés à l'unanimité.",
             "impacts": "Ce vote détermine les moyens financiers qui seront disponibles pour les aides sociales, le soutien aux personnes en difficulté et le fonctionnement des services sociaux de Bègles pour l'année 2026.",
-            "points_debattus": "null"
+            "points_debattus": null
           },
+          "budget_impact": 0,
+          "budget_breakdown": null,
           "vote": {
             "has_vote": true,
             "pour": 11,
@@ -1337,16 +1485,7 @@
           },
           "disagreements": "null"
         }
-      ],
-      "agenda": null,
-      "analysis": {
-        "budget_impact": 1159098,
-        "budget_label": "Administration",
-        "vote_climat": "consensus",
-        "vote_summary": "Enjeu Clé : Optimisation de la gestion communale.",
-        "votes_pour": 33,
-        "votes_contre": 2
-      }
+      ]
     },
     {
       "id": "https://www.mairie-begles.fr/d%C3%A9lib%C3%A9rations/deliberations-du-conseil-dadministration-du-ccas-du-01-decembre-2025/",
@@ -1355,6 +1494,14 @@
       "title": "Délibérations du Conseil d’administration du CCAS du 01 décembre 2025",
       "summary": "Centre communal d'action sociale:\t\t\t\n\t\t\t\tDélibérations du Conseil d’administration du CCAS du 01 décembre 2025\n\t\t\t\n\t\t\t\t\t\n\t\t\n\t\t\t\n\t\t\t\t1 document\t\t\n\t\t\t\t\tPublié le\n\t\t\t\t\t\n\t\t\t03/12/2025",
       "source_url": "https://www.mairie-begles.fr/d%C3%A9lib%C3%A9rations/deliberations-du-conseil-dadministration-du-ccas-du-01-decembre-2025/",
+      "analysis": {
+        "budget_impact": 0,
+        "budget_label": "",
+        "vote_climat": "",
+        "vote_summary": "",
+        "votes_pour": 0,
+        "votes_contre": 0
+      },
       "deliberations": [
         {
           "id": "Liste-des-Deliberations-01-decembre-2025.pdf",
@@ -1370,6 +1517,8 @@
             "impacts": "Les décisions prises affectent la gestion des agents du CCAS (mise à disposition, compte épargne temps), assurent l'équilibre budgétaire du service d'aide à domicile (S.A.D.) et allouent une aide financière à un habitant pour la réhabilitation de son logement.",
             "points_debattus": null
           },
+          "budget_impact": 0,
+          "budget_breakdown": null,
           "vote": {
             "has_vote": true,
             "pour": 9,
@@ -1378,16 +1527,24 @@
           },
           "disagreements": "L'ensemble des délibérations a été adopté à l'unanimité des 9 membres présents."
         }
-      ],
-      "agenda": null,
+      ]
+    },
+    {
+      "id": "https://www.mairie-begles.fr/d%C3%A9lib%C3%A9rations/deliberations-du-conseil-municipal-du-mardi-16-d%C3%A9cembre-2025/",
+      "category": "",
+      "date": "",
+      "title": "",
+      "summary": "",
+      "source_url": "",
       "analysis": {
-        "budget_impact": 2082788,
-        "budget_label": "Éducation & Jeunesse",
+        "budget_impact": 0,
+        "budget_label": "Budget",
         "vote_climat": "consensus",
-        "vote_summary": "Enjeu Clé : Un conseil tourné vers l avenir de nos enfants.",
-        "votes_pour": 28,
-        "votes_contre": 7
-      }
+        "vote_summary": "Enjeu Clé : Adoption du Budget Primitif 2026 de la Ville de Bègles.",
+        "votes_pour": 31,
+        "votes_contre": 0
+      },
+      "deliberations": null
     },
     {
       "id": "https://www.mairie-begles.fr/d%C3%A9lib%C3%A9rations/deliberations-du-conseil-municipal-du-mardi-23-septembre-2025/",
@@ -1396,6 +1553,14 @@
       "title": "Délibérations du Conseil Municipal du mardi 23 septembre 2025",
       "summary": "Conseil municipal:\t\t\t\n\t\t\t\tDélibérations du Conseil Municipal du mardi 23 septembre 2025\n\t\t\t\n\t\t\t\t\t\n\t\t\n\t\t\t\n\t\t\t\t9 documents\t\t\n\t\t\t\t\tPublié le\n\t\t\t\t\t\n\t\t\t25/09/2025",
       "source_url": "https://www.mairie-begles.fr/d%C3%A9lib%C3%A9rations/deliberations-du-conseil-municipal-du-mardi-23-septembre-2025/",
+      "analysis": {
+        "budget_impact": 0,
+        "budget_label": "",
+        "vote_climat": "",
+        "vote_summary": "",
+        "votes_pour": 0,
+        "votes_contre": 0
+      },
       "deliberations": [
         {
           "id": "D02-2025_071.pdf",
@@ -1409,8 +1574,10 @@
             "contexte": "Suite à l'organisation d'une fan zone pour la finale du Top 14, qui a coûté 42 384 €, la commune cherche à obtenir un soutien financier de Bordeaux Métropole.",
             "decision": "Le conseil municipal a autorisé le Maire à demander une subvention de 21 192 € à Bordeaux Métropole pour cette opération.",
             "impacts": "L'obtention de cette subvention permettra de couvrir 50% du coût de l'événement, ce qui réduira la charge sur le budget municipal.",
-            "points_debattus": "La délibération a été adoptée à l'unanimité des votants, sans désaccord mentionné dans le document."
+            "points_debattus": null
           },
+          "budget_impact": 0,
+          "budget_breakdown": null,
           "vote": {
             "has_vote": true,
             "pour": 35,
@@ -1431,8 +1598,10 @@
             "contexte": "Suite à une demande du service de gestion comptable, la municipalité a dû adopter une délibération de principe pour préciser formellement les types de dépenses imputables au compte budgétaire 6232.",
             "decision": "Le Conseil Municipal a approuvé la liste détaillée des dépenses (décorations, réceptions, spectacles, frais de déplacement, etc.) pouvant être affectées au compte \"Fêtes et cérémonies\".",
             "impacts": "Cette décision est d'ordre administratif et comptable, sans impact direct identifiable pour les citoyens, car elle ne modifie pas les budgets alloués mais seulement leur classification.",
-            "points_debattus": "Le document n'expose aucun débat, mais le vote n'a pas été unanime, indiquant une absence de consensus de la part de certains élus."
+            "points_debattus": null
           },
+          "budget_impact": 0,
+          "budget_breakdown": null,
           "vote": {
             "has_vote": true,
             "pour": 28,
@@ -1455,6 +1624,8 @@
             "impacts": "Les associations béglaises bénéficieront d'un accès facilité et gratuit à des informations, des conseils et une orientation pour leurs démarches administratives et le développement de leurs projets.",
             "points_debattus": null
           },
+          "budget_impact": 0,
+          "budget_breakdown": null,
           "vote": {
             "has_vote": true,
             "pour": 35,
@@ -1477,6 +1648,8 @@
             "impacts": "La vente permet de clarifier les limites de propriété pour quatre foyers et rapporte 21 400 € au budget de la Ville. Les frais d'acte et de bornage sont à la charge des acquéreurs.",
             "points_debattus": null
           },
+          "budget_impact": 0,
+          "budget_breakdown": null,
           "vote": {
             "has_vote": true,
             "pour": 35,
@@ -1499,6 +1672,8 @@
             "impacts": "Cette décision vise à améliorer l'encadrement des enfants dans les activités périscolaires et à renforcer l'offre d'enseignement musical pour les habitants.",
             "points_debattus": null
           },
+          "budget_impact": 0,
+          "budget_breakdown": null,
           "vote": {
             "has_vote": true,
             "pour": 35,
@@ -1521,6 +1696,8 @@
             "impacts": "La Ville de Bègles perçoit une recette de 20 000 € pour son budget d'investissement et n'a plus à charge les coûts de gestion, d'entretien et de gardiennage du chapiteau.",
             "points_debattus": null
           },
+          "budget_impact": 0,
+          "budget_breakdown": null,
           "vote": {
             "has_vote": true,
             "pour": 35,
@@ -1529,16 +1706,7 @@
           },
           "disagreements": null
         }
-      ],
-      "agenda": null,
-      "analysis": {
-        "budget_impact": 1947909,
-        "budget_label": "Transition Écologique",
-        "vote_climat": "consensus",
-        "vote_summary": "Enjeu Clé : Bègles accélère sa mutation verte ce mois-ci.",
-        "votes_pour": 31,
-        "votes_contre": 4
-      }
+      ]
     },
     {
       "id": "https://www.mairie-begles.fr/d%C3%A9lib%C3%A9rations/deliberations-du-conseil-dadministration-du-ccas-du-13-octobre-2025/",
@@ -1547,6 +1715,14 @@
       "title": "Délibérations du Conseil d’administration du CCAS du 13 octobre 2025",
       "summary": "Centre communal d'action sociale:\t\t\t\n\t\t\t\tDélibérations du Conseil d’administration du CCAS du 13 octobre 2025\n\t\t\t\n\t\t\t\t\t\n\t\t\n\t\t\t\n\t\t\t\t1 document\t\t\n\t\t\t\t\tPublié le\n\t\t\t\t\t\n\t\t\t15/10/2025",
       "source_url": "https://www.mairie-begles.fr/d%C3%A9lib%C3%A9rations/deliberations-du-conseil-dadministration-du-ccas-du-13-octobre-2025/",
+      "analysis": {
+        "budget_impact": 0,
+        "budget_label": "",
+        "vote_climat": "",
+        "vote_summary": "",
+        "votes_pour": 0,
+        "votes_contre": 0
+      },
       "deliberations": [
         {
           "id": "Liste-des-Deliberations-13-octobre-2025.pdf",
@@ -1562,6 +1738,8 @@
             "impacts": "Ces décisions assurent la continuité du service d'aide à domicile pour 2026, allouent des aides directes à des Béglais pour l'amélioration de leur habitat et valident la gestion financière de l'organisme.",
             "points_debattus": null
           },
+          "budget_impact": 0,
+          "budget_breakdown": null,
           "vote": {
             "has_vote": true,
             "pour": null,
@@ -1570,16 +1748,7 @@
           },
           "disagreements": "Toutes les délibérations ont été adoptées à l'unanimité. Le nombre de voix \"pour\" varie cependant de 4, 12 ou 13 selon les points, sans explication fournie dans le document pour ces variations."
         }
-      ],
-      "agenda": null,
-      "analysis": {
-        "budget_impact": 2471054,
-        "budget_label": "Solidarité & Social",
-        "vote_climat": "tensions",
-        "vote_summary": "Enjeu Clé : Le pacte social au coeur des débats municipaux.",
-        "votes_pour": 34,
-        "votes_contre": 1
-      }
+      ]
     },
     {
       "id": "https://www.mairie-begles.fr/d%C3%A9lib%C3%A9rations/deliberations-du-conseil-dadministration-du-centre-social-et-culturel-lestey/",
@@ -1588,16 +1757,15 @@
       "title": "Délibérations du Conseil d'administration du Centre social et culturel l'Estey du 6 octobre 2025",
       "summary": "Centre social et culturel de l'Estey:\t\t\t\n\t\t\t\tDélibérations du Conseil d'administration du Centre social et culturel l'Estey du 6 octobre 2025\n\t\t\t\n\t\t\t\t\t\n\t\t\n\t\t\t\n\t\t\t\t1 document\t\t\n\t\t\t\t\tPublié le\n\t\t\t\t\t\n\t\t\t08/10/2025",
       "source_url": "https://www.mairie-begles.fr/d%C3%A9lib%C3%A9rations/deliberations-du-conseil-dadministration-du-centre-social-et-culturel-lestey/",
-      "deliberations": null,
-      "agenda": null,
       "analysis": {
-        "budget_impact": 1623657,
-        "budget_label": "Sport & Culture",
-        "vote_climat": "consensus",
-        "vote_summary": "Enjeu Clé : Dynamiser la vie associative et culturelle.",
-        "votes_pour": 35,
+        "budget_impact": 0,
+        "budget_label": "",
+        "vote_climat": "",
+        "vote_summary": "",
+        "votes_pour": 0,
         "votes_contre": 0
-      }
+      },
+      "deliberations": null
     },
     {
       "id": "https://www.mairie-begles.fr/d%C3%A9lib%C3%A9rations/deliberations-du-conseil-dadministration-du-centre-social-et-culturel-lestey-du-19-janvier-2026/",
@@ -1606,6 +1774,14 @@
       "title": "Délibérations du Conseil d’administration du Centre social et culturel l’Estey du 19 janvier 2026",
       "summary": "Centre social et culturel de l'Estey:\t\t\t\n\t\t\t\tDélibérations du Conseil d’administration du Centre social et culturel l’Estey du 19 janvier 2026\n\t\t\t\n\t\t\t\t\t\n\t\t\n\t\t\t\n\t\t\t\t1 document\t\t\n\t\t\t\t\tPublié le\n\t\t\t\t\t\n\t\t\t21/01/2026",
       "source_url": "https://www.mairie-begles.fr/d%C3%A9lib%C3%A9rations/deliberations-du-conseil-dadministration-du-centre-social-et-culturel-lestey-du-19-janvier-2026/",
+      "analysis": {
+        "budget_impact": 0,
+        "budget_label": "Budget",
+        "vote_climat": "consensus",
+        "vote_summary": "Enjeu Clé : Validation du budget de fonctionnement pour le centre social l Estey.",
+        "votes_pour": 12,
+        "votes_contre": 0
+      },
       "deliberations": [
         {
           "id": "Liste-des-Deliberations-CA-CENSO-du-19-janvier-2026.pdf",
@@ -1621,6 +1797,8 @@
             "impacts": "Cette adoption assure le financement des activités, des ateliers et des services sociaux et culturels proposés par le centre L'Estey aux Béglais pour l'année 2026.",
             "points_debattus": null
           },
+          "budget_impact": 0,
+          "budget_breakdown": null,
           "vote": {
             "has_vote": true,
             "pour": 13,
@@ -1629,16 +1807,7 @@
           },
           "disagreements": null
         }
-      ],
-      "agenda": null,
-      "analysis": {
-        "budget_impact": 774701,
-        "budget_label": "Aménagement & Travaux",
-        "vote_climat": "consensus",
-        "vote_summary": "Enjeu Clé : Modernisation des infrastructures urbaines.",
-        "votes_pour": 30,
-        "votes_contre": 5
-      }
+      ]
     },
     {
       "id": "https://www.mairie-begles.fr/d%C3%A9lib%C3%A9rations/deliberation-du-conseil-municipal-du-24-fevrier-2026/",
@@ -1647,6 +1816,14 @@
       "title": "Délibérations du conseil municipal du 24 février 2026",
       "summary": "Conseil municipal:\t\t\t\n\t\t\t\tDélibérations du conseil municipal du 24 février 2026\n\t\t\t\n\t\t\t\t\t\n\t\t\n\t\t\t\n\t\t\t\t19 documents\t\t\n\t\t\t\t\tPublié le\n\t\t\t\t\t\n\t\t\t26/02/2026",
       "source_url": "https://www.mairie-begles.fr/d%C3%A9lib%C3%A9rations/deliberation-du-conseil-municipal-du-24-fevrier-2026/",
+      "analysis": {
+        "budget_impact": 121450,
+        "budget_label": "Administration",
+        "vote_climat": "consensus",
+        "vote_summary": "Enjeu Clé : Adoption du cadre éthique pour l’IA et dénominations d’équipements sportifs.",
+        "votes_pour": 32,
+        "votes_contre": 0
+      },
       "deliberations": [
         {
           "id": "D09-2026_009.pdf",
@@ -1662,6 +1839,8 @@
             "impacts": "Les habitants, et notamment ceux en situation de précarité, auront accès à des denrées alimentaires gratuites, tandis que la cuisine municipale disposera d'un moyen concret pour réduire ses déchets.",
             "points_debattus": null
           },
+          "budget_impact": 0,
+          "budget_breakdown": null,
           "vote": {
             "has_vote": true,
             "pour": 33,
@@ -1684,6 +1863,8 @@
             "impacts": "Cette décision administrative est un prérequis à la future construction d'une aire de camping-cars, visant à renforcer l'attractivité touristique du secteur portuaire de Bègles.",
             "points_debattus": null
           },
+          "budget_impact": 0,
+          "budget_breakdown": null,
           "vote": {
             "has_vote": true,
             "pour": 33,
@@ -1706,6 +1887,8 @@
             "impacts": "Cette décision est d'ordre administratif et n'a pas d'impact direct identifiable pour les citoyens, si ce n'est une potentielle accélération des projets d'efficacité énergétique à long terme.",
             "points_debattus": null
           },
+          "budget_impact": 0,
+          "budget_breakdown": null,
           "vote": {
             "has_vote": true,
             "pour": 33,
@@ -1728,6 +1911,8 @@
             "impacts": "Ce financement permettra de présenter une nouvelle œuvre monumentale dans les meilleures conditions aux visiteurs lors de la réouverture du Musée de la Création Franche en 2026.",
             "points_debattus": null
           },
+          "budget_impact": 3000,
+          "budget_breakdown": null,
           "vote": {
             "has_vote": true,
             "pour": 33,
@@ -1748,8 +1933,10 @@
             "contexte": "Le Musée de la Création Franche, reconnu \"musée de France\", souhaite acquérir de nouvelles œuvres pour développer ses collections permanentes et son projet culturel.",
             "decision": "Le conseil a voté pour autoriser le Maire à solliciter des subventions auprès du Fonds Régional d'Acquisition pour les Musées (FRAM) afin de financer ces achats.",
             "impacts": "L'obtention de ces subventions permettra d'enrichir le patrimoine public de la ville en acquérant de nouvelles œuvres d'art, accessibles aux habitants et visiteurs du musée.",
-            "points_debattus": "Sept conseillers municipaux se sont opposés à la délibération, mais les raisons de leur vote contre ne sont pas explicitées dans le document."
+            "points_debattus": null
           },
+          "budget_impact": 0,
+          "budget_breakdown": null,
           "vote": {
             "has_vote": true,
             "pour": 26,
@@ -1770,8 +1957,10 @@
             "contexte": "Dans le cadre de l'aménagement du Réseau Express Vélos (REVE14), il est nécessaire d'installer un éclairage public, qui est de compétence communale. Pour assurer la cohérence technique, Bordeaux Métropole est désignée comme maître d'ouvrage unique.",
             "decision": "La convention cadre avec Bordeaux Métropole pour la réalisation des travaux d'éclairage public du REVE14 est approuvée.",
             "impacts": "La nouvelle portion de la piste cyclable express sera éclairée, ce qui améliorera la sécurité et le confort des cyclistes, notamment en soirée et la nuit.",
-            "points_debattus": "Le document ne retranscrit aucun débat, mais le vote indique que sept conseillers municipaux se sont abstenus, signalant une absence de consensus sur la décision."
+            "points_debattus": null
           },
+          "budget_impact": 45450,
+          "budget_breakdown": null,
           "vote": {
             "has_vote": true,
             "pour": 26,
@@ -1792,8 +1981,10 @@
             "contexte": "Face à une forte augmentation des cambriolages en Gironde, la ville a initié cette aide en 2025 avec des résultats positifs (65 foyers aidés, baisse des cambriolages). Cette délibération vise à poursuivre et renforcer ce dispositif.",
             "decision": "Le dispositif d'aide à l'achat de systèmes de sécurité est poursuivi pour 2026 avec une enveloppe de 10 000 € et est étendu aux associations et commerces locaux.",
             "impacts": "Les habitants, associations et commerçants de proximité de Bègles peuvent demander une subvention de 100€ pour s'équiper d'un système d'alarme ou de vidéosurveillance.",
-            "points_debattus": "La délibération n'a pas été adoptée à l'unanimité, un groupe de 7 conseillers municipaux a voté contre la mesure."
+            "points_debattus": null
           },
+          "budget_impact": 10000,
+          "budget_breakdown": null,
           "vote": {
             "has_vote": true,
             "pour": 26,
@@ -1816,6 +2007,8 @@
             "impacts": "Cela permettra à la ville de mieux piloter sa consommation d'énergie, de réaliser des économies et de répondre à ses obligations de réduction de consommation énergétique, sans coût financier pour la commune.",
             "points_debattus": null
           },
+          "budget_impact": 0,
+          "budget_breakdown": null,
           "vote": {
             "has_vote": true,
             "pour": 33,
@@ -1836,8 +2029,10 @@
             "contexte": "La construction d'un nouveau complexe sportif par la Ville de Bègles, dont la livraison est prévue pour le second semestre 2026, nécessite de lui attribuer une dénomination officielle.",
             "decision": "Le nouveau complexe sportif situé rue Louis Rochemont à Bègles est officiellement nommé \"Alice MILLIAT\".",
             "impacts": "La nouvelle installation sportive municipale portera le nom d'une figure historique du sport féminin, valorisant ainsi l'égalité dans le sport.",
-            "points_debattus": "La délibération n'a pas été adoptée à l'unanimité, un groupe de 7 conseillers a voté contre cette dénomination."
+            "points_debattus": null
           },
+          "budget_impact": 0,
+          "budget_breakdown": null,
           "vote": {
             "has_vote": true,
             "pour": 26,
@@ -1860,6 +2055,8 @@
             "impacts": "Les citoyens auront la garantie d'une alternative humaine pour leurs démarches administratives et la ville s'interdit d'utiliser l'IA pour la surveillance individuelle ou la notation sociale.",
             "points_debattus": null
           },
+          "budget_impact": 0,
+          "budget_breakdown": null,
           "vote": {
             "has_vote": true,
             "pour": 33,
@@ -1882,6 +2079,8 @@
             "impacts": "L'impact est principalement symbolique, honorant une personnalité locale et donnant un nom officiel à un équipement sportif utilisé par les habitants.",
             "points_debattus": null
           },
+          "budget_impact": 0,
+          "budget_breakdown": null,
           "vote": {
             "has_vote": true,
             "pour": 33,
@@ -1904,6 +2103,8 @@
             "impacts": "La vente assure la pérennité d'un commerce de centre-ville, fournit une recette immédiate à la commune et la libère de futures charges d'entretien sur ce bien.",
             "points_debattus": null
           },
+          "budget_impact": 63000,
+          "budget_breakdown": null,
           "vote": {
             "has_vote": true,
             "pour": 33,
@@ -1924,8 +2125,10 @@
             "contexte": "La ville a construit une nouvelle cuisine pédagogique et doit fixer les prix de location pour la mettre à disposition d'organismes de formation et d'établissements publics.",
             "decision": "Les tarifs de mise à disposition de la cuisine pédagogique et de ses espaces (plateau technique, salle de réunion) ont été fixés à compter du 1er janvier 2026.",
             "impacts": "Cette décision va générer de nouvelles recettes pour le budget de la ville en louant un équipement public à des professionnels. Elle n'a pas d'impact direct sur les habitants au quotidien.",
-            "points_debattus": "Le vote n'a pas été unanime, sept conseillers municipaux se sont abstenus, mais les raisons de leur abstention ne sont pas précisées dans le document."
+            "points_debattus": null
           },
+          "budget_impact": 0,
+          "budget_breakdown": null,
           "vote": {
             "has_vote": true,
             "pour": 26,
@@ -1946,8 +2149,10 @@
             "contexte": "La Maison Sport-Santé de la ville, récemment labellisée, souhaite élargir son offre pour répondre à une demande croissante et aux exigences de son habilitation, mais ne dispose pas en interne des éducateurs spécialisés requis.",
             "decision": "Le conseil municipal a autorisé le Maire à signer une convention de partenariat avec l'association \"Mon Vélo ma Santé\" pour encadrer des activités physiques adaptées et réaliser des bilans.",
             "impacts": "Les habitants de Bègles, notamment ceux atteints d'affections de longue durée ou sédentaires, auront un meilleur accès à des programmes de sport-santé spécialisés pour améliorer leur bien-être.",
-            "points_debattus": "La délibération n'a pas été adoptée à l'unanimité, sept conseillers municipaux se sont abstenus lors du vote."
+            "points_debattus": null
           },
+          "budget_impact": 0,
+          "budget_breakdown": null,
           "vote": {
             "has_vote": true,
             "pour": 26,
@@ -1968,8 +2173,10 @@
             "contexte": "La municipalité a identifié de nouveaux besoins pour renforcer les effectifs de plusieurs services clés afin d'assurer leur bon fonctionnement.",
             "decision": "Le conseil a voté la création de quatre emplois permanents : deux policiers municipaux, un chargé de relations commerçants et un chargé des mobilités douces.",
             "impacts": "Les Béglais bénéficieront d'un renforcement des services de police municipale, d'un meilleur soutien aux commerces locaux et d'une accélération des projets liés à la transition écologique.",
-            "points_debattus": "La délibération n'a pas été adoptée à l'unanimité, sept conseillers municipaux ayant choisi de s'abstenir lors du vote."
+            "points_debattus": null
           },
+          "budget_impact": 0,
+          "budget_breakdown": null,
           "vote": {
             "has_vote": true,
             "pour": 26,
@@ -1990,8 +2197,10 @@
             "contexte": "Un escalier de secours d'un bâtiment appartenant à la SCI 2G Énergie empiétait sur une parcelle de la commune. Cette cession vise à régulariser la situation foncière pour que le propriétaire du bâtiment soit aussi propriétaire du terrain sous l'escalier.",
             "decision": "La cession de la parcelle de 17 m² à la SCI 2G Énergie a été autorisée pour un prix de 1 euro symbolique.",
             "impacts": "Aucun impact direct pour les habitants. Il s'agit d'une régularisation administrative qui clarifie la propriété du terrain et transfère les charges d'entretien à la société privée.",
-            "points_debattus": "null"
+            "points_debattus": null
           },
+          "budget_impact": 0,
+          "budget_breakdown": null,
           "vote": {
             "has_vote": true,
             "pour": 33,
@@ -2012,8 +2221,10 @@
             "contexte": "La Ville de Bègles reprend en gestion directe l'activité de l'association CREAC à partir du 1er janvier 2026, ce qui nécessite le transfert officiel de ses biens à la municipalité.",
             "decision": "La reprise des biens mobiliers de l'association CREAC et leur rattachement à l'entité municipale CitéCirque à compter du 23 mars 2026 a été approuvée.",
             "impacts": "Les activités culturelles et de médiation, notamment autour de la caravane \"Columbia Circus\", se poursuivront pour les habitants sous la gestion directe de la Ville, garantissant leur continuité.",
-            "points_debattus": "Le document ne retranscrit aucun débat, mais le vote indique une absence de consensus, avec sept abstentions."
+            "points_debattus": null
           },
+          "budget_impact": 0,
+          "budget_breakdown": null,
           "vote": {
             "has_vote": true,
             "pour": 26,
@@ -2034,8 +2245,10 @@
             "contexte": "Face au dérèglement climatique et à la diminution des ressources en eau, la commune souhaite inciter les citoyens à adopter des comportements plus économes.",
             "decision": "Une participation financière de 40 euros est accordée aux habitants de Bègles pour l'achat d'un récupérateur d'eau de pluie, dans la limite des 30 premiers foyers pour l'année 2026.",
             "impacts": "Les 30 premiers ménages béglais qui achèteront un récupérateur d'eau en 2026 pourront bénéficier d'un remboursement de 40 euros sur présentation des justificatifs requis.",
-            "points_debattus": "La délibération n'a pas été adoptée à l'unanimité, sept conseillers municipaux se sont abstenus lors du vote."
+            "points_debattus": null
           },
+          "budget_impact": 0,
+          "budget_breakdown": null,
           "vote": {
             "has_vote": true,
             "pour": 26,
@@ -2044,16 +2257,7 @@
           },
           "disagreements": "Sept membres du conseil se sont abstenus : M. Christian BAGATE, M. Mohammed MICHRAFY, M. Alexandre DIAS, Mme Isabelle TEURLAY NICOT, Mme Fabienne DA COSTA, M. Christophe THOMAS, Mme Seynabou GUEYE. Le document ne précise pas les raisons de leur abstention."
         }
-      ],
-      "agenda": null,
-      "analysis": {
-        "budget_impact": 2460964,
-        "budget_label": "Administration",
-        "vote_climat": "consensus",
-        "vote_summary": "Enjeu Clé : Optimisation de la gestion communale.",
-        "votes_pour": 32,
-        "votes_contre": 3
-      }
+      ]
     }
   ]
 }

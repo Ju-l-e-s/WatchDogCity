@@ -60,6 +60,29 @@ async function init() {
         }
 
         allCouncils = (t.councils || []).sort((e, t) => t.date.localeCompare(e.date));
+        
+        // Extraction dynamique des montants de budget depuis le texte
+        allCouncils.forEach(c => {
+            (c.deliberations || []).forEach(d => {
+                if (d.budget_impact > 0) return; // Déjà calculé
+                let amount = 0;
+                const text = (d.title + " " + (d.summary || "") + " " + (d.analysis_data?.decision || "") + " " + (d.analysis_data?.impacts || "")).replace(/[\u202F\u00A0]/g, " ");
+                const badgeMatch = text.match(/💰\s*([\d\s]+)\s*€/);
+                if (badgeMatch) {
+                    amount = parseInt(badgeMatch[1].replace(/\s/g, ""), 10);
+                } else {
+                    const match = text.match(/([0-9]{1,3}(?:\s[0-9]{3})*(?:[.,][0-9]{1,2})?)\s*€/);
+                    if (match) {
+                        amount = parseInt(match[1].replace(/\s/g, ""), 10);
+                    } else {
+                        const mMatch = text.match(/([0-9.,]+)\s*millions d.euros/i);
+                        if (mMatch) amount = parseFloat(mMatch[1].replace(",", ".")) * 1000000;
+                    }
+                }
+                d.budget_impact = amount || 0;
+            });
+        });
+
         console.log("📊 Nombre de conseils:", allCouncils.length);
 
         updateStats();
@@ -343,6 +366,134 @@ function renderDeliberationRow(e) {
 
 function renderVoteBar(e, t, n, s) { if (null == t) return `<div class="flex justify-between text-[11px] font-light text-slate-300 tracking-wide"><span>${e}</span><span>—</span></div>`; return `<div><div class="flex justify-between text-[11px] font-medium mb-1"><span class="text-slate-600">${e}</span><span class="text-slate-600 font-semibold">${t}</span></div><div class="h-1.5 bg-slate-100 rounded-full overflow-hidden"><div class="${s} h-full rounded-full transition-all duration-500" style="width:${n > 0 ? t / n * 100 : 0}%"></div></div></div>` }
 function toggleDelib(e) { const t = document.getElementById(`content-${e}`), n = document.getElementById(`icon-${e}`), s = document.getElementById(`btn-${e}`); if (!t || !n || !s) return; const a = t.classList.contains("is-open"); t.classList.toggle("is-open"), n.classList.toggle("rotate-180"), s.setAttribute("aria-expanded", a ? "false" : "true") }
+
+function toggleView(viewName) {
+    const timelineView = document.getElementById("timeline");
+    const budgetView = document.getElementById("budget-view");
+    const globalDashboard = document.getElementById("global-dashboard");
+    const navBudgetBtn = document.getElementById("nav-budget-btn");
+    const navTimelineBtn = document.getElementById("nav-timeline-btn");
+
+    if (viewName === 'budget') {
+        if(timelineView) timelineView.classList.add("hidden");
+        if(globalDashboard) globalDashboard.classList.add("hidden");
+        if(budgetView) budgetView.classList.remove("hidden");
+        
+        if(navBudgetBtn) {
+            navBudgetBtn.classList.add("text-brand-700", "font-bold");
+            navBudgetBtn.classList.remove("text-slate-500", "font-medium");
+        }
+        if(navTimelineBtn) {
+            navTimelineBtn.classList.remove("text-brand-700", "font-bold");
+            navTimelineBtn.classList.add("text-slate-500", "font-medium");
+        }
+        
+        renderBudgetView();
+    } else {
+        if(timelineView) timelineView.classList.remove("hidden");
+        if(globalDashboard) globalDashboard.classList.remove("hidden");
+        if(budgetView) budgetView.classList.add("hidden");
+        
+        if(navTimelineBtn) {
+            navTimelineBtn.classList.add("text-brand-700", "font-bold");
+            navTimelineBtn.classList.remove("text-slate-500", "font-medium");
+        }
+        if(navBudgetBtn) {
+            navBudgetBtn.classList.remove("text-brand-700", "font-bold");
+            navBudgetBtn.classList.add("text-slate-500", "font-medium");
+        }
+    }
+}
+
+function renderBudgetView() {
+    const container = document.getElementById("budget-view");
+    if (!container) return;
+
+    let totalBudget = 0;
+    const thematicData = {};
+    let financialDelibsCount = 0;
+
+    allCouncils.forEach(council => {
+        (council.deliberations || []).forEach(d => {
+            if (d.budget_impact && d.budget_impact > 0) {
+                totalBudget += d.budget_impact;
+                financialDelibsCount++;
+                const theme = d.topic_tag || 'Administration Générale';
+                
+                if (!thematicData[theme]) {
+                    thematicData[theme] = { total: 0, delibs: [] };
+                }
+                
+                thematicData[theme].total += d.budget_impact;
+                thematicData[theme].delibs.push({
+                    ...d,
+                    council_date: council.date
+                });
+            }
+        });
+    });
+
+    if (financialDelibsCount === 0) {
+        container.innerHTML = `<div class="text-center py-20 text-slate-500">Aucune donnée budgétaire disponible pour le moment.</div>`;
+        return;
+    }
+
+    const sortedThemes = Object.entries(thematicData).sort((a, b) => b[1].total - a[1].total);
+
+    generateBudgetHTML(container, totalBudget, financialDelibsCount, sortedThemes);
+}
+
+function generateBudgetHTML(container, totalBudget, count, sortedThemes) {
+    let html = `
+        <div class="dashboard-container animate-fade-in mb-12">
+            <div class="mb-8">
+                <span class="dashboard-title flex items-center gap-2 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">
+                    💰 Synthèse des dépenses votées
+                </span>
+                <div class="flex flex-col md:flex-row md:items-end gap-4">
+                    <div class="text-4xl md:text-5xl font-black text-slate-900 tracking-tight">${formatBudget(totalBudget)}</div>
+                    <div class="text-sm font-semibold text-slate-500 mb-2">${count} délibérations financées</div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    sortedThemes.forEach(([themeName, themeData]) => {
+        const themeColor = COLORS[themeName] || COLORS['Autres'];
+        const percentage = ((themeData.total / totalBudget) * 100).toFixed(1);
+        
+        html += `
+            <div class="mb-10">
+                <div class="flex items-center justify-between border-b border-slate-200 pb-3 mb-6">
+                    <div class="flex items-center gap-3">
+                        <div class="w-4 h-4 rounded" style="background-color: ${themeColor}"></div>
+                        <h3 class="text-2xl font-bold text-slate-900">${themeName}</h3>
+                        <span class="text-sm font-semibold text-slate-500 bg-slate-100 px-2 py-1 rounded">${percentage}%</span>
+                    </div>
+                    <div class="text-xl font-bold" style="color: ${themeColor}">${formatBudget(themeData.total)}</div>
+                </div>
+                <div class="bg-white rounded-[2rem] shadow-card overflow-hidden">
+                    <div class="divide-y divide-slate-100/50">
+        `;
+
+        themeData.delibs.sort((a, b) => b.council_date.localeCompare(a.council_date));
+
+        themeData.delibs.forEach(delib => {
+            const originalTag = delib.topic_tag;
+            delib.topic_tag = formatDate(delib.council_date);
+            html += renderDeliberationRow(delib);
+            delib.topic_tag = originalTag;
+        });
+
+        html += `
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+
+    container.innerHTML = html;
+}
 
 init();
 const contactForm = document.getElementById("contact-form"), contactStatus = document.getElementById("contact-status");

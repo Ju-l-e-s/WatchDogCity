@@ -21,15 +21,16 @@ const GLOBAL_GLOSSARY = {
     SIAL: "Système d'Information pour l'Accueil et le Logement"
 };
 const COLORS = {
-    'Éducation & Jeunesse': '#3b82f6',
-    'Transition Écologique': '#10b981',
-    'Solidarité & Social': '#6366f1',
-    'Sport & Culture': '#f59e0b',
-    'Aménagement & Travaux': '#8b5cf6',
-    'Administration': '#94a3b8',
-    'Sécurité': '#ef4444',
-    'Mobilité': '#06b6d4',
-    'Urbanisme': '#f97316',
+    'Éducation': '#3b82f6',     // Blue 500
+    'Culture': '#f59e0b',       // Amber 500
+    'Administration': '#94a3b8', // Slate 400
+    'Social': '#6366f1',        // Indigo 500
+    'Budget': '#8b5cf6',        // Violet 500
+    'Environnement': '#10b981',  // Emerald 500
+    'Urbanisme': '#f97316',     // Orange 500
+    'Sécurité': '#ef4444',      // Red 500
+    'Sport': '#ec4899',         // Pink 500
+    'Mobilité': '#06b6d4',      // Cyan 500
     'Autres': '#cbd5e1'
 };
 
@@ -85,18 +86,19 @@ function renderDashboard() {
 
     allCouncils.forEach(c => {
         (c.deliberations || []).forEach(d => {
-            if (d.budget_impact > 0) {
+            if (d.budget_breakdown && d.budget_breakdown.length > 0) {
+                d.budget_breakdown.forEach(item => {
+                    if (item.amount > 0) {
+                        totalBudget += item.amount;
+                        const cat = item.topic_tag || 'Administration';
+                        categories[cat] = (categories[cat] || 0) + item.amount;
+                    }
+                });
+            } else if (d.budget_impact > 0) {
                 totalBudget += d.budget_impact;
                 const cat = d.topic_tag || 'Administration';
                 categories[cat] = (categories[cat] || 0) + d.budget_impact;
             }
-            (d.budget_breakdown || []).forEach(item => {
-                if (item.amount > 0) {
-                    totalBudget += item.amount;
-                    const cat = item.topic_tag || 'Administration';
-                    categories[cat] = (categories[cat] || 0) + item.amount;
-                }
-            });
         });
     });
 

@@ -44,23 +44,29 @@ type CouncilAnalysis struct {
 	VotesContre  int    `dynamodbav:"votes_contre" json:"votes_contre"`
 }
 
+type BudgetBreakdownItem struct {
+	TopicTag string `dynamodbav:"topic_tag" json:"topic_tag"`
+	Amount   int64  `dynamodbav:"amount"    json:"amount"`
+}
+
 type DeliberationRecord struct {
-	ID             string            `dynamodbav:"id"`
-	CouncilID      string            `dynamodbav:"council_id"`
-	Title          string            `dynamodbav:"title"`
-	TopicTag       string            `dynamodbav:"topic_tag"`
-	PDFURL         string            `dynamodbav:"pdf_url"`
-	Summary        string            `dynamodbav:"summary"`
-	IsSubstantial  bool              `dynamodbav:"is_substantial"`
-	Acronyms       map[string]string `dynamodbav:"acronyms"`
-	AnalysisData   AnalysisData      `dynamodbav:"analysis_data"`
-	BudgetImpact   int64             `dynamodbav:"budget_impact"`
-	HasVote        bool              `dynamodbav:"has_vote"`
-	VotePour       *int              `dynamodbav:"vote_pour"`
-	VoteContre     *int              `dynamodbav:"vote_contre"`
-	VoteAbstention *int              `dynamodbav:"vote_abstention"`
-	Disagreements  *string           `dynamodbav:"disagreements"`
-	ProcessedAt    string            `dynamodbav:"processed_at"`
+	ID              string                `dynamodbav:"id"`
+	CouncilID       string                `dynamodbav:"council_id"`
+	Title           string                `dynamodbav:"title"`
+	TopicTag        string                `dynamodbav:"topic_tag"`
+	PDFURL          string                `dynamodbav:"pdf_url"`
+	Summary         string                `dynamodbav:"summary"`
+	IsSubstantial   bool                  `dynamodbav:"is_substantial"`
+	Acronyms        map[string]string     `dynamodbav:"acronyms"`
+	AnalysisData    AnalysisData          `dynamodbav:"analysis_data"`
+	BudgetImpact    int64                 `dynamodbav:"budget_impact"`
+	BudgetBreakdown []BudgetBreakdownItem `dynamodbav:"budget_breakdown"`
+	HasVote         bool                  `dynamodbav:"has_vote"`
+	VotePour        *int                  `dynamodbav:"vote_pour"`
+	VoteContre      *int                  `dynamodbav:"vote_contre"`
+	VoteAbstention  *int                  `dynamodbav:"vote_abstention"`
+	Disagreements   *string               `dynamodbav:"disagreements"`
+	ProcessedAt     string                `dynamodbav:"processed_at"`
 }
 
 // ── JSON output format ────────────────────────────────────────────────────────
@@ -83,17 +89,18 @@ type CouncilOutput struct {
 }
 
 type DeliberationOutput struct {
-	ID            string            `json:"id"`
-	Title         string            `json:"title"`
-	TopicTag      string            `json:"topic_tag"`
-	PDFURL        string            `json:"pdf_url"`
-	Summary       string            `json:"summary"`
-	IsSubstantial bool              `json:"is_substantial"`
-	Acronyms      map[string]string `json:"acronyms"`
-	AnalysisData  AnalysisData      `json:"analysis_data"`
-	BudgetImpact  int64             `json:"budget_impact"`
-	Vote          VoteCount         `json:"vote"`
-	Disagreements *string           `json:"disagreements"`
+	ID              string                `json:"id"`
+	Title           string                `json:"title"`
+	TopicTag        string                `json:"topic_tag"`
+	PDFURL          string                `json:"pdf_url"`
+	Summary         string                `json:"summary"`
+	IsSubstantial   bool                  `json:"is_substantial"`
+	Acronyms        map[string]string     `json:"acronyms"`
+	AnalysisData    AnalysisData          `json:"analysis_data"`
+	BudgetImpact    int64                 `json:"budget_impact"`
+	BudgetBreakdown []BudgetBreakdownItem `json:"budget_breakdown"`
+	Vote            VoteCount             `json:"vote"`
+	Disagreements   *string               `json:"disagreements"`
 }
 
 type AnalysisData struct {
@@ -137,15 +144,16 @@ func buildDataJSON(ctx context.Context, ddb *dynamodb.Client, councils []Council
 		}
 		for _, d := range delibs[c.CouncilID] {
 			co.Deliberations = append(co.Deliberations, DeliberationOutput{
-				ID:            d.ID,
-				Title:         d.Title,
-				TopicTag:      d.TopicTag,
-				PDFURL:        d.PDFURL,
-				Summary:       d.Summary,
-				IsSubstantial: d.IsSubstantial,
-				Acronyms:      d.Acronyms,
-				AnalysisData:  d.AnalysisData,
-				BudgetImpact:  d.BudgetImpact,
+				ID:              d.ID,
+				Title:           d.Title,
+				TopicTag:        d.TopicTag,
+				PDFURL:          d.PDFURL,
+				Summary:         d.Summary,
+				IsSubstantial:   d.IsSubstantial,
+				Acronyms:        d.Acronyms,
+				AnalysisData:    d.AnalysisData,
+				BudgetImpact:    d.BudgetImpact,
+				BudgetBreakdown: d.BudgetBreakdown,
 				Vote: VoteCount{
 					HasVote:    d.HasVote || d.VotePour != nil || d.VoteContre != nil || d.VoteAbstention != nil,
 					Pour:       d.VotePour,

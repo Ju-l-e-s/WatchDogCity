@@ -60,28 +60,6 @@ async function init() {
         }
 
         allCouncils = (t.councils || []).sort((e, t) => t.date.localeCompare(e.date));
-        
-        // Extraction dynamique des montants de budget depuis le texte
-        allCouncils.forEach(c => {
-            (c.deliberations || []).forEach(d => {
-                if (d.budget_impact > 0) return; // Déjà calculé
-                let amount = 0;
-                const text = (d.title + " " + (d.summary || "") + " " + (d.analysis_data?.decision || "") + " " + (d.analysis_data?.impacts || "")).replace(/[\u202F\u00A0]/g, " ");
-                const badgeMatch = text.match(/💰\s*([\d\s]+)\s*€/);
-                if (badgeMatch) {
-                    amount = parseInt(badgeMatch[1].replace(/\s/g, ""), 10);
-                } else {
-                    const match = text.match(/([0-9]{1,3}(?:\s[0-9]{3})*(?:[.,][0-9]{1,2})?)\s*€/);
-                    if (match) {
-                        amount = parseInt(match[1].replace(/\s/g, ""), 10);
-                    } else {
-                        const mMatch = text.match(/([0-9.,]+)\s*millions d.euros/i);
-                        if (mMatch) amount = parseFloat(mMatch[1].replace(",", ".")) * 1000000;
-                    }
-                }
-                d.budget_impact = amount || 0;
-            });
-        });
 
         console.log("📊 Nombre de conseils:", allCouncils.length);
 
@@ -415,19 +393,33 @@ function renderBudgetView() {
 
     allCouncils.forEach(council => {
         (council.deliberations || []).forEach(d => {
+            // Source 1 : montant individuel vérifié par l'IA
             if (d.budget_impact && d.budget_impact > 0) {
                 totalBudget += d.budget_impact;
                 financialDelibsCount++;
-                const theme = d.topic_tag || 'Administration Générale';
-                
-                if (!thematicData[theme]) {
-                    thematicData[theme] = { total: 0, delibs: [] };
-                }
-                
+                const theme = d.topic_tag || 'Administration';
+                if (!thematicData[theme]) thematicData[theme] = { total: 0, delibs: [] };
                 thematicData[theme].total += d.budget_impact;
-                thematicData[theme].delibs.push({
-                    ...d,
-                    council_date: council.date
+                thematicData[theme].delibs.push({ ...d, council_date: council.date });
+            }
+            // Source 2 : ventilation thématique du budget global (budget primitif)
+            if (d.budget_breakdown && d.budget_breakdown.length > 0) {
+                d.budget_breakdown.forEach(item => {
+                    if (!item.amount || item.amount <= 0) return;
+                    totalBudget += item.amount;
+                    financialDelibsCount++;
+                    const theme = item.topic_tag || 'Administration';
+                    if (!thematicData[theme]) thematicData[theme] = { total: 0, delibs: [] };
+                    thematicData[theme].total += item.amount;
+                    // Représente comme une délibération virtuelle pour l'affichage
+                    thematicData[theme].delibs.push({
+                        ...d,
+                        council_date: council.date,
+                        budget_impact: item.amount,
+                        topic_tag: item.topic_tag,
+                        title: d.title + ` — ${item.topic_tag}`,
+                        _is_breakdown: true,
+                    });
                 });
             }
         });

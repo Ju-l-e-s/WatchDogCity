@@ -77,25 +77,26 @@ func (h *WorkerHandler) handleRecord(ctx context.Context, msg SQSPayload, result
 
 	// 1. Write to DynamoDB
 	item, err := attributevalue.MarshalMap(map[string]interface{}{
-		"id":              id,
-		"council_id":      msg.CouncilID,
-		"title":           result.Title,
-		"topic_tag":      result.TopicTag,
-		"pdf_url":         msg.PDFURL,
-		"summary":         result.Summary,
-		"is_substantial":  result.IsSubstantial,
-		"analysis_data":   result.AnalysisData,
-		"budget_impact":   result.BudgetImpact,
-		"climate_impact":  result.ClimateImpact,
-		"key_points":      result.KeyPoints,
-		"has_vote":        result.Vote.HasVote,
-		"vote_pour":       result.Vote.Pour,
-		"vote_contre":     result.Vote.Contre,
-		"vote_abstention": result.Vote.Abstention,
-		"disagreements":   result.Disagreements,
-		"input_tokens":    result.InputTokens,
-		"output_tokens":   result.OutputTokens,
-		"processed_at":    time.Now().UTC().Format(time.RFC3339),
+		"id":               id,
+		"council_id":       msg.CouncilID,
+		"title":            result.Title,
+		"topic_tag":        result.TopicTag,
+		"pdf_url":          msg.PDFURL,
+		"summary":          result.Summary,
+		"is_substantial":   result.IsSubstantial,
+		"analysis_data":    result.AnalysisData,
+		"budget_impact":    result.BudgetImpact,
+		"budget_breakdown": result.BudgetBreakdown,
+		"climate_impact":   result.ClimateImpact,
+		"key_points":       result.KeyPoints,
+		"has_vote":         result.Vote.HasVote,
+		"vote_pour":        result.Vote.Pour,
+		"vote_contre":      result.Vote.Contre,
+		"vote_abstention":  result.Vote.Abstention,
+		"disagreements":    result.Disagreements,
+		"input_tokens":     result.InputTokens,
+		"output_tokens":    result.OutputTokens,
+		"processed_at":     time.Now().UTC().Format(time.RFC3339),
 	})
 	if err != nil {
 		return fmt.Errorf("marshal item: %w", err)
@@ -110,25 +111,27 @@ func (h *WorkerHandler) handleRecord(ctx context.Context, msg SQSPayload, result
 		if !strings.Contains(err.Error(), "ConditionalCheckFailedException") {
 			return fmt.Errorf("put deliberation: %w", err)
 		}
-		// Item exists — update budget_impact if it was previously missing or zero
-		if result.BudgetImpact > 0 {
-			_, uerr := h.ddb.UpdateItem(ctx, &dynamodb.UpdateItemInput{
-				TableName: aws.String(os.Getenv("DELIBERATIONS_TABLE")),
-				Key: map[string]types.AttributeValue{
-					"id": &types.AttributeValueMemberS{Value: id},
-				},
-				UpdateExpression:    aws.String("SET budget_impact = :bi"),
-				ConditionExpression: aws.String("attribute_not_exists(budget_impact) OR budget_impact = :zero"),
-				ExpressionAttributeValues: map[string]types.AttributeValue{
-					":bi":   &types.AttributeValueMemberN{Value: strconv.FormatInt(result.BudgetImpact, 10)},
-					":zero": &types.AttributeValueMemberN{Value: "0"},
-				},
-			})
-			if uerr != nil && !strings.Contains(uerr.Error(), "ConditionalCheckFailedException") {
-				log.Printf("warn: could not update budget_impact for %s: %v", id, uerr)
-			}
+		// Item exists — update budget_impact and budget_breakdown unconditionally
+		breakdownVal, merr := attributevalue.Marshal(result.BudgetBreakdown)
+		if merr != nil {
+			log.Printf("warn: could not marshal budget_breakdown for %s: %v", id, merr)
+			breakdownVal = &types.AttributeValueMemberL{}
 		}
-		log.Printf("deliberation %s already processed, budget_impact updated if needed", id)
+		_, uerr := h.ddb.UpdateItem(ctx, &dynamodb.UpdateItemInput{
+			TableName: aws.String(os.Getenv("DELIBERATIONS_TABLE")),
+			Key: map[string]types.AttributeValue{
+				"id": &types.AttributeValueMemberS{Value: id},
+			},
+			UpdateExpression: aws.String("SET budget_impact = :bi, budget_breakdown = :bb"),
+			ExpressionAttributeValues: map[string]types.AttributeValue{
+				":bi": &types.AttributeValueMemberN{Value: strconv.FormatInt(result.BudgetImpact, 10)},
+				":bb": breakdownVal,
+			},
+		})
+		if uerr != nil {
+			log.Printf("warn: could not update budget fields for %s: %v", id, uerr)
+		}
+		log.Printf("deliberation %s already processed, budget fields updated", id)
 	}
 
 	// 2. Increment counter

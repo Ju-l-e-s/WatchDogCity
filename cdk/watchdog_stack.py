@@ -294,42 +294,37 @@ class WatchdogStack(Stack):
                     "*.md", ".gitignore"
                 ])],
             destination_bucket=website_bucket,
-            # On retire la distribution ici pour gagner 10-15 minutes de déploiement
             cache_control=[s3_deploy.CacheControl.from_string("public, max-age=31536000, immutable")],
         )
 
-        # 2. Déploiement de la Configuration (HTML) - AVEC Invalidation Chirurgicale
+        # 2. Déploiement de la Configuration (HTML, JS, CSS) - AVEC Invalidation Chirurgicale
         deploy_config = s3_deploy.BucketDeployment(
             self, "DeployWebsiteConfig",
             sources=[s3_deploy.Source.asset("../frontend",
-                exclude=["*", "!index.html", "!merci.html"]
+                exclude=["*", "!index.html", "!merci.html", "!app.js", "!style.css"]
             )],
             destination_bucket=website_bucket,            
             distribution=distribution,
-            # ON NE PURGE QUE LES FICHIERS CRITIQUES (Très rapide : < 60s)
-            distribution_paths=["/index.html", "/merci.html"],
+            # ON PURGE LES FICHIERS DYNAMIQUES
+            distribution_paths=["/index.html", "/merci.html", "/app.js", "/style.css"],
             cache_control=[s3_deploy.CacheControl.from_string("no-cache, no-store, must-revalidate")],
             prune=False,
         )
 
-        # CRUCIAL : On force le Bloc 2 à s'exécuter APRES le Bloc 1 pour écraser le cache de 365j sur index.html par du no-cache.
-        deploy_config.node.add_dependency(deploy_website)
-
-        # 3. Déploiement des Données (data.json) : Cache Long SANS Invalidation
-        # On utilise une approche plus directe pour ne pas être bloqué par les patterns d'exclusion
+        # 3. Déploiement des Données (data.json) : Invalidation Système
         deploy_data = s3_deploy.BucketDeployment(
             self, "DeployDataJson",
             sources=[s3_deploy.Source.asset("../frontend", exclude=["*", "!data.json"])],
             destination_bucket=website_bucket,
-            # Invalidation temporaire pour forcer le nettoyage de l'erreur 404
             distribution=distribution,
             distribution_paths=["/data.json"],
-            cache_control=[s3_deploy.CacheControl.from_string("public, max-age=31536000, immutable")],
+            cache_control=[s3_deploy.CacheControl.from_string("no-cache, no-store, must-revalidate")],
             prune=False,
         )
 
-        # On s'assure que DeployDataJson s'exécute après DeployWebsite pour éviter un potentiel PRUNE
-        deploy_data.node.add_dependency(deploy_website)
+        # Chaînage des déploiements pour assurer l'ordre
+        deploy_config.node.add_dependency(deploy_website)
+        deploy_data.node.add_dependency(deploy_config)
 
         # ── Monitoring & Dashboard ────────────────────────────────────────
         dashboard = cloudwatch.Dashboard(self, "WatchdogDashboard", dashboard_name="Watchdog-Begles-Health")

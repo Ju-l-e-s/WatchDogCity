@@ -1,23 +1,30 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="fr" class="scroll-smooth">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Merci - L'Observatoire de Bègles</title>
-  <link rel="stylesheet" href="style.css">
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+  
+  <link rel="stylesheet" href="./style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔭</text></svg>">
 </head>
-<body class="bg-[#F8FAFC] text-slate-900 min-h-screen flex items-center justify-center p-6">
-  <div class="max-w-md w-full bg-white rounded-3xl shadow-xl shadow-slate-200/60 p-8 text-center border border-slate-100">
-    <div class="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-6">
+<body class="bg-[#F8FAFC] text-slate-900 min-h-screen flex items-center justify-center p-6 font-sans">
+  <div class="max-w-md w-full bg-white rounded-[2.5rem] shadow-card p-10 text-center border border-slate-100 animate-slide-up">
+    <div class="w-20 h-20 bg-emerald-50 text-emerald-600 rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-sm rotate-3">
       <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" />
       </svg>
     </div>
-    <h1 class="text-3xl font-bold text-slate-900 mb-4 tracking-tight">C'est confirmé !</h1>
-    <p class="text-slate-600 mb-8 leading-relaxed text-lg">
+    <h1 class="text-3xl font-bold text-slate-900 mb-4 tracking-tight font-outfit">C'est confirmé !</h1>
+    <p class="text-slate-500 mb-10 leading-relaxed text-lg font-light">
       Merci pour votre inscription. Vous recevrez désormais les alertes citoyennes de Bègles en temps réel.
     </p>
-    <a href="/" class="inline-block w-full bg-slate-900 text-white font-bold py-4 rounded-2xl hover:bg-slate-800 transition-all shadow-xl shadow-slate-900/10">
+    <a href="/" class="inline-flex items-center justify-center w-full bg-slate-900 text-white font-bold py-5 rounded-2xl hover:bg-slate-800 transition-all shadow-micro active:scale-[0.98]">
       Retour à l'accueil
     </a>
   </div>

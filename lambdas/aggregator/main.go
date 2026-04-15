@@ -130,48 +130,13 @@ func runSynthesis(ctx context.Context, ddb *dynamodb.Client, lambdaClient *lambd
 	}
 
 	// 2. Calculs statistiques
-	var totalBudget int64
-	var totalPour, totalContre, totalAbst int
-	var summaries []string
-	topicBudgets := make(map[string]int64)
+	stats := computeStats(delibs)
 
-	for _, d := range delibs {
-		totalBudget += d.BudgetImpact
-		if d.TopicTag != "" {
-			topicBudgets[d.TopicTag] += d.BudgetImpact
-		}
-		if d.Vote.Pour != nil {
-			totalPour += *d.Vote.Pour
-		}
-		if d.Vote.Contre != nil {
-			totalContre += *d.Vote.Contre
-		}
-		if d.Vote.Abstention != nil {
-			totalAbst += *d.Vote.Abstention
-		}
-		if d.Summary != "" {
-			summaries = append(summaries, fmt.Sprintf("- %s", d.Summary))
-		}
-	}
-
-	// Déterminer le thème dominant par budget
-	mainTheme := "Administration"
-	var maxB int64 = -1
-	for t, b := range topicBudgets {
-		if b > maxB {
-			maxB = b
-			mainTheme = t
-		}
-	}
-
-	// Climat (Tension si > 10% d'opposition)
-	climat := "consensus"
-	if totalPour+totalContre > 0 && float64(totalContre)/float64(totalPour+totalContre) > 0.10 {
-		climat = "tensions"
-	}
+	mainTheme := dominantTheme(stats.topicBudgets)
+	climat := voteClimat(stats.totalPour, stats.totalContre)
 
 	// 3. Synthèse IA (Enjeu Clé)
-	voteSummary, err := askGeminiForSynthesis(ctx, summaries)
+	voteSummary, err := askGeminiForSynthesis(ctx, stats.summaries)
 	if err != nil {
 		log.Printf("IA Synthesis failed, using fallback: %v", err)
 		voteSummary = "Synthèse des enjeux majeurs de la séance du conseil municipal."
@@ -179,12 +144,12 @@ func runSynthesis(ctx context.Context, ddb *dynamodb.Client, lambdaClient *lambd
 
 	// 4. Mise à jour du Conseil dans DynamoDB
 	analysis := CouncilAnalysis{
-		BudgetImpact: totalBudget,
+		BudgetImpact: stats.totalBudget,
 		BudgetLabel:  mainTheme,
 		VoteClimat:   climat,
 		VoteSummary:  voteSummary,
-		VotesPour:    totalPour,
-		VotesContre:  totalContre,
+		VotesPour:    stats.totalPour,
+		VotesContre:  stats.totalContre,
 	}
 
 	analysisMap, _ := attributevalue.MarshalMap(analysis)
@@ -210,6 +175,62 @@ func runSynthesis(ctx context.Context, ddb *dynamodb.Client, lambdaClient *lambd
 	})
 
 	return err
+}
+
+// ── Pure calculation functions (extracted for testability) ───────────────────
+
+type councilStats struct {
+	totalBudget  int64
+	topicBudgets map[string]int64
+	totalPour    int
+	totalContre  int
+	totalAbst    int
+	summaries    []string
+}
+
+func computeStats(delibs []Deliberation) councilStats {
+	s := councilStats{topicBudgets: make(map[string]int64)}
+	for _, d := range delibs {
+		s.totalBudget += d.BudgetImpact
+		if d.TopicTag != "" {
+			s.topicBudgets[d.TopicTag] += d.BudgetImpact
+		}
+		if d.Vote.Pour != nil {
+			s.totalPour += *d.Vote.Pour
+		}
+		if d.Vote.Contre != nil {
+			s.totalContre += *d.Vote.Contre
+		}
+		if d.Vote.Abstention != nil {
+			s.totalAbst += *d.Vote.Abstention
+		}
+		if d.Summary != "" {
+			s.summaries = append(s.summaries, fmt.Sprintf("- %s", d.Summary))
+		}
+	}
+	return s
+}
+
+// dominantTheme returns the topic with the highest total budget.
+// Falls back to "Administration" when there are no budget amounts.
+func dominantTheme(topicBudgets map[string]int64) string {
+	mainTheme := "Administration"
+	var maxB int64 = -1
+	for t, b := range topicBudgets {
+		if b > maxB {
+			maxB = b
+			mainTheme = t
+		}
+	}
+	return mainTheme
+}
+
+// voteClimat returns "tensions" when opposition exceeds 10% of votes cast, else "consensus".
+func voteClimat(totalPour, totalContre int) string {
+	if totalPour+totalContre > 0 && float64(totalContre)/float64(totalPour+totalContre) > 0.10 {
+		return "tensions"
+	}
+	return "consensus"
 }
 
 func askGeminiForSynthesis(ctx context.Context, summaries []string) (string, error) {

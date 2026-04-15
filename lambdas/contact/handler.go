@@ -37,7 +37,15 @@ type contactRequest struct {
 	Message     string `json:"message"`
 }
 
-func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
+type contactDeps struct {
+	httpClient  *http.Client
+	brevoURL    string
+	apiKey      string
+	senderEmail string
+	adminEmail  string
+}
+
+func (d *contactDeps) handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
 	if req.HTTPMethod == http.MethodOptions {
 		return events.APIGatewayProxyResponse{StatusCode: 200, Headers: corsHeaders()}, nil
 	}
@@ -54,9 +62,6 @@ func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 	if cr.Name == "" || cr.EmailSender == "" || cr.Message == "" {
 		return apiResponse(400, map[string]string{"error": "name, email_sender and message are required"}), nil
 	}
-
-	domainSender := os.Getenv("SENDER_EMAIL")
-	adminEmail := os.Getenv("ADMIN_EMAIL")
 
 	subject := fmt.Sprintf("[Observatoire Bègles] Message de %s", cr.Name)
 	htmlBody := fmt.Sprintf(`<!DOCTYPE html>
@@ -76,24 +81,24 @@ func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 	textBody := fmt.Sprintf("Nom : %s\nEmail : %s\n\n%s", cr.Name, cr.EmailSender, cr.Message)
 
 	payload, _ := json.Marshal(map[string]interface{}{
-		"sender":      map[string]string{"email": domainSender},
-		"to":          []map[string]string{{"email": adminEmail}},
+		"sender":      map[string]string{"email": d.senderEmail},
+		"to":          []map[string]string{{"email": d.adminEmail}},
 		"replyTo":     map[string]string{"email": cr.EmailSender},
 		"subject":     subject,
 		"htmlContent": htmlBody,
 		"textContent": textBody,
 	})
 
-	brevoReq, err := http.NewRequest(http.MethodPost, "https://api.brevo.com/v3/smtp/email", bytes.NewReader(payload))
+	brevoReq, err := http.NewRequest(http.MethodPost, d.brevoURL, bytes.NewReader(payload))
 	if err != nil {
 		log.Printf("failed to build brevo request: %v", err)
 		return apiResponse(500, map[string]string{"error": "failed to build message"}), nil
 	}
 
-	brevoReq.Header.Set("api-key", os.Getenv("MAIL_API_KEY"))
+	brevoReq.Header.Set("api-key", d.apiKey)
 	brevoReq.Header.Set("Content-Type", "application/json")
 
-	resp, err := http.DefaultClient.Do(brevoReq)
+	resp, err := d.httpClient.Do(brevoReq)
 	if err != nil {
 		log.Printf("brevo send error: %v", err)
 		return apiResponse(500, map[string]string{"error": "failed to send message"}), nil
@@ -106,4 +111,21 @@ func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 	}
 
 	return apiResponse(200, map[string]string{"message": "message sent"}), nil
+}
+
+// handler is the package-level function registered with Lambda.
+var globalDeps *contactDeps
+
+func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
+	return globalDeps.handler(ctx, req)
+}
+
+func init() {
+	globalDeps = &contactDeps{
+		httpClient:  http.DefaultClient,
+		brevoURL:    "https://api.brevo.com/v3/smtp/email",
+		apiKey:      os.Getenv("MAIL_API_KEY"),
+		senderEmail: os.Getenv("SENDER_EMAIL"),
+		adminEmail:  os.Getenv("ADMIN_EMAIL"),
+	}
 }

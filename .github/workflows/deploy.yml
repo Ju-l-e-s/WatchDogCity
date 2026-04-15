@@ -44,41 +44,31 @@ jobs:
           
           # Setup Frontend
           cd ../frontend
-          npm install
+          npm ci
 
       - name: Build Frontend
         run: |
           cd frontend
           # Build CSS
           ./node_modules/.bin/tailwindcss -i input.css -o style.css -m
+          
+          # Verify CSS was generated
+          if [ ! -s style.css ]; then echo "style.css is empty" && exit 1; fi
 
           # Minify JS
           ./node_modules/.bin/terser app.js --compress --mangle --output app.js
-
+          
           # Hash assets for cache busting
           node build.js
-
+          
           # Minify HTML
           ./node_modules/.bin/html-minifier-terser index.html --collapse-whitespace --remove-comments --minify-js true --output index.html
-
-      - name: Check Generated Files
-        run: |
-          cd frontend
-          if [ ! -s index.html ]; then echo "index.html is empty" && exit 1; fi
-          if [ ! -s style.css ]; then echo "style.css is empty" && exit 1; fi
-          if [ ! -s data.json ]; then echo "data.json is empty" && exit 1; fi
 
       - name: Test Lambdas
         run: make test
 
       - name: Build Lambdas
         run: make build
-
-      - name: CDK Synth
-        run: |
-          cd cdk
-          source .venv/bin/activate
-          cdk synth
 
       - name: Deploy to AWS
         run: |

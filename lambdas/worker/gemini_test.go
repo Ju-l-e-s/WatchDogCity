@@ -63,3 +63,40 @@ func TestParseGeminiResponseInvalidJSON(t *testing.T) {
 	_, err := parseGeminiResponse("not json")
 	assert.Error(t, err)
 }
+
+// --- Float sanitization regression (obs 299) ---
+
+func TestParseGeminiResponse_BudgetImpactFloat(t *testing.T) {
+	// Gemini sometimes returns floats like 2028913.40 instead of integer.
+	// The regex must strip the decimal part so int64 unmarshal succeeds.
+	raw := `{"title":"T","summary":"S","budget_impact": 2028913.40}`
+	result, err := parseGeminiResponse(raw)
+	require.NoError(t, err)
+	assert.Equal(t, int64(2028913), result.BudgetImpact)
+}
+
+func TestParseGeminiResponse_BudgetBreakdownAmountFloat(t *testing.T) {
+	// The same fix must apply to "amount" fields inside budget_breakdown items.
+	// Without the fix, unmarshaling a float into int64 would fail silently or error.
+	raw := `{
+		"title": "Budget Primitif",
+		"summary": "Vote du budget.",
+		"budget_impact": 0,
+		"budget_breakdown": [
+			{"topic_tag": "Sport", "label": "Subventions sportives", "amount": 407950.00},
+			{"topic_tag": "Social", "label": "CCAS", "amount": 150000.50}
+		]
+	}`
+	result, err := parseGeminiResponse(raw)
+	require.NoError(t, err)
+	require.Len(t, result.BudgetBreakdown, 2)
+	assert.Equal(t, int64(407950), result.BudgetBreakdown[0].Amount)
+	assert.Equal(t, int64(150000), result.BudgetBreakdown[1].Amount)
+}
+
+func TestParseGeminiResponse_BudgetImpactZeroFloat(t *testing.T) {
+	raw := `{"title":"T","summary":"S","budget_impact": 0.00}`
+	result, err := parseGeminiResponse(raw)
+	require.NoError(t, err)
+	assert.Equal(t, int64(0), result.BudgetImpact)
+}

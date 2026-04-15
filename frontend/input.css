@@ -1,4 +1,6 @@
 @import "tailwindcss";
+@source "./index.html";
+@source "./merci.html";
 
 /* Inter - 400, 500 */
 @font-face {

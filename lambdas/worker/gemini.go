@@ -11,7 +11,9 @@ import (
 	"google.golang.org/genai"
 )
 
-var budgetImpactFloatRe = regexp.MustCompile(`("budget_impact"\s*:\s*)(\d+)\.\d+`)
+// budgetAmountFloatRe strips decimal parts from any budget integer field.
+// Covers both "budget_impact": 1234.56 and "amount": 1234.56 (inside budget_breakdown items).
+var budgetAmountFloatRe = regexp.MustCompile(`("(?:budget_impact|amount)"\s*:\s*)(\d+)\.\d+`)
 
 const deliberationPrompt = `Tu es un analyste de données factuel et neutre spécialisé dans les affaires publiques locales. 
 Analyse ce document PDF de délibération du conseil municipal de Bègles.
@@ -174,7 +176,7 @@ func parseGeminiResponse(raw string) (*GeminiResult, error) {
 
 	// Normalize: Gemini sometimes returns budget_impact as a float (e.g. 2028913.40)
 	// but our struct expects int64 — truncate the decimal part.
-	raw = budgetImpactFloatRe.ReplaceAllString(raw, "${1}${2}")
+	raw = budgetAmountFloatRe.ReplaceAllString(raw, "${1}${2}")
 
 	var res GeminiResult
 	if err := json.Unmarshal([]byte(raw), &res); err != nil {

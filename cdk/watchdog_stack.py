@@ -31,7 +31,8 @@ class WatchdogStack(Stack):
             table_name="watchdog-councils",
             partition_key=dynamodb.Attribute(name="council_id", type=dynamodb.AttributeType.STRING),
             billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
-            removal_policy=RemovalPolicy.RETAIN,
+            point_in_time_recovery=True, # Autorise la restauration à la seconde près
+            removal_policy=RemovalPolicy.RETAIN # Empêche la suppression de la DB si tu supprimes la stack
         )
 
         deliberations_table = dynamodb.Table(
@@ -39,6 +40,7 @@ class WatchdogStack(Stack):
             table_name="watchdog-deliberations",
             partition_key=dynamodb.Attribute(name="id", type=dynamodb.AttributeType.STRING),
             billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
+            point_in_time_recovery=True,
             removal_policy=RemovalPolicy.RETAIN,
             stream=dynamodb.StreamViewType.NEW_IMAGE,
         )
@@ -52,10 +54,14 @@ class WatchdogStack(Stack):
             table_name="watchdog-subscribers",
             partition_key=dynamodb.Attribute(name="email", type=dynamodb.AttributeType.STRING),
             billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
+            point_in_time_recovery=True,
             removal_policy=RemovalPolicy.RETAIN,
         )
 
-        # ── S3 Website Bucket (EXISTING) ──────────────────────────────────
+        # ── S3 Website Bucket (EXISTING) ─────────────────────────────────
+        # On référence le bucket existant pour ne pas perdre les données.
+        # Les sécurités (versioning, lifecycle, encryption) sont appliquées
+        # directement sur le bucket via AWS CLI — voir docs/secure-bucket.sh
         historical_bucket_name = "watchdogstack-websitebucket75c24d94-clsmaf2ocvxq"
         website_bucket = s3.Bucket.from_bucket_name(
             self, "WebsiteBucket",

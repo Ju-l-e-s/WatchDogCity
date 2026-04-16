@@ -378,18 +378,34 @@ func buildNewsletterPrompt(council *councilRec, delibs []deliberationRec, stats 
   "climat_color": "code hex couleur (fourni ci-dessous, copie verbatim)",
   "vote_stats": "résumé votes (fourni ci-dessous, copie verbatim)",
   "tensions": [
-    {"title": "...", "context": "1 phrase", "impact": "1 phrase pour le citoyen", "budget": "X €", "vote_details": "Y votes contre"}
+    {
+      "title": "Titre explicite de la délibération",
+      "context": "Description riche de 35 à 50 mots expliquant l'historique, le problème initial rencontré par la mairie ou l'ambition politique.",
+      "impact": "Description riche de 35 à 50 mots détaillant ce qui change concrètement pour le citoyen, les conséquences financières et la raison des votes d'opposition.",
+      "budget": "X €",
+      "vote_details": "Y votes contre"
+    }
   ],
   "adopted": [
-    {"tag": "TAG", "title": "...", "context": "1 phrase", "impact": "1 phrase", "budget": "X €"}
+    {
+      "tag": "ADMINISTRATION, MOBILITÉ, SÉCURITÉ, ENVIRONNEMENT ou CULTURE",
+      "title": "Titre explicite de la délibération",
+      "context": "Description riche de 35 à 50 mots expliquant le 'Pourquoi' (besoin municipal, cadre légal, urgence locale).",
+      "impact": "Description riche de 35 à 50 mots décrivant le 'Concrètement' (ce qui va changer physiquement, financièrement ou socialement pour les Béglais).",
+      "budget": "X €"
+    }
   ],
-  "next_meeting": "date prochaine séance (fournie ci-dessous, copie verbatim)",
-  "total_councils": 0,
-  "total_delibs": 0
-}
+  "next_meeting": "Mardi 21 avril 2026, à 18h30 (fourni ci-dessous, copie verbatim)",
+  "website_url": "https://lobservatoiredebegles.fr",
+  "total_councils": "13 (fourni ci-dessous, copie verbatim)",
+  "total_delibs": "83 (fourni ci-dessous, copie verbatim)"
+}`)
 
-`)
-
+	sb.WriteString("\n\nCONSIGNES ÉDITORIALES CRUCIALES :\n")
+	sb.WriteString("- NE DIS PAS : 'Installation de mâts LED pour la sécurité.'\n")
+	sb.WriteString("- DIS PLUTÔT : 'Face à l'augmentation des trajets nocturnes et aux demandes répétées des associations de cyclistes concernant le manque de visibilité sur l'axe principal, la ville a décidé de sécuriser le tronçon du Réseau Express Vélos reliant le centre à Villenave.'\n")
+	sb.WriteString("- Chaque champ 'context' et 'impact' DOIT faire entre 35 et 50 mots. Sois précis et factuel.\n")
+	sb.WriteString("- Utilise un ton journalistique neutre mais engagé pour la transparence.\n\n")
 	fmt.Fprintf(&sb, "DONNÉES D'ENTRÉE :\n")
 	fmt.Fprintf(&sb, "- Conseil : %s du %s\n", council.Title, council.Date)
 	fmt.Fprintf(&sb, "- budget_total (copie verbatim) : %s\n", stats.budgetFmt)

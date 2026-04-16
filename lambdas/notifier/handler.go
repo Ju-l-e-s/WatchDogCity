@@ -59,19 +59,21 @@ type deliberationRec struct {
 // ── Newsletter params (exact Brevo template schema) ───────────────────────────
 
 type NewsletterParams struct {
-	EmailSubject  string        `json:"email_subject"`
-	CouncilTitle  string        `json:"council_title"`
-	CouncilDate   string        `json:"council_date"`
-	MainIssue     string        `json:"main_issue"`
-	BudgetTotal   string        `json:"budget_total"`
-	VoteClimat    string        `json:"vote_climat"`
-	ClimatColor   string        `json:"climat_color"`
-	VoteStats     string        `json:"vote_stats"`
-	Tensions      []TensionItem `json:"tensions"`
-	Adopted       []AdoptedItem `json:"adopted"`
-	NextMeeting   string        `json:"next_meeting"`
-	TotalCouncils int           `json:"total_councils"`
-	TotalDelibs   int           `json:"total_delibs"`
+	EmailSubject          string        `json:"email_subject"`
+	CouncilTitle          string        `json:"council_title"`
+	CouncilDate           string        `json:"council_date"`
+	MainIssue             string        `json:"main_issue"`
+	BudgetTotal           string        `json:"budget_total"`
+	VoteClimat            string        `json:"vote_climat"`
+	ClimatColor           string        `json:"climat_color"`
+	VoteStats             string        `json:"vote_stats"`
+	TotalDelibsInCouncil  int           `json:"total_delibs_in_council"`
+	Tensions              []TensionItem `json:"tensions"`
+	Adopted               []AdoptedItem `json:"adopted"`
+	Briefs                []BriefItem   `json:"briefs"`
+	NextMeeting           string        `json:"next_meeting"`
+	TotalCouncils         int           `json:"total_councils"`
+	TotalDelibs           int           `json:"total_delibs"`
 }
 
 type TensionItem struct {
@@ -88,6 +90,11 @@ type AdoptedItem struct {
 	Context string `json:"context"`
 	Impact  string `json:"impact"`
 	Budget  string `json:"budget"`
+}
+
+type BriefItem struct {
+	Tag     string `json:"tag"`
+	Summary string `json:"summary"`
 }
 
 // ── Interfaces (for testability) ──────────────────────────────────────────────
@@ -318,10 +325,10 @@ func computeNewsletterStats(delibs []deliberationRec) newsletterStats {
 
 	if s.totalPour+s.totalContre > 0 && float64(s.totalContre)/float64(s.totalPour+s.totalContre) > 0.10 {
 		s.voteClimat = "TENSIONS"
-		s.climatColor = "#ef4444"
+		s.climatColor = "#DC2626"
 	} else {
 		s.voteClimat = "CONSENSUS"
-		s.climatColor = "#22c55e"
+		s.climatColor = "#059669"
 	}
 
 	// French locale: space as thousands separator (e.g. "121 451")
@@ -377,6 +384,7 @@ func buildNewsletterPrompt(council *councilRec, delibs []deliberationRec, stats 
   "vote_climat": "TENSIONS ou CONSENSUS (fourni ci-dessous, copie verbatim)",
   "climat_color": "code hex couleur (fourni ci-dessous, copie verbatim)",
   "vote_stats": "résumé votes (fourni ci-dessous, copie verbatim)",
+  "total_delibs_in_council": 0,
   "tensions": [
     {
       "title": "Titre explicite de la délibération",
@@ -395,6 +403,12 @@ func buildNewsletterPrompt(council *councilRec, delibs []deliberationRec, stats 
       "budget": "X €"
     }
   ],
+  "briefs": [
+    {
+      "tag": "ADMINISTRATION, MOBILITÉ, SÉCURITÉ, ENVIRONNEMENT ou CULTURE",
+      "summary": "Résumé ultra-court (max 15 mots) d'une autre délibération intéressante."
+    }
+  ],
   "next_meeting": "Mardi 21 avril 2026, à 18h30 (fourni ci-dessous, copie verbatim)",
   "website_url": "https://lobservatoiredebegles.fr",
   "total_councils": "13 (fourni ci-dessous, copie verbatim)",
@@ -405,8 +419,10 @@ func buildNewsletterPrompt(council *councilRec, delibs []deliberationRec, stats 
 	sb.WriteString("- NE DIS PAS : 'Installation de mâts LED pour la sécurité.'\n")
 	sb.WriteString("- DIS PLUTÔT : 'Face à l'augmentation des trajets nocturnes et aux demandes répétées des associations de cyclistes concernant le manque de visibilité sur l'axe principal, la ville a décidé de sécuriser le tronçon du Réseau Express Vélos reliant le centre à Villenave.'\n")
 	sb.WriteString("- Chaque champ 'context' et 'impact' DOIT faire entre 35 et 50 mots. Sois précis et factuel.\n")
+	sb.WriteString("- La section 'briefs' doit contenir 3 à 5 éléments maximum, choisis parmi les délibérations non citées plus haut.\n")
 	sb.WriteString("- Utilise un ton journalistique neutre mais engagé pour la transparence.\n\n")
 	fmt.Fprintf(&sb, "DONNÉES D'ENTRÉE :\n")
+	fmt.Fprintf(&sb, "- Nombre total de délibérations ce jour : %d (copie verbatim dans total_delibs_in_council)\n", len(delibs))
 	fmt.Fprintf(&sb, "- Conseil : %s du %s\n", council.Title, council.Date)
 	fmt.Fprintf(&sb, "- budget_total (copie verbatim) : %s\n", stats.budgetFmt)
 	fmt.Fprintf(&sb, "- vote_climat (copie verbatim) : %s\n", stats.voteClimat)
@@ -476,6 +492,29 @@ func buildNewsletterPrompt(council *councilRec, delibs []deliberationRec, stats 
 	}
 	if adoptedCount == 0 {
 		sb.WriteString("(aucune délibération adoptée avec budget)\n\n")
+	}
+
+	// Délibérations restantes → briefs[]
+	sb.WriteString("AUTRES DÉLIBÉRATIONS (pour le champ briefs[], 3 à 4 éléments parmi celles non citées ci-dessus) :\n")
+	briefCount := 0
+	for _, d := range delibs {
+		contre := 0
+		if d.VoteContre != nil {
+			contre = *d.VoteContre
+		}
+		hasDisagreement := d.Disagreements != nil && *d.Disagreements != ""
+		alreadyCited := (contre > 0 || hasDisagreement) || (contre == 0 && d.BudgetImpact > 0 && briefCount < 8)
+		_ = alreadyCited
+		// Include delibs with no budget and no opposition — the "long tail"
+		if contre == 0 && d.BudgetImpact == 0 && briefCount < 6 {
+			fmt.Fprintf(&sb, "- Titre: %s | Tag: %s\n", d.Title, d.TopicTag)
+			fmt.Fprintf(&sb, "  Résumé: %s\n\n", d.Summary)
+			briefCount++
+		}
+	}
+	if briefCount == 0 {
+		// Fallback: pick from any remaining delibs not already in tensions/adopted
+		sb.WriteString("(utilise les délibérations listées ci-dessus pour générer les briefs)\n\n")
 	}
 
 	sb.WriteString("RÈGLES ÉDITORIALES :\n")

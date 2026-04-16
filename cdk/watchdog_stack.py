@@ -153,28 +153,6 @@ class WatchdogStack(Stack):
         councils_table.grant_read_write_data(worker)
         deliberations_table.grant_read_write_data(worker)
 
-        # ── Lambda: Notifier ──────────────────────────────────────────────
-        notifier = lambda_.Function(
-            self, "Notifier",
-            runtime=lambda_.Runtime.PROVIDED_AL2023,
-            architecture=lambda_.Architecture.ARM_64,
-            handler="bootstrap",
-            code=lambda_.Code.from_asset("../dist/notifier.zip"),
-            timeout=Duration.minutes(5),
-            environment={
-                "COUNCILS_TABLE": councils_table.table_name,
-                "DELIBERATIONS_TABLE": deliberations_table.table_name,
-                "GEMINI_API_KEY": gemini_api_key,
-                "GEMINI_MODEL": "gemini-2.5-pro",
-                "BREVO_API_KEY": mail_api_key,
-                "BREVO_NEWSLETTER_TEMPLATE_ID": brevo_newsletter_template_id,
-                "BREVO_LIST_ID": brevo_list_id,
-                "SENDER_EMAIL": sender_email,
-            },
-        )
-        councils_table.grant_read_data(notifier)
-        deliberations_table.grant_read_data(notifier)
-
         # ── Lambda: Publisher ─────────────────────────────────────────────
         publisher = lambda_.Function(
             self, "Publisher",
@@ -188,7 +166,6 @@ class WatchdogStack(Stack):
                 "FROM_EMAIL": "watchdog@begles.citoyen",
                 "SITE_URL": f"https://{distribution.distribution_domain_name}",
                 "CLOUDFRONT_DISTRIBUTION_ID": distribution.distribution_id,
-                "NOTIFIER_FUNCTION_NAME": notifier.function_name,
             },
         )
         councils_table.grant_read_write_data(publisher)
@@ -199,7 +176,6 @@ class WatchdogStack(Stack):
             actions=["ses:SendEmail", "cloudfront:CreateInvalidation"],
             resources=["*"],
         ))
-        notifier.grant_invoke(publisher)
 
         # ── Lambda: Aggregator ───────────────────────────────────────────
         aggregator = lambda_.Function(
@@ -242,7 +218,31 @@ class WatchdogStack(Stack):
         mail_api_key = os.environ.get("BREVO_API_KEY", "")
         brevo_list_id = os.environ.get("BREVO_LIST_ID", "2")
         brevo_template_id = os.environ.get("BREVO_TEMPLATE_ID", "1")
-        brevo_newsletter_template_id = os.environ.get("BREVO_NEWSLETTER_TEMPLATE_ID", "2")
+        brevo_newsletter_template_id = os.environ.get("BREVO_NEWSLETTER_TEMPLATE_ID", "7")
+
+        # ── Lambda: Notifier ──────────────────────────────────────────────
+        notifier = lambda_.Function(
+            self, "Notifier",
+            runtime=lambda_.Runtime.PROVIDED_AL2023,
+            architecture=lambda_.Architecture.ARM_64,
+            handler="bootstrap",
+            code=lambda_.Code.from_asset("../dist/notifier.zip"),
+            timeout=Duration.minutes(5),
+            environment={
+                "COUNCILS_TABLE": councils_table.table_name,
+                "DELIBERATIONS_TABLE": deliberations_table.table_name,
+                "GEMINI_API_KEY": gemini_api_key,
+                "GEMINI_MODEL": "gemini-2.5-pro",
+                "BREVO_API_KEY": mail_api_key,
+                "BREVO_NEWSLETTER_TEMPLATE_ID": brevo_newsletter_template_id,
+                "BREVO_LIST_ID": brevo_list_id,
+                "SENDER_EMAIL": sender_email,
+            },
+        )
+        councils_table.grant_read_data(notifier)
+        deliberations_table.grant_read_data(notifier)
+        notifier.grant_invoke(publisher)
+        publisher.add_environment("NOTIFIER_FUNCTION_NAME", notifier.function_name)
 
         api = apigw.RestApi(
             self, "WatchdogApi",

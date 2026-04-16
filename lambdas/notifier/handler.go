@@ -267,7 +267,7 @@ func (d *notifierDeps) generateNewsletterParams(ctx context.Context, council *co
 
 	client, err := genai.NewClient(ctx, &genai.ClientConfig{
 		APIKey:      d.geminiKey,
-		HTTPOptions: genai.HTTPOptions{APIVersion: "v1"},
+		HTTPOptions: genai.HTTPOptions{APIVersion: "v1beta"},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("create gemini client: %w", err)

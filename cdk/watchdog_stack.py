@@ -207,7 +207,7 @@ class WatchdogStack(Stack):
 
         # ── Newsletter & Contact config ───────────────────────────────────
         site_url = os.environ.get("SITE_URL", "https://www.lobservatoiredebegles.fr")
-        sender_email = os.environ.get("SENDER_EMAIL", "noreply@lobservatoiredebegles.fr")
+        sender_email = os.environ.get("SENDER_EMAIL", "newsletter@lobservatoiredebegles.fr")
         contact_sender = os.environ.get("CONTACT_SENDER", "contact@lobservatoiredebegles.fr")
         admin_email = os.environ.get("ADMIN_EMAIL", "")
         ses_identity_arns = [

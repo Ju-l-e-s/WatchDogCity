@@ -416,8 +416,8 @@ func buildNewsletterPrompt(council *councilRec, delibs []deliberationRec, stats 
   ],
   "next_meeting": "Mardi 21 avril 2026, à 18h30 (fourni ci-dessous, copie verbatim)",
   "website_url": "https://lobservatoiredebegles.fr",
-  "total_councils": "13 (fourni ci-dessous, copie verbatim)",
-  "total_delibs": "83 (fourni ci-dessous, copie verbatim)"
+  "total_councils": 13,
+  "total_delibs": 83
 }`)
 
 	sb.WriteString("\n\nCONSIGNES ÉDITORIALES CRUCIALES :\n")
@@ -542,7 +542,8 @@ func parseNewsletterParams(raw string) (*NewsletterParams, error) {
 	raw = budgetFloatRe.ReplaceAllString(raw, "${1}${2}")
 
 	var p NewsletterParams
-	if err := json.Unmarshal([]byte(raw), &p); err != nil {
+	dec := json.NewDecoder(strings.NewReader(raw))
+	if err := dec.Decode(&p); err != nil {
 		return nil, fmt.Errorf("unmarshal newsletter params: %w (raw: %.200s)", err, raw)
 	}
 	return &p, nil

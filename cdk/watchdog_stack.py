@@ -293,7 +293,7 @@ class WatchdogStack(Stack):
         # 1. Déploiement Principal : Assets Statiques (Images, Fonts) - SANS Invalidation
         deploy_website = s3_deploy.BucketDeployment(
             self, "DeployWebsite",
-            sources=[s3_deploy.Source.asset("../frontend", 
+            sources=[s3_deploy.Source.asset("../frontend",
                 exclude=[
                     "data.json", "index.html", "app.js", "style.css", "input.css",
                     "node_modules/*", "package.json", "package-lock.json", "tailwind.config.js",
@@ -301,6 +301,7 @@ class WatchdogStack(Stack):
                 ])],
             destination_bucket=website_bucket,
             cache_control=[s3_deploy.CacheControl.from_string("public, max-age=31536000, immutable")],
+            prune=False,  # Ne pas supprimer les fichiers gérés par d'autres déploiements (data.json, etc.)
         )
 
         # 2. Déploiement de la Configuration (HTML, JS, CSS) - AVEC Invalidation Chirurgicale

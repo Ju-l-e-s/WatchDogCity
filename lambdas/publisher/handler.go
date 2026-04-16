@@ -16,6 +16,8 @@ import (
 	cftypes "github.com/aws/aws-sdk-go-v2/service/cloudfront/types"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	lambdaSvc "github.com/aws/aws-sdk-go-v2/service/lambda"
+	lambdaTypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
@@ -245,6 +247,22 @@ func HandleRequest(ctx context.Context, event PublisherEvent) error {
 			log.Printf("warn: could not invalidate CloudFront cache: %v", err)
 		} else {
 			log.Printf("CloudFront cache invalidated for /data.json")
+		}
+	}
+
+	// Trigger newsletter Notifier asynchronously — last instruction, after S3 + CloudFront.
+	if fn := os.Getenv("NOTIFIER_FUNCTION_NAME"); fn != "" {
+		notifierPayload, _ := json.Marshal(map[string]string{"council_id": event.CouncilID})
+		lambdaClient := lambdaSvc.NewFromConfig(cfg)
+		_, err := lambdaClient.Invoke(ctx, &lambdaSvc.InvokeInput{
+			FunctionName:   aws.String(fn),
+			InvocationType: lambdaTypes.InvocationTypeEvent,
+			Payload:        notifierPayload,
+		})
+		if err != nil {
+			log.Printf("warn: could not invoke notifier for council %s: %v", event.CouncilID, err)
+		} else {
+			log.Printf("notifier invoked async for council %s", event.CouncilID)
 		}
 	}
 

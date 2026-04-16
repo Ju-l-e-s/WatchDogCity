@@ -292,7 +292,12 @@ func (d *notifierDeps) generateNewsletterParams(ctx context.Context, council *co
 	}
 
 	raw := resp.Candidates[0].Content.Parts[0].Text
-	return parseNewsletterParams(raw)
+	params, err := parseNewsletterParams(raw)
+	if err != nil {
+		return nil, err
+	}
+	params.EmailSubject = "L'Essentiel du Conseil"
+	return params, nil
 }
 
 // ── Pure helpers (testable) ────────────────────────────────────────────────────

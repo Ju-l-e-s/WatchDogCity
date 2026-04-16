@@ -312,13 +312,22 @@
       <form id="newsletter-form" class="flex flex-col gap-3 max-w-md mx-auto">
         <div class="flex flex-col md:flex-row gap-3">
           <input type="email" id="newsletter-email" required placeholder="votre@email.com" class="flex-1 bg-white/10 border border-white/20 px-6 py-4 rounded-2xl text-white font-medium placeholder:text-slate-200 focus:outline-none focus:border-brand-400 transition-colors">
-          <button type="submit" id="newsletter-submit" class="bg-brand-700 text-white font-bold px-8 py-4 rounded-2xl hover:bg-brand-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+          <button type="submit" id="newsletter-submit" disabled class="bg-brand-700 text-white font-bold px-8 py-4 rounded-2xl hover:bg-brand-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
             S'inscrire
           </button>
         </div>
-        <p class="text-[11px] text-slate-400 mt-2 italic text-center">Envoi du mail de confirmation pour valider votre inscription.</p>
+        <label class="flex items-start gap-3 cursor-pointer text-left mt-1">
+          <input type="checkbox" id="newsletter-checkbox" class="mt-0.5 w-4 h-4 accent-brand-500 cursor-pointer shrink-0">
+          <span class="text-slate-300 text-sm leading-relaxed">Je comprends que je recevrai un email pour confirmer mon inscription.</span>
+        </label>
         <div id="newsletter-status" class="hidden text-sm font-medium text-center py-2 rounded-xl"></div>
       </form>
+      <div id="newsletter-confirm" class="hidden max-w-md mx-auto text-center">
+        <div style="font-size:5rem;line-height:1;margin-bottom:1rem;">📬</div>
+        <p class="text-white font-bold text-lg mb-2">Vérifiez votre boîte mail !</p>
+        <p class="text-slate-300 text-sm leading-relaxed">Nous avons envoyé un email à <span id="newsletter-confirm-email" class="text-brand-400 font-medium"></span>.<br>Ouvrez-le et cliquez sur le bouton de confirmation pour activer votre inscription.</p>
+        <p class="text-slate-500 text-xs mt-4">Vous ne trouvez pas l'email ? Vérifiez vos spams.</p>
+      </div>
     </div>
   </section>
 

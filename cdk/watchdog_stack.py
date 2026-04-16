@@ -107,8 +107,8 @@ class WatchdogStack(Stack):
         )
 
         # ── Gemini Models ────────────────────────────────────────────────
-        worker_model = "gemini-2.5-pro"
-        aggregator_model = "gemini-3.1-pro-preview"
+        worker_model = "gemini-2.5-flash"
+        aggregator_model = "gemini-2.5-pro"
 
         # ── Lambda common config ──────────────────────────────────────────
         common_env = {
@@ -232,7 +232,7 @@ class WatchdogStack(Stack):
                 "COUNCILS_TABLE": councils_table.table_name,
                 "DELIBERATIONS_TABLE": deliberations_table.table_name,
                 "GEMINI_API_KEY": gemini_api_key,
-                "GEMINI_MODEL": "gemini-2.5-pro",
+                "GEMINI_MODEL": "gemini-2.5-flash",
                 "BREVO_API_KEY": mail_api_key,
                 "BREVO_NEWSLETTER_TEMPLATE_ID": brevo_newsletter_template_id,
                 "BREVO_LIST_ID": brevo_list_id,

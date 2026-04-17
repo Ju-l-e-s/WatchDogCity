@@ -1,0 +1,260 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "watchdog/city-config",
+  "title": "Watchdog City Configuration",
+  "description": "Contract for instantiating a full Watchdog municipal stack for any city. All SSM paths must exist in the target AWS account before cdk deploy.",
+  "type": "object",
+  "required": ["city", "scraping", "domain", "email", "brevo", "gemini", "aws"],
+  "additionalProperties": false,
+
+  "properties": {
+
+    "city": {
+      "type": "object",
+      "description": "Human-readable identity of the city. Used in prompts, email subjects, and CloudWatch dashboard names.",
+      "required": ["id", "name", "label", "citizen_label", "timezone", "country"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]+$",
+          "description": "Slug used as AWS resource prefix and stack name suffix. Lowercase, no spaces. e.g. 'begles', 'bordeaux', 'paris-14'."
+        },
+        "name": {
+          "type": "string",
+          "description": "Display name of the city. e.g. 'Bègles'."
+        },
+        "label": {
+          "type": "string",
+          "description": "Full brand name of the civic observatory for this city. Used as Brevo sender name and in prompts. e.g. \"L'Observatoire de Bègles\"."
+        },
+        "citizen_label": {
+          "type": "string",
+          "description": "Demonym used in Gemini prompts to refer to citizens. e.g. 'les Béglaises et Béglais', 'les Bordelais'."
+        },
+        "timezone": {
+          "type": "string",
+          "description": "IANA timezone for display purposes. e.g. 'Europe/Paris'."
+        },
+        "country": {
+          "type": "string",
+          "pattern": "^[A-Z]{2}$",
+          "description": "ISO 3166-1 alpha-2 country code. e.g. 'FR'."
+        }
+      }
+    },
+
+    "scraping": {
+      "type": "object",
+      "description": "All configuration needed by the Orchestrator Lambda to scrape the city website.",
+      "required": ["cms_type", "deliberations_list_url", "next_council_url", "selectors", "category_mapping", "schedule"],
+      "additionalProperties": false,
+      "properties": {
+        "cms_type": {
+          "type": "string",
+          "enum": ["openmairie_v1", "openmairie_v2", "wordpress", "drupal", "custom"],
+          "description": "CMS type. Determines which CityScraper Go implementation is used. 'custom' requires all selectors to be fully specified."
+        },
+        "deliberations_list_url": {
+          "type": "string",
+          "format": "uri",
+          "description": "Full URL of the page listing all council deliberations."
+        },
+        "next_council_url": {
+          "type": "string",
+          "format": "uri",
+          "description": "Full URL of the page showing the next council session date."
+        },
+        "selectors": {
+          "type": "object",
+          "description": "CSS selectors used by the scraper. For known cms_type values, defaults are applied by the scraper — only override here if the site deviates from the CMS standard.",
+          "additionalProperties": false,
+          "required": ["item", "title_link", "summary", "category", "date", "pdf_item", "pdf_link", "next_council_date"],
+          "properties": {
+            "item":              { "type": "string" },
+            "title_link":        { "type": "string" },
+            "summary": {
+              "oneOf": [
+                { "type": "string" },
+                { "type": "array", "items": { "type": "string" }, "minItems": 1,
+                  "description": "Ordered list of fallback selectors tried in sequence until a non-empty match is found." }
+              ]
+            },
+            "category":          { "type": "string" },
+            "date":              { "type": "string" },
+            "pdf_item":          { "type": "string" },
+            "pdf_link":          { "type": "string" },
+            "next_council_date": { "type": "string" }
+          }
+        },
+        "category_mapping": {
+          "type": "object",
+          "description": "Maps raw category strings (lowercased, partial match) to normalized category names. '_default' key is mandatory and used when no match is found.",
+          "required": ["_default"],
+          "additionalProperties": { "type": "string" }
+        },
+        "schedule": {
+          "type": "object",
+          "description": "EventBridge cron schedule for the Orchestrator trigger.",
+          "required": ["cron_week_day", "cron_hour_utc", "cron_minute"],
+          "additionalProperties": false,
+          "properties": {
+            "cron_week_day": {
+              "type": "string",
+              "description": "AWS cron week_day field. e.g. 'MON-FRI', 'MON,WED,FRI', '*'."
+            },
+            "cron_hour_utc": {
+              "type": "string",
+              "pattern": "^([01]?[0-9]|2[0-3])$",
+              "description": "UTC hour (0-23). Convert from local time. Paris = local - 1 or 2 depending on DST."
+            },
+            "cron_minute": {
+              "type": "string",
+              "pattern": "^[0-5]?[0-9]$",
+              "description": "Minute of the hour (0-59)."
+            }
+          }
+        }
+      }
+    },
+
+    "domain": {
+      "type": "object",
+      "description": "DNS and TLS configuration. The ACM certificate must already exist in us-east-1 (CloudFront requirement) before deploying.",
+      "required": ["apex", "www", "acm_certificate_arn_ssm"],
+      "additionalProperties": false,
+      "properties": {
+        "apex": {
+          "type": "string",
+          "description": "Apex domain. e.g. 'lobservatoiredebegles.fr'."
+        },
+        "www": {
+          "type": "string",
+          "description": "WWW subdomain. e.g. 'www.lobservatoiredebegles.fr'."
+        },
+        "acm_certificate_arn_ssm": {
+          "type": "string",
+          "pattern": "^/watchdog/[a-z0-9-]+/acm_certificate_arn$",
+          "description": "SSM Parameter Store path containing the ACM certificate ARN. Must be pre-populated before cdk deploy."
+        }
+      }
+    },
+
+    "email": {
+      "type": "object",
+      "description": "Email identities. All domains must be verified in AWS SES before sending.",
+      "required": ["sender_newsletter", "sender_contact", "sender_transactional", "admin", "ses_identity_domain"],
+      "additionalProperties": false,
+      "properties": {
+        "sender_newsletter": {
+          "type": "string",
+          "format": "email",
+          "description": "From address for newsletter campaigns."
+        },
+        "sender_contact": {
+          "type": "string",
+          "format": "email",
+          "description": "From address for the contact form emails sent to admin."
+        },
+        "sender_transactional": {
+          "type": "string",
+          "format": "email",
+          "description": "From address for subscription confirmation emails."
+        },
+        "admin": {
+          "type": "string",
+          "pattern": "^/watchdog/[a-z0-9-]+/admin_email$",
+          "description": "SSM path containing the admin email address (contact form destination). Stored in SSM to avoid committing PII."
+        },
+        "ses_identity_domain": {
+          "type": "string",
+          "description": "SES verified domain used to scope the ses:SendEmail IAM policy. e.g. 'lobservatoiredebegles.fr'."
+        }
+      }
+    },
+
+    "brevo": {
+      "type": "object",
+      "description": "Brevo account and list configuration. All IDs refer to resources in the Brevo account whose API key is stored at api_key_ssm.",
+      "required": ["api_key_ssm", "list_id", "confirmation_template_id", "newsletter_template_id", "sender_name"],
+      "additionalProperties": false,
+      "properties": {
+        "api_key_ssm": {
+          "type": "string",
+          "pattern": "^/watchdog/[a-z0-9-]+/brevo_api_key$",
+          "description": "SSM path for the Brevo API key. Must be a SecureString."
+        },
+        "list_id": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Brevo contact list ID for newsletter subscribers."
+        },
+        "confirmation_template_id": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Brevo transactional email template ID for subscription confirmation."
+        },
+        "newsletter_template_id": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Brevo email campaign template ID for the newsletter."
+        },
+        "sender_name": {
+          "type": "string",
+          "description": "Display name shown in email clients as the sender. e.g. \"L'Observatoire de Bègles\"."
+        }
+      }
+    },
+
+    "gemini": {
+      "type": "object",
+      "description": "Google Gemini API configuration.",
+      "required": ["api_key_ssm", "worker_model", "aggregator_model", "notifier_model"],
+      "additionalProperties": false,
+      "properties": {
+        "api_key_ssm": {
+          "type": "string",
+          "pattern": "^/watchdog/[a-z0-9-]+/gemini_api_key$",
+          "description": "SSM path for the Gemini API key. Can point to a shared key across cities or a per-city key."
+        },
+        "worker_model": {
+          "type": "string",
+          "description": "Gemini model used by the Worker Lambda (PDF analysis). e.g. 'gemini-2.5-flash'."
+        },
+        "aggregator_model": {
+          "type": "string",
+          "description": "Gemini model used by the Aggregator Lambda (council synthesis). e.g. 'gemini-2.5-pro'."
+        },
+        "notifier_model": {
+          "type": "string",
+          "description": "Gemini model used by the Notifier Lambda (newsletter generation). e.g. 'gemini-2.5-flash'."
+        }
+      }
+    },
+
+    "aws": {
+      "type": "object",
+      "description": "AWS-specific deployment parameters.",
+      "required": ["stack_name", "resource_prefix"],
+      "additionalProperties": false,
+      "properties": {
+        "existing_s3_bucket": {
+          "type": "string",
+          "description": "Name of a pre-existing S3 bucket to import instead of creating a new one. Omit for new deployments — CDK will create the bucket.",
+          "pattern": "^[a-z0-9][a-z0-9\\-]{1,61}[a-z0-9]$"
+        },
+        "stack_name": {
+          "type": "string",
+          "pattern": "^WatchdogStack-[a-z0-9-]+$",
+          "description": "CDK stack name. Convention: WatchdogStack-{city.id}."
+        },
+        "resource_prefix": {
+          "type": "string",
+          "pattern": "^watchdog-[a-z0-9-]+$",
+          "description": "Prefix for all named AWS resources (DynamoDB tables, SQS queues, etc.). Convention: watchdog-{city.id}."
+        }
+      }
+    }
+
+  }
+}

@@ -1,0 +1,78 @@
+{
+  "$schema": "../city.schema.json",
+
+  "city": {
+    "id": "begles",
+    "name": "Bègles",
+    "label": "L'Observatoire de Bègles",
+    "citizen_label": "les Béglaises et Béglais",
+    "timezone": "Europe/Paris",
+    "country": "FR"
+  },
+
+  "scraping": {
+    "cms_type": "openmairie_v2",
+    "deliberations_list_url": "https://www.mairie-begles.fr/d%C3%A9lib%C3%A9rations/",
+    "next_council_url": "https://www.mairie-begles.fr/vie-municipale/le-conseil-municipal-2/les-seances-du-conseil-municipal/",
+    "selectors": {
+      "item": "li.list__item",
+      "title_link": "a.publications-list-item__title-link",
+      "summary": [
+        ".publications-list-item__excerpt",
+        ".publications-list-item__text",
+        ".publications-list-item__content"
+      ],
+      "category": "span.theme",
+      "date": "time",
+      "pdf_item": ".telecharger-item",
+      "pdf_link": "a.telecharger-item__link",
+      "next_council_date": ".infowidget .rte ul li strong"
+    },
+    "category_mapping": {
+      "ccas": "CCAS",
+      "centre communal": "CCAS",
+      "estey": "Estey",
+      "_default": "Conseil municipal"
+    },
+    "schedule": {
+      "cron_week_day": "MON-FRI",
+      "cron_hour_utc": "16",
+      "cron_minute": "0"
+    }
+  },
+
+  "domain": {
+    "apex": "lobservatoiredebegles.fr",
+    "www": "www.lobservatoiredebegles.fr",
+    "acm_certificate_arn_ssm": "/watchdog/begles/acm_certificate_arn"
+  },
+
+  "email": {
+    "sender_newsletter": "newsletter@lobservatoiredebegles.fr",
+    "sender_contact": "contact@lobservatoiredebegles.fr",
+    "sender_transactional": "newsletter@lobservatoiredebegles.fr",
+    "admin": "/watchdog/begles/admin_email",
+    "ses_identity_domain": "lobservatoiredebegles.fr"
+  },
+
+  "brevo": {
+    "api_key_ssm": "/watchdog/begles/brevo_api_key",
+    "list_id": 2,
+    "confirmation_template_id": 1,
+    "newsletter_template_id": 7,
+    "sender_name": "L'Observatoire de Bègles"
+  },
+
+  "gemini": {
+    "api_key_ssm": "/watchdog/begles/gemini_api_key",
+    "worker_model": "gemini-2.5-flash",
+    "aggregator_model": "gemini-2.5-pro",
+    "notifier_model": "gemini-2.5-flash"
+  },
+
+  "aws": {
+    "existing_s3_bucket": "watchdogstack-websitebucket75c24d94-clsmaf2ocvxq",
+    "stack_name": "WatchdogStack-begles",
+    "resource_prefix": "watchdog-begles"
+  }
+}

@@ -1,5 +1,5 @@
 console.log("🚀 L'Observatoire Citoyen : Initialisation...");
-let searchTimeout, allCouncils = [], visibleCouncilsCount = 1, searchQuery = "";
+let searchTimeout, allCouncils = [], visibleCouncilsCount = 2, searchQuery = "";
 const GLOBAL_GLOSSARY = {
     CCAS: "Centre Communal d'Action Sociale",
     ZAC: "Zone d'Aménagement Concerté",
@@ -162,7 +162,7 @@ function renderDashboard() {
     console.log("✅ Dashboard rendu avec succès.");
 }
 
-function handleSearch(e) { const t = document.getElementById("nav-search-input"), n = document.getElementById("mobile-search-input"); t && t.value !== e && (t.value = e), n && n.value !== e && (n.value = e), clearTimeout(searchTimeout), searchTimeout = setTimeout(() => { searchQuery = e.toLowerCase().trim(), visibleCouncilsCount = searchQuery ? 5 : 1, render() }, 300) }
+function handleSearch(e) { const t = document.getElementById("nav-search-input"), n = document.getElementById("mobile-search-input"); t && t.value !== e && (t.value = e), n && n.value !== e && (n.value = e), clearTimeout(searchTimeout), searchTimeout = setTimeout(() => { searchQuery = e.toLowerCase().trim(), visibleCouncilsCount = searchQuery ? 5 : 2, render() }, 300) }
 function loadMore() { visibleCouncilsCount += 2, render() }
 function updateStats() { const e = document.getElementById("stat-councils"), t = document.getElementById("stat-deliberations"); e && (e.textContent = allCouncils.length), t && (t.textContent = allCouncils.reduce((e, t) => e + (t.deliberations?.length || 0), 0)) }
 function formatDate(e) { if (!e) return "Date inconnue"; try { const t = new Date(e); return isNaN(t.getTime()) ? e : t.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" }) } catch (t) { return e } }
@@ -306,7 +306,7 @@ function render() {
             }
         };
         loadMoreBtn.className = "w-full py-5 bg-white rounded-2xl text-slate-600 hover:text-brand-600 font-medium text-sm tracking-wide transition-all shadow-micro group active:scale-[0.98] min-h-[44px] mb-12";
-        loadMoreBtn.innerHTML = `<div class="flex items-center justify-center gap-2"><span>Charger les archives</span><span class="text-xs text-slate-500 font-normal">(${remaining} restants)</span><svg class="w-4 h-4 opacity-40 group-hover:translate-y-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg></div>`;
+        loadMoreBtn.innerHTML = `<div class="flex items-center justify-center gap-2"><span>Voir plus</span><span class="text-xs text-slate-500 font-normal">(${remaining} restants)</span><svg class="w-4 h-4 opacity-40 group-hover:translate-y-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg></div>`;
         container.appendChild(loadMoreBtn);
     }
 }
@@ -508,4 +508,4 @@ contactForm && contactForm.addEventListener("submit", async e => { e.preventDefa
 
 const newsletterForm = document.getElementById("newsletter-form"), newsletterStatus = document.getElementById("newsletter-status"), newsletterEmail = document.getElementById("newsletter-email"), newsletterCheckbox = document.getElementById("newsletter-checkbox"), newsletterSubmit = document.getElementById("newsletter-submit"), newsletterConfirm = document.getElementById("newsletter-confirm"), newsletterConfirmEmail = document.getElementById("newsletter-confirm-email");
 newsletterCheckbox && newsletterCheckbox.addEventListener("change", () => { newsletterSubmit.disabled = !newsletterCheckbox.checked; });
-newsletterForm && newsletterForm.addEventListener("submit", async e => { e.preventDefault(); const email = newsletterEmail.value; try { e.submitter && (e.submitter.disabled = !0); const n = await fetch("https://zq7qfmhra1.execute-api.eu-west-3.amazonaws.com/prod/subscribe", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email }) }), s = await n.json().catch(() => ({})); n.ok ? (newsletterForm.classList.add("hidden"), newsletterConfirmEmail.textContent = email, newsletterConfirm.classList.remove("hidden")) : (newsletterStatus.textContent = s.error || "Erreur lors de l'inscription.", newsletterStatus.className = "text-sm font-medium text-center py-3 px-4 rounded-xl text-rose-400 bg-rose-400/10 border border-rose-400/20 block") } catch (e) { newsletterStatus.textContent = "Erreur réseau. Impossible de contacter le serveur.", newsletterStatus.className = "text-sm font-medium text-center py-3 px-4 rounded-xl text-rose-400 bg-rose-400/10 border border-rose-400/20 block" } finally { e.submitter && (e.submitter.disabled = !1) } });
+newsletterForm && newsletterForm.addEventListener("submit", async e => { e.preventDefault(); const email = newsletterEmail.value; try { e.submitter && (e.submitter.disabled = !0); const n = await fetch("https://zq7qfmhra1.execute-api.eu-west-3.amazonaws.com/prod/subscribe", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email }) }), s = await n.json().catch(() => ({})); n.ok ? (newsletterForm.classList.add("hidden"), newsletterConfirmEmail.textContent = email, newsletterConfirm.classList.remove("hidden")) : (newsletterStatus.textContent = s.error || "Oups ! Une erreur est survenue lors de l'inscription. Merci de réessayer d'ici quelques instants.", newsletterStatus.className = "text-sm font-medium text-center py-3 px-4 rounded-xl text-rose-400 bg-rose-400/10 border border-rose-400/20 block") } catch (e) { newsletterStatus.textContent = "Nous n'avons pas réussi à vous inscrire. Merci de vérifier votre connexion ou de réessayer plus tard.", newsletterStatus.className = "text-sm font-medium text-center py-3 px-4 rounded-xl text-rose-400 bg-rose-400/10 border border-rose-400/20 block" } finally { e.submitter && (e.submitter.disabled = !1) } });

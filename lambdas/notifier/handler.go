@@ -352,32 +352,32 @@ type newsletterStats struct {
 func computeNewsletterStats(delibs []deliberationRec) newsletterStats {
 	var s newsletterStats
 	hasIndividualTension := false
+	nonUnanimousCount := 0
+	maxOpposition := 0
+	maxAbst := 0
 
 	for _, d := range delibs {
 		s.totalBudget += d.BudgetImpact
-		if d.VotePour != nil {
-			s.totalPour += *d.VotePour
-		}
-		if d.VoteContre != nil {
-			s.totalContre += *d.VoteContre
-		}
-		if d.VoteAbst != nil {
-			s.totalAbst += *d.VoteAbst
+		
+		contre := 0
+		if d.VoteContre != nil { contre = *d.VoteContre }
+		abst := 0
+		if d.VoteAbst != nil { abst = *d.VoteAbst }
+		
+		if contre > maxOpposition { maxOpposition = contre }
+		if abst > maxAbst { maxAbst = abst }
+		
+		if contre > 0 || abst > 0 {
+			nonUnanimousCount++
 		}
 
 		// Aligned with website: detect any individual tension
-		if (d.VoteContre != nil && *d.VoteContre > 0) || (d.Disagreements != nil && *d.Disagreements != "") {
+		if contre > 0 || (d.Disagreements != nil && *d.Disagreements != "") {
 			hasIndividualTension = true
 		}
 	}
 
-	totalVotes := s.totalPour + s.totalContre + s.totalAbst
-	ratioOpposition := 0.0
-	if totalVotes > 0 {
-		ratioOpposition = float64(s.totalContre+s.totalAbst) / float64(totalVotes)
-	}
-
-	if hasIndividualTension || ratioOpposition > 0.10 {
+	if hasIndividualTension || nonUnanimousCount > 0 {
 		s.voteClimat = "VOTES PARTAGÉS"
 		s.climatColor = "#E11D48" // Rose 600
 	} else {
@@ -385,16 +385,17 @@ func computeNewsletterStats(delibs []deliberationRec) newsletterStats {
 		s.climatColor = "#059669" // Emerald 600
 	}
 
-	// French locale: space as thousands separator (e.g. "121 451")
 	s.budgetFmt = formatBudgetFR(s.totalBudget)
 
-	// e.g. "3 oppositions / 6 abst." or ""
+	// Clearer stats: "X délibs non unanimes"
 	parts := []string{}
-	if s.totalContre > 0 {
-		parts = append(parts, fmt.Sprintf("%d opposition%s", s.totalContre, plural(s.totalContre)))
-	}
-	if s.totalAbst > 0 {
-		parts = append(parts, fmt.Sprintf("%d abst.", s.totalAbst))
+	if nonUnanimousCount > 0 {
+		parts = append(parts, fmt.Sprintf("%d délib. non unanime%s", nonUnanimousCount, plural(nonUnanimousCount)))
+		if maxOpposition > 0 {
+			parts = append(parts, fmt.Sprintf("jusqu'à %d voix contre", maxOpposition))
+		}
+	} else {
+		parts = append(parts, "Unanimité totale")
 	}
 	s.voteStats = strings.Join(parts, " / ")
 
@@ -511,6 +512,7 @@ func buildNewsletterPrompt(council *councilRec, delibs []deliberationRec, stats 
 	sb.WriteString("- ENJEU CLÉ : Si le VOTE DES TAUX d'imposition est présent, il doit être le sujet prioritaire.\n")
 	sb.WriteString("- VULGARISATION INDEMNITÉS : Pour les indemnités des élus, explique simplement : 'Le conseil définit légalement la rémunération des élus pour leur travail, selon un barème national basé sur la taille de la ville'.\n")
 	sb.WriteString("- PÉDAGOGIE ET NEUTRALITÉ : Agis en traducteur neutre. Bannis le jargon juridique et administratif. N'utilise aucune formulation partisane, orientée ou de jugement de valeur.\n")
+	sb.WriteString("- ANCRAGE (GROUNDING) : N'ajoute AUCUNE information qui n'est pas présente dans les données d'entrée. Ne fais pas de compliments (ex: 'plus grand club'), n'ajoute pas de faits historiques ou géographiques non mentionnés.\n")
 	sb.WriteString("- CATÉGORISATION STRICTE : Classe la Police et la Vidéoprotection exclusivement dans SÉCURITÉ. Classe tous les clubs sportifs (Dojo, Handball, Foot, etc.) exclusivement dans SPORT.\n")
 	sb.WriteString("- AFFICHAGE CONDITIONNEL : Ne mentionne pas de budget ('0 €') si l'impact est nul. Laisse le champ budget vide.\n")
 	sb.WriteString("- STYLE : Journalistique, actif, précis. Vérifie la concordance sujet-verbe.\n\n")

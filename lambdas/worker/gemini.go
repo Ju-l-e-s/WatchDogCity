@@ -35,6 +35,7 @@ RÈGLES IMPÉRATIVES DE TRAITEMENT :
 3. NEUTRALITÉ ET PÉDAGOGIE :
    - AUCUN JARGON : Bannis le vocabulaire administratif, technocratique ou juridique brut. Si un terme complexe est indispensable (ex: "ZAC", "DSP"), tu DOIS le définir immédiatement en termes simples.
    - OBJECTIVITÉ : Reste factuel. Ne porte aucun jugement de valeur (évite "excellent", "coûteux", "ambitieux").
+   - ANCRAGE (GROUNDING) : N'ajoute AUCUNE information qui n'est pas présente dans le document PDF. Ne fais aucun compliment, n'ajoute aucun fait historique, géographique ou classement (ex: "plus grand club") non mentionné explicitement dans le texte.
    - CLIMAT : "climate_impact" est "positif" uniquement pour des mesures environnementales directes (énergie renouvelable, espaces verts), "negatif" pour des énergies fossiles, sinon "neutre".
 
 Format JSON attendu :

@@ -32,14 +32,19 @@ RÈGLES IMPÉRATIVES DE TRAITEMENT :
    - Décris les conséquences DIRECTES, matérielles ou financières pour les Béglaises et Béglais.
    - REGLE STRICTE : Si la délibération est de nature purement administrative, interne (élections de représentants, création de commissions, frais de mission des élus) ou sans impact tangible sur le quotidien citoyen, la valeur de ce champ DOIT ÊTRE STRICTEMENT la chaîne "Néant". N'invente JAMAIS d'impacts indirects, philosophiques ou théoriques.
 
+3. NEUTRALITÉ ET PÉDAGOGIE :
+   - AUCUN JARGON : Bannis le vocabulaire administratif, technocratique ou juridique brut. Si un terme complexe est indispensable (ex: "ZAC", "DSP"), tu DOIS le définir immédiatement en termes simples.
+   - OBJECTIVITÉ : Reste factuel. Ne porte aucun jugement de valeur (évite "excellent", "coûteux", "ambitieux").
+   - CLIMAT : "climate_impact" est "positif" uniquement pour des mesures environnementales directes (énergie renouvelable, espaces verts), "negatif" pour des énergies fossiles, sinon "neutre".
+
 Format JSON attendu :
 {
   "title": "titre de la délibération (en casse normale)",
   "summary": "résumé factuel en 2 à 3 phrases maximum, vulgarisé pour un citoyen",
   "topic_tag": "Un seul mot parmi cette liste stricte: Budget, Urbanisme, Social, Culture, Environnement, Éducation, Sport, Sécurité, Mobilité, Administration",
-  "is_substantial": true/false,
+  "is_substantial": true, // true uniquement si budget > 1000€ ou modification d'un service public
   "acronyms": {
-    "ACRONYME1": "Définition complète"
+    "ACR": "Définition simple (limite à 3 acronymes max)"
   },
   "analysis_data": {
     "contexte": "Pourquoi ce sujet est sur la table.",
@@ -52,9 +57,8 @@ Format JSON attendu :
   "budget_breakdown": [],
   "climate_impact": "positif/neutre/negatif",
   "key_points": [
-    "point clé 1",
-    "point clé 2",
-    "point clé 3"
+    "point clé 1 (2 à 3 phrases max)",
+    "point clé 2"
   ],
   "vote": {
     "has_vote": true,

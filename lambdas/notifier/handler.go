@@ -27,7 +27,8 @@ var budgetFloatRe = regexp.MustCompile(`("(?:budget_total|total_councils|total_d
 // ── Input event ───────────────────────────────────────────────────────────────
 
 type NotifierEvent struct {
-	CouncilID string `json:"council_id"`
+	CouncilID  string `json:"council_id"`
+	TestListID *int   `json:"test_list_id"`
 }
 
 // ── DynamoDB records (minimal projection) ────────────────────────────────────
@@ -148,6 +149,12 @@ func HandleRequest(ctx context.Context, event NotifierEvent) error {
 }
 
 func (d *notifierDeps) handle(ctx context.Context, event NotifierEvent) error {
+	// Override list ID if provided in event
+	if event.TestListID != nil {
+		d.brevoListID = *event.TestListID
+		log.Printf("OVERRIDE: sending newsletter to test list ID %d", d.brevoListID)
+	}
+
 	council, err := d.fetchCouncil(ctx, event.CouncilID)
 	if err != nil {
 		return fmt.Errorf("fetch council %s: %w", event.CouncilID, err)
@@ -315,6 +322,8 @@ type newsletterStats struct {
 
 func computeNewsletterStats(delibs []deliberationRec) newsletterStats {
 	var s newsletterStats
+	hasIndividualTension := false
+
 	for _, d := range delibs {
 		s.totalBudget += d.BudgetImpact
 		if d.VotePour != nil {
@@ -326,14 +335,25 @@ func computeNewsletterStats(delibs []deliberationRec) newsletterStats {
 		if d.VoteAbst != nil {
 			s.totalAbst += *d.VoteAbst
 		}
+
+		// Aligned with website: detect any individual tension
+		if (d.VoteContre != nil && *d.VoteContre > 0) || (d.Disagreements != nil && *d.Disagreements != "") {
+			hasIndividualTension = true
+		}
 	}
 
-	if s.totalPour+s.totalContre > 0 && float64(s.totalContre)/float64(s.totalPour+s.totalContre) > 0.10 {
-		s.voteClimat = "TENSIONS"
-		s.climatColor = "#DC2626"
+	totalVotes := s.totalPour + s.totalContre + s.totalAbst
+	ratioOpposition := 0.0
+	if totalVotes > 0 {
+		ratioOpposition = float64(s.totalContre+s.totalAbst) / float64(totalVotes)
+	}
+
+	if hasIndividualTension || ratioOpposition > 0.10 {
+		s.voteClimat = "VOTES PARTAGÉS"
+		s.climatColor = "#E11D48" // Rose 600
 	} else {
 		s.voteClimat = "CONSENSUS"
-		s.climatColor = "#059669"
+		s.climatColor = "#059669" // Emerald 600
 	}
 
 	// French locale: space as thousands separator (e.g. "121 451")
@@ -378,156 +398,122 @@ func plural(n int) string {
 func buildNewsletterPrompt(council *councilRec, delibs []deliberationRec, stats newsletterStats, nextMeeting string, totalCouncils, totalDelibs int) string {
 	var sb strings.Builder
 
-	sb.WriteString("Tu es rédacteur de newsletter municipale pour L'Observatoire de Bègles.\n")
+	// --- LOGIQUE DE FILTRAGE (Entonnoir de pertinence) ---
+	var politicalTensions []deliberationRec
+	var majorImpact []deliberationRec
+	var localLife []deliberationRec
+
+	for _, d := range delibs {
+		contre := 0
+		if d.VoteContre != nil {
+			contre = *d.VoteContre
+		}
+		hasDisagreement := d.Disagreements != nil && *d.Disagreements != ""
+		
+		// 1. Priorité Politique (Tensions) : Toujours inclus même pour 1€
+		if contre > 0 || hasDisagreement {
+			politicalTensions = append(politicalTensions, d)
+			continue
+		}
+
+		// 2. Impact Majeur (> 5000€) : Inclus d'office
+		if d.BudgetImpact >= 5000 {
+			majorImpact = append(majorImpact, d)
+			continue
+		}
+
+		// 3. Vie Locale (500€ - 5000€ + Catégories "Plaisir") : Bonus visibilité
+		isPlaisir := d.TopicTag == "SPORT" || d.TopicTag == "CULTURE" || d.TopicTag == "SOCIAL" || d.TopicTag == "SOLIDARITÉ"
+		if d.BudgetImpact >= 500 && isPlaisir {
+			localLife = append(localLife, d)
+			continue
+		}
+		
+		// Le reste (ex: Bureaucratie < 500€ unanime) est considéré comme du "bruit" et exclu de la newsletter.
+	}
+
+	sb.WriteString("Tu es rédacteur en chef de L'Observatoire de Bègles, une newsletter de transparence citoyenne.\n")
 	sb.WriteString("Génère un objet JSON avec EXACTEMENT ce schéma (ne génère aucun texte en dehors) :\n\n")
 	sb.WriteString(`{
-  "email_subject": "accrocheur, < 60 caractères, reflète l'enjeu principal",
+  "email_subject": "accrocheur, < 60 caractères, reflète l'enjeu politique majeur",
   "council_title": "titre complet du conseil municipal",
-  "council_date": "date au format '24 février 2026'",
-  "main_issue": "synthèse éditoriale de 1-2 phrases (25-45 mots) sur l'enjeu politique/social majeur",
+  "council_date": "date au format '24 avril 2026'",
+  "main_issue": "Analyse journalistique (2 à 3 phrases maximum). Pourquoi ce conseil est-il important ? Utilise le pluriel si plusieurs sujets majeurs. Reste strictement neutre et objectif. Aucun jargon administratif.",
   "budget_total": "montant total voté (fourni ci-dessous, copie verbatim)",
-  "vote_climat": "TENSIONS ou CONSENSUS (fourni ci-dessous, copie verbatim)",
+  "vote_climat": "VOTES PARTAGÉS ou CONSENSUS (fourni ci-dessous, copie verbatim)",
   "climat_color": "code hex couleur (fourni ci-dessous, copie verbatim)",
   "vote_stats": "résumé votes (fourni ci-dessous, copie verbatim)",
   "total_delibs_in_council": 0,
   "tensions": [
     {
-      "title": "Titre explicite de la délibération",
-      "context": "Description riche de 35 à 50 mots expliquant l'historique, le problème initial rencontré par la mairie ou l'ambition politique.",
-      "impact": "Description riche de 35 à 50 mots détaillant ce qui change concrètement pour le citoyen, les conséquences financières et la raison des votes d'opposition.",
-      "budget": "X €",
+      "title": "Titre explicite et percutant",
+      "context": "Analyse neutre en 2 à 3 phrases maximum : l'historique du dossier, pourquoi la ville prend cette décision maintenant.",
+      "impact": "Analyse neutre en 2 à 3 phrases maximum : que se passe-t-il concrètement pour le citoyen ? Explication simple, sans jargon. Pourquoi l'opposition a voté contre ?",
+      "budget": "X € (LAISSER VIDE '' SI IMPACT NUL)",
       "vote_details": "Y votes contre"
     }
   ],
   "adopted": [
     {
-      "tag": "ADMINISTRATION, MOBILITÉ, SÉCURITÉ, ENVIRONNEMENT ou CULTURE",
-      "title": "Titre explicite de la délibération",
-      "context": "Description riche de 35 à 50 mots expliquant le 'Pourquoi' (besoin municipal, cadre légal, urgence locale).",
-      "impact": "Description riche de 35 à 50 mots décrivant le 'Concrètement' (ce qui va changer physiquement, financièrement ou socialement pour les Béglais).",
-      "budget": "X €"
+      "tag": "ADMINISTRATION, SPORT, FINANCES, SÉCURITÉ, ENVIRONNEMENT, MOBILITÉ, SOLIDARITÉ ou CULTURE",
+      "title": "Titre vulgarisé",
+      "context": "2 à 3 phrases maximum. Pourquoi ? Explication factuelle et pédagogique du besoin.",
+      "impact": "2 à 3 phrases maximum. Concrètement ? Conséquence directe sur le quotidien, sans jargon.",
+      "budget": "X € (LAISSER VIDE '' SI IMPACT NUL)"
     }
   ],
   "briefs": [
     {
-      "tag": "ADMINISTRATION, MOBILITÉ, SÉCURITÉ, ENVIRONNEMENT ou CULTURE",
-      "summary": "Résumé ultra-court (max 15 mots) d'une autre délibération intéressante."
+      "tag": "Catégorie exacte",
+      "summary": "Résumé ultra-court (1 à 2 phrases) focalisé sur l'essentiel, factuel et neutre."
     }
   ],
-  "next_meeting": "Mardi 21 avril 2026, à 18h30 (fourni ci-dessous, copie verbatim)",
+  "next_meeting": "Date du prochain conseil (fourni ci-dessous, copie verbatim)",
   "website_url": "https://lobservatoiredebegles.fr",
   "total_councils": 13,
   "total_delibs": 83
 }`)
 
-	sb.WriteString("\n\nCONSIGNES ÉDITORIALES CRUCIALES :\n")
-	sb.WriteString("- NE DIS PAS : 'Installation de mâts LED pour la sécurité.'\n")
-	sb.WriteString("- DIS PLUTÔT : 'Face à l'augmentation des trajets nocturnes et aux demandes répétées des associations de cyclistes concernant le manque de visibilité sur l'axe principal, la ville a décidé de sécuriser le tronçon du Réseau Express Vélos reliant le centre à Villenave.'\n")
-	sb.WriteString("- Chaque champ 'context' et 'impact' DOIT faire entre 35 et 50 mots. Sois précis et factuel.\n")
-	sb.WriteString("- La section 'briefs' doit contenir 3 à 5 éléments maximum, choisis parmi les délibérations non citées plus haut.\n")
-	sb.WriteString("- Utilise un ton journalistique neutre mais engagé pour la transparence.\n\n")
+	sb.WriteString("\n\nCONSIGNES ÉDITORIALES ET LOGIQUES :\n")
+	sb.WriteString("- PRIORITÉ ABSOLUE : Toute délibération avec des votes contre ou abstentions DOIT figurer dans 'tensions', quel que soit son montant financier.\n")
+	sb.WriteString("- ENJEU CLÉ : Si le VOTE DES TAUX d'imposition est présent, il doit être le sujet prioritaire.\n")
+	sb.WriteString("- VULGARISATION INDEMNITÉS : Pour les indemnités des élus, explique simplement : 'Le conseil définit légalement la rémunération des élus pour leur travail, selon un barème national basé sur la taille de la ville'.\n")
+	sb.WriteString("- PÉDAGOGIE ET NEUTRALITÉ : Agis en traducteur neutre. Bannis le jargon juridique et administratif. N'utilise aucune formulation partisane, orientée ou de jugement de valeur.\n")
+	sb.WriteString("- CATÉGORISATION STRICTE : Classe la Police et la Vidéoprotection exclusivement dans SÉCURITÉ. Classe tous les clubs sportifs (Dojo, Handball, Foot, etc.) exclusivement dans SPORT.\n")
+	sb.WriteString("- AFFICHAGE CONDITIONNEL : Ne mentionne pas de budget ('0 €') si l'impact est nul. Laisse le champ budget vide.\n")
+	sb.WriteString("- STYLE : Journalistique, actif, précis. Vérifie la concordance sujet-verbe.\n\n")
+
 	fmt.Fprintf(&sb, "DONNÉES D'ENTRÉE :\n")
-	fmt.Fprintf(&sb, "- Nombre total de délibérations ce jour : %d (copie verbatim dans total_delibs_in_council)\n", len(delibs))
-	fmt.Fprintf(&sb, "- Conseil : %s du %s\n", council.Title, council.Date)
-	fmt.Fprintf(&sb, "- budget_total (copie verbatim) : %s\n", stats.budgetFmt)
-	fmt.Fprintf(&sb, "- vote_climat (copie verbatim) : %s\n", stats.voteClimat)
-	fmt.Fprintf(&sb, "- climat_color (copie verbatim) : %s\n", stats.climatColor)
-	fmt.Fprintf(&sb, "- vote_stats (copie verbatim) : %s\n", stats.voteStats)
-	fmt.Fprintf(&sb, "- next_meeting (copie verbatim) : %s\n", nextMeeting)
-	fmt.Fprintf(&sb, "- total_councils (copie verbatim) : %d\n", totalCouncils)
-	fmt.Fprintf(&sb, "- total_delibs (copie verbatim) : %d\n\n", totalDelibs)
+	fmt.Fprintf(&sb, "- Nombre total de délibérations ce jour : %d\n", len(delibs))
+	fmt.Fprintf(&sb, "- budget_total : %s\n", stats.budgetFmt)
+	fmt.Fprintf(&sb, "- vote_climat : %s\n", stats.voteClimat)
+	fmt.Fprintf(&sb, "- vote_stats : %s\n", stats.voteStats)
+	fmt.Fprintf(&sb, "- next_meeting : %s\n", nextMeeting)
+	fmt.Fprintf(&sb, "- total_councils : %d\n", totalCouncils)
+	fmt.Fprintf(&sb, "- total_delibs : %d\n\n", totalDelibs)
 
-	// Délibérations avec opposition ou désaccords → tensions[]
-	sb.WriteString("DÉLIBÉRATIONS AVEC OPPOSITION (pour le champ tensions[]) :\n")
-	hasTension := false
-	for _, d := range delibs {
+	// Injecter les tensions
+	sb.WriteString("\nDÉLIBÉRATIONS AVEC OPPOSITION (A METTRE DANS tensions[]) :\n")
+	for _, d := range politicalTensions {
 		contre := 0
-		if d.VoteContre != nil {
-			contre = *d.VoteContre
-		}
-		hasDisagreement := d.Disagreements != nil && *d.Disagreements != ""
-		if contre > 0 || hasDisagreement {
-			hasTension = true
-			fmt.Fprintf(&sb, "- Titre: %s\n", d.Title)
-			fmt.Fprintf(&sb, "  Tag: %s | Budget: %d €\n", d.TopicTag, d.BudgetImpact)
-			fmt.Fprintf(&sb, "  Résumé: %s\n", d.Summary)
-			if d.AnalysisData.Contexte != nil {
-				fmt.Fprintf(&sb, "  Contexte: %s\n", *d.AnalysisData.Contexte)
-			}
-			if d.AnalysisData.Impacts != nil {
-				fmt.Fprintf(&sb, "  Impacts: %s\n", *d.AnalysisData.Impacts)
-			}
-			pour := 0
-			if d.VotePour != nil {
-				pour = *d.VotePour
-			}
-			abst := 0
-			if d.VoteAbst != nil {
-				abst = *d.VoteAbst
-			}
-			fmt.Fprintf(&sb, "  Vote: %d pour / %d contre / %d abst.\n", pour, contre, abst)
-			if hasDisagreement {
-				fmt.Fprintf(&sb, "  Désaccords: %s\n", *d.Disagreements)
-			}
-			sb.WriteString("\n")
-		}
+		if d.VoteContre != nil { contre = *d.VoteContre }
+		abst := 0
+		if d.VoteAbst != nil { abst = *d.VoteAbst }
+		pour := 0
+		if d.VotePour != nil { pour = *d.VotePour }
+		dis := "aucun"
+		if d.Disagreements != nil { dis = *d.Disagreements }
+		
+		fmt.Fprintf(&sb, "- %s | Budget: %d€ | Vote: %d/%d/%d | Désaccords: %s\n", d.Title, d.BudgetImpact, pour, contre, abst, dis)
 	}
-	if !hasTension {
-		sb.WriteString("(aucune délibération avec opposition)\n\n")
-	}
+	if len(politicalTensions) == 0 { sb.WriteString("(néant)\n") }
 
-	// Délibérations adoptées significatives → adopted[]
-	sb.WriteString("DÉLIBÉRATIONS ADOPTÉES (pour le champ adopted[], max 5 les plus significatives) :\n")
-	adoptedCount := 0
-	for _, d := range delibs {
-		contre := 0
-		if d.VoteContre != nil {
-			contre = *d.VoteContre
-		}
-		if contre == 0 && d.BudgetImpact > 0 && adoptedCount < 8 {
-			fmt.Fprintf(&sb, "- Titre: %s\n", d.Title)
-			fmt.Fprintf(&sb, "  Tag: %s | Budget: %d €\n", d.TopicTag, d.BudgetImpact)
-			fmt.Fprintf(&sb, "  Résumé: %s\n", d.Summary)
-			if d.AnalysisData.Impacts != nil {
-				fmt.Fprintf(&sb, "  Impacts: %s\n", *d.AnalysisData.Impacts)
-			}
-			sb.WriteString("\n")
-			adoptedCount++
-		}
+	// Injecter les impacts majeurs et vie locale
+	sb.WriteString("\nDÉLIBÉRATIONS ADOPTÉES SIGNIFICATIVES (A FILTRER POUR adopted[] et briefs[]) :\n")
+	allSignificant := append(majorImpact, localLife...)
+	for _, d := range allSignificant {
+		fmt.Fprintf(&sb, "- %s | Tag: %s | Budget: %d€ | Résumé: %s\n", d.Title, d.TopicTag, d.BudgetImpact, d.Summary)
 	}
-	if adoptedCount == 0 {
-		sb.WriteString("(aucune délibération adoptée avec budget)\n\n")
-	}
-
-	// Délibérations restantes → briefs[]
-	sb.WriteString("AUTRES DÉLIBÉRATIONS (pour le champ briefs[], 3 à 4 éléments parmi celles non citées ci-dessus) :\n")
-	briefCount := 0
-	for _, d := range delibs {
-		contre := 0
-		if d.VoteContre != nil {
-			contre = *d.VoteContre
-		}
-		hasDisagreement := d.Disagreements != nil && *d.Disagreements != ""
-		alreadyCited := (contre > 0 || hasDisagreement) || (contre == 0 && d.BudgetImpact > 0 && briefCount < 8)
-		_ = alreadyCited
-		// Include delibs with no budget and no opposition — the "long tail"
-		if contre == 0 && d.BudgetImpact == 0 && briefCount < 6 {
-			fmt.Fprintf(&sb, "- Titre: %s | Tag: %s\n", d.Title, d.TopicTag)
-			fmt.Fprintf(&sb, "  Résumé: %s\n\n", d.Summary)
-			briefCount++
-		}
-	}
-	if briefCount == 0 {
-		// Fallback: pick from any remaining delibs not already in tensions/adopted
-		sb.WriteString("(utilise les délibérations listées ci-dessus pour générer les briefs)\n\n")
-	}
-
-	sb.WriteString("RÈGLES ÉDITORIALES :\n")
-	sb.WriteString("- Langage citoyen vulgarisé, concret, accessible\n")
-	sb.WriteString("- tensions[]: uniquement les délibérations listées ci-dessus avec opposition\n")
-	sb.WriteString("- adopted[]: sélectionne les 5 plus impactantes (budget ou impact citoyen fort)\n")
-	sb.WriteString("- Pour budget dans tensions[]/adopted[], formate en '45 451 €' (espaces comme séparateurs de milliers)\n")
-	sb.WriteString("- Ne génère aucun texte en dehors de l'objet JSON\n")
 
 	return sb.String()
 }

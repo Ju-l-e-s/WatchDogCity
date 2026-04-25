@@ -220,13 +220,22 @@ function render() {
             councilLegendHtml += '</div>';
         }
 
-        // Calculate vote climate from individual deliberations (more accurate than council-level AI estimate)
+        // Calculate vote climate from individual deliberations
         const allDelibs = council.deliberations || [];
         const votedDelibs = allDelibs.filter(d => d.vote && (d.vote.has_vote || d.vote.pour != null || d.vote.contre != null));
         const unanimousDelibs = votedDelibs.filter(d => (d.vote.contre || 0) === 0 && (d.vote.abstention || 0) === 0);
         const abstentionDelibs = votedDelibs.filter(d => (d.vote.contre || 0) === 0 && (d.vote.abstention || 0) > 0);
         const oppositionDelibs = votedDelibs.filter(d => (d.vote.contre || 0) > 0);
-        const isConsensus = oppositionDelibs.length === 0;
+        
+        // Stricter logic: Tension if any opposition OR ratio > 10%
+        let totalVotes = 0, totalOpposition = 0;
+        votedDelibs.forEach(d => {
+            totalVotes += (d.vote.pour || 0) + (d.vote.contre || 0) + (d.vote.abstention || 0);
+            totalOpposition += (d.vote.contre || 0) + (d.vote.abstention || 0);
+        });
+        const ratio = totalVotes > 0 ? totalOpposition / totalVotes : 0;
+        const isConsensus = oppositionDelibs.length === 0 && ratio <= 0.10;
+        
         const hasVotesFromDelibs = votedDelibs.length > 0;
 
         let analysisHtml = "";
@@ -244,7 +253,7 @@ function render() {
                     const iconSvg = isConsensus
                         ? `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`
                         : `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>`;
-                    const labelText = isConsensus ? "CONSENSUS" : "TENSIONS";
+                    const labelText = isConsensus ? "CONSENSUS" : "VOTES PARTAGÉS";
 
                     // Summary stats line
                     let summaryParts = [`<span class="font-bold text-slate-700">${votedDelibs.length}</span> délibération${votedDelibs.length > 1 ? "s" : ""} votée${votedDelibs.length > 1 ? "s" : ""}`];
@@ -327,7 +336,7 @@ function renderDeliberationRow(e) {
         let badgeClasses = 'bg-slate-100 text-slate-700 border-slate-200';
         let icon = '💰';
         let prefix = '';
-        if (e.budget_type === 'DÉPENSE') { badgeClasses = 'bg-rose-50 text-rose-700 border-rose-200'; icon = '🔴'; prefix = '-'; }
+        if (e.budget_type === 'DÉPENSE') { badgeClasses = 'bg-slate-50 text-slate-600 border-slate-200'; icon = '💰'; prefix = ''; }
         else if (e.budget_type === 'RECETTE') { badgeClasses = 'bg-emerald-50 text-emerald-700 border-emerald-200'; icon = '🟢'; prefix = '+'; }
         else if (e.budget_type === 'CAUTION') { badgeClasses = 'bg-amber-50 text-amber-700 border-amber-200'; icon = '🟠'; }
         budgetBadge = `<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold ${badgeClasses} border ml-2 shadow-sm">${icon} ${prefix}${e.budget_impact.toLocaleString('fr-FR')} €</span>`;
@@ -343,8 +352,8 @@ function renderDeliberationRow(e) {
         
             switch (e.budget_type) {
                 case 'DÉPENSE':
-                    badgeClasses = 'text-rose-700 bg-rose-50 border-rose-200';
-                    icon = '🔴';
+                    badgeClasses = 'text-slate-600 bg-slate-50 border-slate-200';
+                    icon = '💰';
                     break;
                 case 'RECETTE':
                     badgeClasses = 'text-emerald-700 bg-emerald-50 border-emerald-200';

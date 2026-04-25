@@ -310,12 +310,26 @@ func (d *notifierDeps) generateNewsletterParams(ctx context.Context, council *co
 	params.EmailSubject = "L'Essentiel du Conseil"
 	params.WebsiteURL = "https://lobservatoiredebegles.fr"
 
-	// Post-process flags for template logic
+	// Post-process flags and formatting for template logic
 	params.HasGlobalBudget = params.BudgetTotal != "" && params.BudgetTotal != "0"
+	
+	// Ensure thousands separators in individual budgets (Gemini sometimes forgets)
+	reDigit := regexp.MustCompile(`\d+`)
+	formatStr := func(s string) string {
+		if s == "" { return "" }
+		numStr := reDigit.FindString(s)
+		if numStr == "" { return s }
+		var val int64
+		fmt.Sscanf(numStr, "%d", &val)
+		return formatBudgetFR(val)
+	}
+
 	for i := range params.Tensions {
+		params.Tensions[i].Budget = formatStr(params.Tensions[i].Budget)
 		params.Tensions[i].HasBudget = params.Tensions[i].Budget != ""
 	}
 	for i := range params.Adopted {
+		params.Adopted[i].Budget = formatStr(params.Adopted[i].Budget)
 		params.Adopted[i].HasBudget = params.Adopted[i].Budget != ""
 	}
 

@@ -29,3 +29,9 @@ bootstrap
 
 # Frontend generated assets
 frontend/style.css
+
+# Local data and temporary scripts
+dynamo_councils.txt
+publisher_*.json
+purge_april.py
+remote_data*.json

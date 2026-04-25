@@ -1,6 +1,6 @@
 # Bègles Watchdog - Maintenance Makefile
 
-.PHONY: build deploy test logs-orchestrator logs-worker logs-publisher logs-notifier clean update-data
+.PHONY: build build-frontend verify-frontend preflight deploy test logs-orchestrator logs-worker logs-publisher logs-notifier clean update-data
 
 # --- Déploiement ---
 build:
@@ -30,7 +30,27 @@ build:
 	cd lambdas/notifier && go mod tidy && GOOS=linux GOARCH=arm64 go build -o bootstrap .
 	cd lambdas/notifier && zip -j ../../dist/notifier.zip bootstrap && rm bootstrap
 
-deploy: build
+build-frontend:
+	cd frontend && npm run build
+
+verify-frontend:
+	@for f in frontend/index.html frontend/app.js frontend/style.css frontend/merci.html frontend/data.json; do \
+		if [ ! -s "$$f" ]; then \
+			echo "ERROR: $$f is missing or empty — aborting" >&2 ; \
+			exit 1 ; \
+		fi ; \
+	done
+	@echo "Frontend assets verified."
+
+preflight: verify-frontend
+	@if [ -z "$$ACM_CERTIFICATE_ARN" ]; then \
+		echo "ERROR: ACM_CERTIFICATE_ARN is not set — refusing to deploy CDK." >&2 ; \
+		echo "       Export it: export ACM_CERTIFICATE_ARN=arn:aws:acm:us-east-1:..." >&2 ; \
+		exit 1 ; \
+	fi
+	@echo "Preflight OK — ACM_CERTIFICATE_ARN is set, frontend assets present."
+
+deploy: preflight build
 	cd cdk && cdk deploy --require-approval never
 
 # --- Tests & Diagnostics ---

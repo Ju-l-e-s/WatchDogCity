@@ -69,13 +69,21 @@ class WatchdogStack(Stack):
         )
 
         # ── CloudFront Distribution ───────────────────────────────────────
+        # ACM cert is REQUIRED. Deploying without it removes the aliases on the
+        # existing distribution and breaks the lobservatoiredebegles.fr alias
+        # (CloudFront returns 403 for unknown SNI). Fail loudly instead.
         acm_certificate_arn = os.environ.get("ACM_CERTIFICATE_ARN")
+        if not acm_certificate_arn:
+            raise RuntimeError(
+                "ACM_CERTIFICATE_ARN env var is required. "
+                "Refusing to deploy CloudFront without an ACM certificate — "
+                "doing so would strip the aliases and 403 the production domain. "
+                "Export ACM_CERTIFICATE_ARN before running cdk deploy."
+            )
+
         domain_name = os.environ.get("DOMAIN_NAME", "lobservatoiredebegles.fr")
         domain_names = [domain_name, f"www.{domain_name}"]
-
-        cert = None
-        if acm_certificate_arn:
-            cert = acm.Certificate.from_certificate_arn(self, "WebsiteCert", acm_certificate_arn)
+        cert = acm.Certificate.from_certificate_arn(self, "WebsiteCert", acm_certificate_arn)
 
         distribution = cloudfront.Distribution(
             self, "WebsiteDistribution",
@@ -85,7 +93,7 @@ class WatchdogStack(Stack):
                 compress=True, # Active GZIP et Brotli automatiquement
             ),
             default_root_object="index.html",
-            domain_names=domain_names if cert else None,
+            domain_names=domain_names,
             certificate=cert,
         )
 

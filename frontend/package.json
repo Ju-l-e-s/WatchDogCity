@@ -4,6 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "build": "tailwindcss -i input.css -o style.css -m && node verify-build.js",
+    "verify": "node verify-build.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

@@ -48,21 +48,22 @@ jobs:
 
       - name: Build Frontend
         run: |
+          set -euo pipefail
           cd frontend
-          # Build CSS
-          ./node_modules/.bin/tailwindcss -i input.css -o style.css -m
-          
-          # Verify CSS was generated
-          if [ ! -s style.css ]; then echo "style.css is empty" && exit 1; fi
+          npm run build
 
-          # Minify JS
-          ./node_modules/.bin/terser app.js --compress --mangle --output app.js
-          
-          # Hash assets for cache busting
-          node build.js
-          
-          # Minify HTML
-          ./node_modules/.bin/html-minifier-terser index.html --collapse-whitespace --remove-comments --minify-js true --output index.html
+      - name: Pre-deploy guard (fail-fast)
+        run: |
+          set -euo pipefail
+          # Block any deploy if critical assets are missing or empty.
+          # Prevents the "destructive sync of an empty dir" failure mode.
+          for f in frontend/index.html frontend/app.js frontend/style.css frontend/merci.html frontend/data.json; do
+            if [ ! -s "$f" ]; then
+              echo "::error file=$f::missing or empty — aborting deploy"
+              exit 1
+            fi
+          done
+          echo "All critical frontend assets present and non-empty."
 
       - name: Test Lambdas
         run: make test
@@ -70,8 +71,19 @@ jobs:
       - name: Build Lambdas
         run: make build
 
+      - name: Verify ACM certificate ARN
+        run: |
+          if [ -z "${ACM_CERTIFICATE_ARN:-}" ]; then
+            echo "::error::ACM_CERTIFICATE_ARN is empty — refusing to deploy CloudFront without TLS cert (would break aliases)."
+            exit 1
+          fi
+          echo "ACM_CERTIFICATE_ARN is set."
+        env:
+          ACM_CERTIFICATE_ARN: ${{ secrets.ACM_CERTIFICATE_ARN }}
+
       - name: Deploy to AWS
         run: |
+          set -euo pipefail
           cd cdk
           source .venv/bin/activate
           cdk deploy --all --require-approval never

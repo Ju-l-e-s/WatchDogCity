@@ -179,6 +179,12 @@ func parseGeminiResponse(raw string) (*GeminiResult, error) {
 	// but our struct expects int64 — truncate the decimal part.
 	raw = budgetAmountFloatRe.ReplaceAllString(raw, "${1}${2}")
 
+	// Fix common Gemini JSON hallucinations: closing arrays with } or ) instead of ]
+	raw = strings.ReplaceAll(raw, "\n  },", "\n  ],")
+	raw = strings.ReplaceAll(raw, "\n  ),", "\n  ],")
+	raw = strings.ReplaceAll(raw, "\t},", "\t],")
+	raw = strings.ReplaceAll(raw, "\t),", "\t],")
+
 	var res GeminiResult
 	if err := json.Unmarshal([]byte(raw), &res); err != nil {
 		return nil, fmt.Errorf("unmarshal gemini json: %w (raw: %s)", err, raw)

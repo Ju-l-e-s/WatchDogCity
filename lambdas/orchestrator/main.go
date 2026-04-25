@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-lambda-go/lambda"
@@ -71,18 +72,24 @@ func handler(ctx context.Context, event OrchestratorEvent) error {
 			return fmt.Errorf("get item %s: %w", council.CouncilID, err)
 		}
 		if existing.Item != nil {
-			log.Printf("council %s already processed, updating summary only", council.CouncilID)
-			_, _ = ddb.UpdateItem(ctx, &dynamodb.UpdateItemInput{
-				TableName: aws.String(os.Getenv("COUNCILS_TABLE")),
-				Key: map[string]types.AttributeValue{
-					"council_id": &types.AttributeValueMemberS{Value: council.CouncilID},
-				},
-				UpdateExpression: aws.String("SET summary = :s"),
-				ExpressionAttributeValues: map[string]types.AttributeValue{
-					":s": &types.AttributeValueMemberS{Value: council.Summary},
-				},
-			})
-			continue
+			processed := attrInt(existing.Item, "processed_pdfs")
+			total := attrInt(existing.Item, "total_pdfs")
+
+			if processed >= total && total > 0 {
+				log.Printf("council %s already processed, updating summary only", council.CouncilID)
+				_, _ = ddb.UpdateItem(ctx, &dynamodb.UpdateItemInput{
+					TableName: aws.String(os.Getenv("COUNCILS_TABLE")),
+					Key: map[string]types.AttributeValue{
+						"council_id": &types.AttributeValueMemberS{Value: council.CouncilID},
+					},
+					UpdateExpression: aws.String("SET summary = :s"),
+					ExpressionAttributeValues: map[string]types.AttributeValue{
+						":s": &types.AttributeValueMemberS{Value: council.Summary},
+					},
+				})
+				continue
+			}
+			log.Printf("council %s is incomplete (%d/%d), forcing rescan", council.CouncilID, processed, total)
 		}
 
 		// Nouveau conseil détecté ! Téléchargement de tous les PDF
@@ -96,6 +103,24 @@ func handler(ctx context.Context, event OrchestratorEvent) error {
 			continue
 		}
 
+		// Query existing processed PDFs
+		processedSet := make(map[string]bool)
+		qOutput, err := ddb.Query(ctx, &dynamodb.QueryInput{
+			TableName:              aws.String(os.Getenv("DELIBERATIONS_TABLE")),
+			IndexName:              aws.String("council_id-index"),
+			KeyConditionExpression: aws.String("council_id = :cid"),
+			ExpressionAttributeValues: map[string]types.AttributeValue{
+				":cid": &types.AttributeValueMemberS{Value: council.CouncilID},
+			},
+		})
+		if err == nil {
+			for _, pitem := range qOutput.Items {
+				if idAttr, ok := pitem["id"].(*types.AttributeValueMemberS); ok {
+					processedSet[idAttr.Value] = true
+				}
+			}
+		}
+
 		// Sauvegarde des métadonnées du conseil
 		item, err := attributevalue.MarshalMap(map[string]interface{}{
 			"council_id":     council.CouncilID,
@@ -105,7 +130,7 @@ func handler(ctx context.Context, event OrchestratorEvent) error {
 			"summary":        council.Summary,
 			"source_url":     council.URL,
 			"total_pdfs":     len(pdfs),
-			"processed_pdfs": 0,
+			"processed_pdfs": len(processedSet),
 			"created_at":     time.Now().UTC().Format(time.RFC3339),
 		})
 		if err != nil {
@@ -120,8 +145,13 @@ func handler(ctx context.Context, event OrchestratorEvent) error {
 			return fmt.Errorf("put council: %w", err)
 		}
 
-		// Envoi de chaque PDF vers le Worker via SQS
+		queuedCount := 0
+		// Envoi de chaque PDF manquant vers le Worker via SQS
 		for _, pdf := range pdfs {
+			if processedSet[deliberationID(pdf.URL)] {
+				continue
+			}
+
 			msg := SQSMessage{
 				CouncilID: council.CouncilID,
 				PDFTitle:  pdf.Title,
@@ -135,9 +165,11 @@ func handler(ctx context.Context, event OrchestratorEvent) error {
 			})
 			if err != nil {
 				log.Printf("error sending msg to SQS: %v", err)
+			} else {
+				queuedCount++
 			}
 		}
-		log.Printf("Queued %d PDFs for council %s", len(pdfs), council.Title)
+		log.Printf("Queued %d new PDFs for council %s (already processed: %d/%d)", queuedCount, council.Title, len(processedSet), len(pdfs))
 	}
 
 	return nil
@@ -154,6 +186,22 @@ func updateNextCouncilMetadata(ctx context.Context, ddb *dynamodb.Client, nextDa
 		TableName: aws.String(os.Getenv("COUNCILS_TABLE")),
 		Item:      item,
 	})
+}
+
+func attrInt(m map[string]types.AttributeValue, key string) int {
+	if val, ok := m[key]; ok {
+		if n, ok := val.(*types.AttributeValueMemberN); ok {
+			var i int
+			fmt.Sscanf(n.Value, "%d", &i)
+			return i
+		}
+	}
+	return 0
+}
+
+func deliberationID(url string) string {
+	parts := strings.Split(url, "/")
+	return parts[len(parts)-1]
 }
 
 func main() {

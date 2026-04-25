@@ -24,6 +24,7 @@ import (
 type DynamoDBAPI interface {
 	PutItem(ctx context.Context, params *dynamodb.PutItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.PutItemOutput, error)
 	UpdateItem(ctx context.Context, params *dynamodb.UpdateItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.UpdateItemOutput, error)
+	GetItem(ctx context.Context, params *dynamodb.GetItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.GetItemOutput, error)
 }
 
 type LambdaAPI interface {
@@ -52,21 +53,41 @@ func (h *WorkerHandler) HandleRequest(ctx context.Context, event events.SQSEvent
 			continue
 		}
 
+		id := deliberationID(msg.PDFURL)
+		
+		// 0. Idempotence Check
+		existing, err := h.ddb.GetItem(ctx, &dynamodb.GetItemInput{
+			TableName: aws.String(os.Getenv("DELIBERATIONS_TABLE")),
+			Key: map[string]types.AttributeValue{
+				"id": &types.AttributeValueMemberS{Value: id},
+			},
+		})
+		if err != nil {
+			log.Printf("error checking idempotence for %s: %v", id, err)
+			return err
+		}
+		if existing.Item != nil {
+			if _, ok := existing.Item["analysis_data"]; ok {
+				log.Printf("deliberation %s already analyzed, skipping gracefully", id)
+				continue
+			}
+		}
+
 		pdfBytes, err := downloadPDF(msg.PDFURL)
 		if err != nil {
 			log.Printf("error downloading PDF %s: %v", msg.PDFURL, err)
-			continue
+			return err
 		}
 
 		result, err := analyzeWithGemini(ctx, apiKey, pdfBytes)
 		if err != nil {
 			log.Printf("error analyzing with Gemini: %v", err)
-			continue
+			return err
 		}
 
 		if err := h.handleRecord(ctx, msg, result); err != nil {
 			log.Printf("error handling record: %v", err)
-			continue
+			return err
 		}
 	}
 	return nil

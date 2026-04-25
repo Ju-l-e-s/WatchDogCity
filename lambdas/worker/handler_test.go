@@ -24,6 +24,10 @@ func (m *mockDDB) PutItem(_ context.Context, params *dynamodb.PutItemInput, _ ..
 	return &dynamodb.PutItemOutput{}, m.putItemErr
 }
 
+func (m *mockDDB) GetItem(_ context.Context, params *dynamodb.GetItemInput, _ ...func(*dynamodb.Options)) (*dynamodb.GetItemOutput, error) {
+	return &dynamodb.GetItemOutput{}, nil
+}
+
 func (m *mockDDB) UpdateItem(_ context.Context, params *dynamodb.UpdateItemInput, _ ...func(*dynamodb.Options)) (*dynamodb.UpdateItemOutput, error) {
 	if m.updateItemOut != nil {
 		return m.updateItemOut, m.updateItemErr

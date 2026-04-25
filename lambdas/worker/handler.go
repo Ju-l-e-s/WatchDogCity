@@ -107,6 +107,7 @@ func (h *WorkerHandler) handleRecord(ctx context.Context, msg SQSPayload, result
 		"is_substantial":   result.IsSubstantial,
 		"analysis_data":    result.AnalysisData,
 		"budget_impact":    result.BudgetImpact,
+		"budget_type":      result.BudgetType,
 		"budget_breakdown": result.BudgetBreakdown,
 		"climate_impact":   result.ClimateImpact,
 		"key_points":       result.KeyPoints,
@@ -143,9 +144,10 @@ func (h *WorkerHandler) handleRecord(ctx context.Context, msg SQSPayload, result
 			Key: map[string]types.AttributeValue{
 				"id": &types.AttributeValueMemberS{Value: id},
 			},
-			UpdateExpression: aws.String("SET budget_impact = :bi, budget_breakdown = :bb"),
+			UpdateExpression: aws.String("SET budget_impact = :bi, budget_type = :bt, budget_breakdown = :bb"),
 			ExpressionAttributeValues: map[string]types.AttributeValue{
 				":bi": &types.AttributeValueMemberN{Value: strconv.FormatInt(result.BudgetImpact, 10)},
+				":bt": &types.AttributeValueMemberS{Value: result.BudgetType},
 				":bb": breakdownVal,
 			},
 		})

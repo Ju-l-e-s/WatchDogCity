@@ -322,18 +322,67 @@ function renderDeliberationRow(e) {
           i = highlightText(e.topic_tag || "Délibération", searchQuery);
     
     // Badge budgétaire pour Option C
-    const budgetBadge = e.budget_impact > 0 
-        ? `<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-100 ml-2 shadow-sm">💰 ${e.budget_impact.toLocaleString('fr-FR')} €</span>` 
-        : "";
-
+    let budgetBadge = '';
+    if (e.budget_impact > 0) {
+        let badgeClasses = 'bg-slate-100 text-slate-700 border-slate-200';
+        let icon = '💰';
+        let prefix = '';
+        if (e.budget_type === 'DÉPENSE') { badgeClasses = 'bg-rose-50 text-rose-700 border-rose-200'; icon = '🔴'; prefix = '-'; }
+        else if (e.budget_type === 'RECETTE') { badgeClasses = 'bg-emerald-50 text-emerald-700 border-emerald-200'; icon = '🟢'; prefix = '+'; }
+        else if (e.budget_type === 'CAUTION') { badgeClasses = 'bg-amber-50 text-amber-700 border-amber-200'; icon = '🟠'; }
+        budgetBadge = `<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold ${badgeClasses} border ml-2 shadow-sm">${icon} ${prefix}${e.budget_impact.toLocaleString('fr-FR')} €</span>`;
+    }
     let c = "";
     if (e.analysis_data) {
         // Détail budgétaire dans Éclairage pour Option C
-        const budgetDetail = e.budget_impact > 0 
-            ? `<div class="mb-6"><p class="text-[11px] font-semibold text-amber-600 uppercase tracking-widest mb-1.5">Impact Financier</p><p class="text-[15px] text-slate-600 font-bold">Le montant alloué pour cette délibération est de ${e.budget_impact.toLocaleString('fr-FR')} €.</p></div>`
-            : "";
+        let budgetDetail = '';
+        if (e.budget_impact > 0) {
+            let badgeClasses = 'text-slate-600 bg-slate-100 border-slate-200'; // Fallback
+            let icon = '💰';
+            let typeLabel = e.budget_type || '';
+        
+            switch (e.budget_type) {
+                case 'DÉPENSE':
+                    badgeClasses = 'text-rose-700 bg-rose-50 border-rose-200';
+                    icon = '🔴';
+                    break;
+                case 'RECETTE':
+                    badgeClasses = 'text-emerald-700 bg-emerald-50 border-emerald-200';
+                    icon = '🟢';
+                    break;
+                case 'CAUTION':
+                    badgeClasses = 'text-amber-700 bg-amber-50 border-amber-200';
+                    icon = '🟠';
+                    break;
+            }
+        
+            const typeHtml = typeLabel ? `<span class="opacity-75 ml-1 hidden sm:inline">(${typeLabel.toLowerCase()})</span>` : '';
+            
+            budgetDetail = `
+                <div class="mb-6">
+                    <p class="text-[11px] font-semibold text-brand-600 uppercase tracking-widest mb-1.5">Impact Financier</p>
+                    <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded border ${badgeClasses} text-[13px] font-bold shadow-sm">
+                        <span>${icon}</span>
+                        <span>${e.budget_impact.toLocaleString('fr-FR')} €</span>
+                        ${typeHtml}
+                    </div>
+                </div>
+            `;
+        }
 
-        const sections = [{ label: "Contexte", content: e.analysis_data.contexte }, { label: "Décision prise", content: e.analysis_data.decision }, { label: "Impacts concrets", content: e.analysis_data.impacts }, { label: "Points de controverse", content: e.analysis_data.points_debattus }].filter(e => e.content && "null" !== e.content).map(t => `<div class="mb-6 last:mb-0"><p class="text-[11px] font-semibold text-brand-600 uppercase tracking-widest mb-1.5">${escapeHTML(t.label)}</p><p class="text-[15px] text-slate-500 leading-relaxed">${highlightText(t.content, searchQuery, e.acronyms)}</p></div>`).join("");
+        let impactsHtml = '';
+        // On masque silencieusement si l'IA a retourné "Néant"
+        if (e.analysis_data.impacts && e.analysis_data.impacts.toLowerCase() !== 'néant' && e.analysis_data.impacts !== 'null') {
+            impactsHtml = `<div class="mb-6 last:mb-0"><p class="text-[11px] font-semibold text-brand-600 uppercase tracking-widest mb-1.5">Impacts concrets</p><p class="text-[15px] text-slate-500 leading-relaxed">${highlightText(e.analysis_data.impacts, searchQuery, e.acronyms)}</p></div>`;
+        }
+
+        const otherSections = [
+            { label: "Contexte", content: e.analysis_data.contexte }, 
+            { label: "Décision prise", content: e.analysis_data.decision }, 
+            { label: "Points de controverse", content: e.analysis_data.points_debattus }
+        ].filter(s => s.content && "null" !== s.content).map(t => `<div class="mb-6 last:mb-0"><p class="text-[11px] font-semibold text-brand-600 uppercase tracking-widest mb-1.5">${escapeHTML(t.label)}</p><p class="text-[15px] text-slate-500 leading-relaxed">${highlightText(t.content, searchQuery, e.acronyms)}</p></div>`).join("");
+
+        const sections = otherSections + impactsHtml;
         
         if (budgetDetail || sections) {
             c = `<div class="bg-brand-50/50 rounded-xl px-3 py-5 md:px-4 border border-brand-100/60 mb-8"><h5 class="text-[11px] font-semibold text-brand-700 uppercase tracking-widest mb-5 flex items-center gap-2"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path></svg>Éclairage</h5>${budgetDetail}${sections}</div>`;

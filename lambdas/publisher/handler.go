@@ -63,6 +63,7 @@ type DeliberationRecord struct {
 	Acronyms        map[string]string     `dynamodbav:"acronyms"`
 	AnalysisData    AnalysisData          `dynamodbav:"analysis_data"`
 	BudgetImpact    int64                 `dynamodbav:"budget_impact"`
+	BudgetType      string                `dynamodbav:"budget_type"`
 	BudgetBreakdown []BudgetBreakdownItem `dynamodbav:"budget_breakdown"`
 	HasVote         bool                  `dynamodbav:"has_vote"`
 	VotePour        *int                  `dynamodbav:"vote_pour"`
@@ -101,6 +102,7 @@ type DeliberationOutput struct {
 	Acronyms        map[string]string     `json:"acronyms"`
 	AnalysisData    AnalysisData          `json:"analysis_data"`
 	BudgetImpact    int64                 `json:"budget_impact"`
+	BudgetType      string                `json:"budget_type"`
 	BudgetBreakdown []BudgetBreakdownItem `json:"budget_breakdown"`
 	Vote            VoteCount             `json:"vote"`
 	Disagreements   *string               `json:"disagreements"`
@@ -156,6 +158,7 @@ func buildDataJSON(ctx context.Context, ddb *dynamodb.Client, councils []Council
 				Acronyms:        d.Acronyms,
 				AnalysisData:    d.AnalysisData,
 				BudgetImpact:    d.BudgetImpact,
+				BudgetType:      d.BudgetType,
 				BudgetBreakdown: d.BudgetBreakdown,
 				Vote: VoteCount{
 					HasVote:    d.HasVote || d.VotePour != nil || d.VoteContre != nil || d.VoteAbstention != nil,

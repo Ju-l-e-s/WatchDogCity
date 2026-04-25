@@ -15,62 +15,62 @@ import (
 // Covers both "budget_impact": 1234.56 and "amount": 1234.56 (inside budget_breakdown items).
 var budgetAmountFloatRe = regexp.MustCompile(`("(?:budget_impact|amount)"\s*:\s*)(\d+)\.\d+`)
 
-const deliberationPrompt = `Tu es un analyste de données factuel et neutre spécialisé dans les affaires publiques locales. 
-Analyse ce document PDF de délibération du conseil municipal de Bègles.
+const deliberationPrompt = `Tu es un analyste juridique et financier chargé de décrypter les délibérations de la ville de Bègles.
+Extrais les informations du PDF fourni au format JSON strict.
 
-Retourne UNIQUEMENT un objet JSON valide avec cette structure exacte :
+RÈGLES IMPÉRATIVES DE TRAITEMENT :
+
+1. CATÉGORISATION FINANCIÈRE ("budget_type" et "budget_impact") :
+   - Extrais le montant principal en euros dans "budget_impact" (nombre entier, 0 si aucun).
+   - Tu DOIS qualifier ce flux dans "budget_type" en utilisant UNIQUEMENT l'une de ces 4 valeurs exactes :
+     * "DÉPENSE" : La ville paie ou verse de l'argent (subvention, achat, travaux, frais).
+     * "RECETTE" : La ville gagne ou collecte de l'argent (impôts, taxes, vente de biens, dotations).
+     * "CAUTION" : La ville se porte garante ou cautionne un prêt (ex: Agence France Locale).
+     * "AUCUN" : Aucun montant significatif.
+
+2. IMPACTS CITOYENS ("impacts") :
+   - Décris les conséquences DIRECTES, matérielles ou financières pour les Béglaises et Béglais.
+   - REGLE STRICTE : Si la délibération est de nature purement administrative, interne (élections de représentants, création de commissions, frais de mission des élus) ou sans impact tangible sur le quotidien citoyen, la valeur de ce champ DOIT ÊTRE STRICTEMENT la chaîne "Néant". N'invente JAMAIS d'impacts indirects, philosophiques ou théoriques.
+
+Format JSON attendu :
 {
-  "title": "titre de la délibération (en casse normale, évite les MAJUSCULES intégrales)",
+  "title": "titre de la délibération (en casse normale)",
   "summary": "résumé factuel en 2 à 3 phrases maximum, vulgarisé pour un citoyen",
   "topic_tag": "Un seul mot parmi cette liste stricte: Budget, Urbanisme, Social, Culture, Environnement, Éducation, Sport, Sécurité, Mobilité, Administration",
   "is_substantial": true/false,
   "acronyms": {
-    "ACRONYME1": "Définition complète",
-    "ACRONYME2": "Définition complète"
+    "ACRONYME1": "Définition complète"
   },
   "analysis_data": {
-    "contexte": "en 1 à 2 phrases : pourquoi ce point est à l'ordre du jour, son origine",
-    "decision": "en 1 phrase : ce qui a été concrètement acté ou voté",
-    "impacts": "en 1 à 2 phrases : conséquences directes pour les Béglaises et Béglais (ou null si aucun impact identifiable)",
-    "points_debattus": "en 1 phrase : s'il y a eu débat ou opposition, résumer le désaccord (ou null si vote unanime sans discussion)"
+    "contexte": "Pourquoi ce sujet est sur la table.",
+    "decision": "L'action concrète qui a été votée.",
+    "impacts": "L'impact direct, ou 'Néant'.",
+    "points_debattus": "Les arguments de l'opposition s'il y en a, sinon null."
   },
-  "budget_impact": 150000,
+  "budget_impact": 10000,
+  "budget_type": "DÉPENSE",
   "budget_breakdown": [],
   "climate_impact": "positif/neutre/negatif",
   "key_points": [
-    "point clé 1 (style télégraphique, très concis)",
+    "point clé 1",
     "point clé 2",
     "point clé 3"
   ],
   "vote": {
-    "has_vote": true/false,
-    "pour": entier ou null,
-    "contre": entier ou null,
-    "abstention": entier ou null
+    "has_vote": true,
+    "pour": 0,
+    "contre": 0,
+    "abstention": 0
   },
-  "disagreements": "description factuelle des désaccords (ou null si vote unanime ou sans objet)"
+  "disagreements": "description factuelle des désaccords ou null"
 }
 
-Règles d'exécution strictes :
-- Identifie systématiquement les acronymes ou sigles techniques (ex: CCAS, CREPAQ, EPCI, DSP) présents dans le PDF et donne leur définition complète dans le champ "acronyms".
-- Le champ "budget_impact" est CRUCIAL. Cherche tous les montants monétaires (€, euros, HT, TTC, crédits).
-  * Priorise le montant total de l'opération, de l'investissement ou de la subvention accordée.
-  * Si plusieurs montants sont cités (ex: coût total vs subvention attendue), prends le coût total de l'action municipale.
-  * Cherche aussi dans les tableaux financiers s'ils existent.
-  * Si aucun montant n'est mentionné, mets 0. Ne mets jamais null.
-  * budget_impact doit toujours être un entier (arrondi à l'euro inférieur, sans décimale). Exemple : 2028913, pas 2028913.40.
-  * EXCEPTION BUDGET GLOBAL UNIQUEMENT : Si la délibération est un "VOTE DU BUDGET PRIMITIF", "BUDGET SUPPLÉMENTAIRE" ou "DÉCISION MODIFICATIVE" — c'est-à-dire un document qui présente l'enveloppe budgétaire globale de la commune avec des lignes par fonction — alors mets budget_impact = 0 et remplis budget_breakdown. ATTENTION : une délibération d'attribution de subventions aux associations n'est PAS un vote de budget global, même si elle mentionne "lors du vote du budget" en introduction. Dans ce dernier cas, mets budget_impact = montant total du tableau.
-- Le champ "budget_breakdown" est un tableau de ventilation détaillée des dépenses. Règles selon le type de délibération :
-  * Pour les délibérations ordinaires sans tableau de bénéficiaires multiples : laisse le tableau vide [].
-  * Pour un VOTE DU BUDGET PRIMITIF ou document budgétaire global (maquette, annexe budgétaire avec lignes fonctionnelles) : extrait TOUTES les lignes de dépenses identifiables. Objectif : 15 à 40 entrées précises, pas de regroupement grossier. Chaque entrée : {"topic_tag": "...", "label": "libellé exact de la ligne budgétaire", "amount": entier_en_euros}. Pour label : copie le libellé exact de la ligne du tableau (ex: "Personnel enseignant", "Entretien voirie", "Subvention CCAS"). Ne double pas les montants : si une ligne est un sous-total d'une autre déjà présente, ne prends que le détail le plus fin.
-  * Pour les délibérations d'ATTRIBUTION DE SUBVENTIONS aux associations (tableau listant des associations bénéficiaires avec leurs montants individuels) : agrège par thématique en 5 à 10 entrées. Chaque entrée : {"topic_tag": "...", "label": "Subventions [thème] (N associations)", "amount": somme_en_euros}. Exemple : {"topic_tag": "Sport", "label": "Subventions sportives (12 associations)", "amount": 407950}. budget_impact = montant total du tableau (PAS 0).
-  Règles pour topic_tag (tous cas) : utilise uniquement Budget, Urbanisme, Social, Culture, Environnement, Éducation, Sport, Sécurité, Mobilité, Administration.
-- Le champ "climate_impact" doit être "positif" (investissement vert, nature en ville, isolation), "negatif" (artificialisation, fossile) ou "neutre" (fonctionnement courant, social sans impact bâti). Par défaut, mets "neutre".
-- Le champ "is_substantial" doit être "true" uniquement si le document est dense (budget, DSP, projet structurant).
-- Séparation des préoccupations : Ne génère JAMAIS de balises HTML. Retourne uniquement du texte brut dans les champs.
-- Si le document ne mentionne pas de vote, "has_vote" doit être "false" et les compteurs à "null".
-- Ne génère absolument aucun texte en dehors de l'objet JSON.
-- Assure-toi que le JSON est valide et ne contient pas de caractères d'échappement incorrects.`
+Règles supplémentaires :
+- Le champ "budget_breakdown" est un tableau de ventilation détaillée. Laisse vide [] sauf si c'est un VOTE DU BUDGET ou des subventions à de multiples associations (dans ce cas, extraire {"topic_tag": "...", "label": "...", "amount": entier}).
+- Le champ "climate_impact" doit être "positif" (investissement vert), "negatif" (fossile) ou "neutre". Par défaut: "neutre".
+- "is_substantial" vaut "true" pour un budget, une DSP ou un projet structurant.
+- Si pas de vote, "has_vote" = false et compteurs à null.
+- Ne génère aucun texte en dehors du JSON.`
 
 type BudgetBreakdownItem struct {
 	TopicTag string `json:"topic_tag" dynamodbav:"topic_tag"`
@@ -91,6 +91,7 @@ type GeminiResult struct {
 		PointsDebattus *string `json:"points_debattus"`
 	} `json:"analysis_data"`
 	BudgetImpact     int64                 `json:"budget_impact"`
+	BudgetType       string                `json:"budget_type"`
 	BudgetBreakdown  []BudgetBreakdownItem `json:"budget_breakdown"`
 	ClimateImpact string   `json:"climate_impact"`
 	KeyPoints     []string `json:"key_points"`

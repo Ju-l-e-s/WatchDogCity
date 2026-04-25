@@ -35,3 +35,4 @@ dynamo_councils.txt
 publisher_*.json
 purge_april.py
 remote_data*.json
+response_*.json

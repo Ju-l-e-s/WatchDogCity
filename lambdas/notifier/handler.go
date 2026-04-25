@@ -65,6 +65,7 @@ type NewsletterParams struct {
 	CouncilDate           string        `json:"council_date"`
 	MainIssue             string        `json:"main_issue"`
 	BudgetTotal           string        `json:"budget_total"`
+	HasGlobalBudget       bool          `json:"has_global_budget"`
 	VoteClimat            string        `json:"vote_climat"`
 	ClimatColor           string        `json:"climat_color"`
 	VoteStats             string        `json:"vote_stats"`
@@ -73,6 +74,7 @@ type NewsletterParams struct {
 	Adopted               []AdoptedItem `json:"adopted"`
 	Briefs                []BriefItem   `json:"briefs"`
 	NextMeeting           string        `json:"next_meeting"`
+	WebsiteURL            string        `json:"website_url"`
 	TotalCouncils         int           `json:"total_councils"`
 	TotalDelibs           int           `json:"total_delibs"`
 }
@@ -82,15 +84,17 @@ type TensionItem struct {
 	Context     string `json:"context"`
 	Impact      string `json:"impact"`
 	Budget      string `json:"budget"`
+	HasBudget   bool   `json:"has_budget"`
 	VoteDetails string `json:"vote_details"`
 }
 
 type AdoptedItem struct {
-	Tag     string `json:"tag"`
-	Title   string `json:"title"`
-	Context string `json:"context"`
-	Impact  string `json:"impact"`
-	Budget  string `json:"budget"`
+	Tag       string `json:"tag"`
+	Title     string `json:"title"`
+	Context   string `json:"context"`
+	Impact    string `json:"impact"`
+	Budget    string `json:"budget"`
+	HasBudget bool   `json:"has_budget"`
 }
 
 type BriefItem struct {
@@ -304,6 +308,17 @@ func (d *notifierDeps) generateNewsletterParams(ctx context.Context, council *co
 		return nil, err
 	}
 	params.EmailSubject = "L'Essentiel du Conseil"
+	params.WebsiteURL = "https://lobservatoiredebegles.fr"
+
+	// Post-process flags for template logic
+	params.HasGlobalBudget = params.BudgetTotal != "" && params.BudgetTotal != "0"
+	for i := range params.Tensions {
+		params.Tensions[i].HasBudget = params.Tensions[i].Budget != ""
+	}
+	for i := range params.Adopted {
+		params.Adopted[i].HasBudget = params.Adopted[i].Budget != ""
+	}
+
 	return params, nil
 }
 
@@ -440,6 +455,7 @@ func buildNewsletterPrompt(council *councilRec, delibs []deliberationRec, stats 
   "council_date": "date au format '24 avril 2026'",
   "main_issue": "Analyse journalistique (2 à 3 phrases maximum). Pourquoi ce conseil est-il important ? Utilise le pluriel si plusieurs sujets majeurs. Reste strictement neutre et objectif. Aucun jargon administratif.",
   "budget_total": "montant total voté (fourni ci-dessous, copie verbatim)",
+  "has_global_budget": true,
   "vote_climat": "VOTES PARTAGÉS ou CONSENSUS (fourni ci-dessous, copie verbatim)",
   "climat_color": "code hex couleur (fourni ci-dessous, copie verbatim)",
   "vote_stats": "résumé votes (fourni ci-dessous, copie verbatim)",
@@ -450,6 +466,7 @@ func buildNewsletterPrompt(council *councilRec, delibs []deliberationRec, stats 
       "context": "Analyse neutre en 2 à 3 phrases maximum : l'historique du dossier, pourquoi la ville prend cette décision maintenant.",
       "impact": "Analyse neutre en 2 à 3 phrases maximum : que se passe-t-il concrètement pour le citoyen ? Explication simple, sans jargon. Pourquoi l'opposition a voté contre ?",
       "budget": "X € (LAISSER VIDE '' SI IMPACT NUL)",
+      "has_budget": true,
       "vote_details": "Y votes contre"
     }
   ],
@@ -459,7 +476,8 @@ func buildNewsletterPrompt(council *councilRec, delibs []deliberationRec, stats 
       "title": "Titre vulgarisé",
       "context": "2 à 3 phrases maximum. Pourquoi ? Explication factuelle et pédagogique du besoin.",
       "impact": "2 à 3 phrases maximum. Concrètement ? Conséquence directe sur le quotidien, sans jargon.",
-      "budget": "X € (LAISSER VIDE '' SI IMPACT NUL)"
+      "budget": "X € (LAISSER VIDE '' SI IMPACT NUL)",
+      "has_budget": true
     }
   ],
   "briefs": [

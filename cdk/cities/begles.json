@@ -67,7 +67,7 @@
     "api_key_ssm": "/watchdog/begles/gemini_api_key",
     "worker_model": "gemini-2.5-flash",
     "aggregator_model": "gemini-2.5-pro",
-    "notifier_model": "gemini-3.1-flash"
+    "notifier_model": "gemini-2.5-pro"
   },
 
   "aws": {

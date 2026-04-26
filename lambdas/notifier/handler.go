@@ -466,8 +466,8 @@ func buildNewsletterPrompt(council *councilRec, delibs []deliberationRec, stats 
 	sb.WriteString("Génère un objet JSON avec EXACTEMENT ce schéma (ne génère aucun texte en dehors) :\n\n")
 	sb.WriteString(`{
   "email_subject": "accrocheur, < 60 caractères, reflète l'enjeu politique majeur",
-  "council_title": "titre complet du conseil municipal",
-  "council_date": "date au format '24 avril 2026'",
+  "council_title": "copie verbatim du council_title fourni ci-dessous",
+  "council_date": "copie verbatim du council_date fourni ci-dessous",
   "main_issue": "Analyse journalistique (2 à 3 phrases maximum). Pourquoi ce conseil est-il important ? Utilise le pluriel si plusieurs sujets majeurs. Reste strictement neutre et objectif. Aucun jargon administratif.",
   "budget_total": "montant total voté (fourni ci-dessous, copie verbatim)",
   "has_global_budget": true,
@@ -503,8 +503,8 @@ func buildNewsletterPrompt(council *councilRec, delibs []deliberationRec, stats 
   ],
   "next_meeting": "Date du prochain conseil (fourni ci-dessous, copie verbatim)",
   "website_url": "https://lobservatoiredebegles.fr",
-  "total_councils": 13,
-  "total_delibs": 83
+  "total_councils": 0,
+  "total_delibs": 0
 }`)
 
 	sb.WriteString("\n\nCONSIGNES ÉDITORIALES ET LOGIQUES :\n")
@@ -519,6 +519,8 @@ func buildNewsletterPrompt(council *councilRec, delibs []deliberationRec, stats 
 	sb.WriteString("- STYLE : Journalistique, actif, précis. Vérifie la concordance sujet-verbe.\n\n")
 
 	fmt.Fprintf(&sb, "DONNÉES D'ENTRÉE :\n")
+	fmt.Fprintf(&sb, "- council_title : %s (copie verbatim)\n", council.Title)
+	fmt.Fprintf(&sb, "- council_date : %s (copie verbatim)\n", council.Date)
 	fmt.Fprintf(&sb, "- Nombre total de délibérations ce jour : %d\n", len(delibs))
 	fmt.Fprintf(&sb, "- budget_total : %s\n", stats.budgetFmt)
 	fmt.Fprintf(&sb, "- vote_climat : %s\n", stats.voteClimat)

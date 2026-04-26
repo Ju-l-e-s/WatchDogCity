@@ -237,7 +237,7 @@ func askGeminiForSynthesis(ctx context.Context, summaries []string) (string, err
 	apiKey := os.Getenv("GEMINI_API_KEY")
 	modelName := os.Getenv("GEMINI_MODEL")
 	if modelName == "" {
-		modelName = "gemini-3.1-pro-preview"
+		modelName = "gemini-2.5-pro"
 	}
 
 	client, err := genai.NewClient(ctx, &genai.ClientConfig{

@@ -43,7 +43,7 @@ Format JSON attendu :
   "title": "titre de la délibération (en casse normale)",
   "summary": "résumé factuel en 2 à 3 phrases maximum, vulgarisé pour un citoyen",
   "topic_tag": "Un seul mot parmi cette liste stricte: Budget, Urbanisme, Social, Culture, Environnement, Éducation, Sport, Sécurité, Mobilité, Administration",
-  "is_substantial": true, // true uniquement si budget > 1000€ ou modification d'un service public
+  "is_substantial": true,
   "acronyms": {
     "ACR": "Définition simple (limite à 3 acronymes max)"
   },

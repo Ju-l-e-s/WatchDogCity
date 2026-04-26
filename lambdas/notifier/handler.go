@@ -11,6 +11,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
@@ -312,25 +313,46 @@ func (d *notifierDeps) generateNewsletterParams(ctx context.Context, council *co
 
 	// Post-process flags and formatting for template logic
 	params.HasGlobalBudget = params.BudgetTotal != "" && params.BudgetTotal != "0"
-	
-	// Ensure thousands separators in individual budgets (Gemini sometimes forgets)
-	reDigit := regexp.MustCompile(`\d+`)
+
+	// Re-format budgets from the raw integer (strips Gemini's thousands formatting
+	// which breaks FindString — "20 000 €" → FindString returns "20" not "20000").
+	reNonDigit := regexp.MustCompile(`\D`)
 	formatStr := func(s string) string {
-		if s == "" { return "" }
-		numStr := reDigit.FindString(s)
-		if numStr == "" { return s }
+		if s == "" {
+			return ""
+		}
+		digitsOnly := reNonDigit.ReplaceAllString(s, "")
+		if digitsOnly == "" {
+			return ""
+		}
 		var val int64
-		fmt.Sscanf(numStr, "%d", &val)
+		fmt.Sscanf(digitsOnly, "%d", &val)
+		if val == 0 {
+			return ""
+		}
 		return formatBudgetFR(val)
+	}
+
+	// Strip any "En savoir plus" / link text Gemini may have appended despite the rule.
+	reLink := regexp.MustCompile(`(?i)\s*(en savoir plus[^.]*|voir sur le site[^.]*|→[^\n]*)$`)
+	stripLinks := func(s string) string {
+		return strings.TrimSpace(reLink.ReplaceAllString(s, ""))
 	}
 
 	for i := range params.Tensions {
 		params.Tensions[i].Budget = formatStr(params.Tensions[i].Budget)
 		params.Tensions[i].HasBudget = params.Tensions[i].Budget != ""
+		params.Tensions[i].Context = stripLinks(params.Tensions[i].Context)
+		params.Tensions[i].Impact = stripLinks(params.Tensions[i].Impact)
 	}
 	for i := range params.Adopted {
 		params.Adopted[i].Budget = formatStr(params.Adopted[i].Budget)
 		params.Adopted[i].HasBudget = params.Adopted[i].Budget != ""
+		params.Adopted[i].Context = stripLinks(params.Adopted[i].Context)
+		params.Adopted[i].Impact = stripLinks(params.Adopted[i].Impact)
+	}
+	for i := range params.Briefs {
+		params.Briefs[i].Summary = stripLinks(params.Briefs[i].Summary)
 	}
 
 	return params, nil
@@ -400,6 +422,17 @@ func computeNewsletterStats(delibs []deliberationRec) newsletterStats {
 	s.voteStats = strings.Join(parts, " / ")
 
 	return s
+}
+
+var frMonths = [13]string{"", "janvier", "février", "mars", "avril", "mai", "juin",
+	"juillet", "août", "septembre", "octobre", "novembre", "décembre"}
+
+func formatDateFR(isoDate string) string {
+	t, err := time.Parse("2006-01-02", isoDate)
+	if err != nil {
+		return isoDate
+	}
+	return fmt.Sprintf("%d %s %d", t.Day(), frMonths[t.Month()], t.Year())
 }
 
 func formatBudgetFR(amount int64) string {
@@ -520,7 +553,7 @@ func buildNewsletterPrompt(council *councilRec, delibs []deliberationRec, stats 
 
 	fmt.Fprintf(&sb, "DONNÉES D'ENTRÉE :\n")
 	fmt.Fprintf(&sb, "- council_title : %s (copie verbatim)\n", council.Title)
-	fmt.Fprintf(&sb, "- council_date : %s (copie verbatim)\n", council.Date)
+	fmt.Fprintf(&sb, "- council_date : %s (copie verbatim)\n", formatDateFR(council.Date))
 	fmt.Fprintf(&sb, "- Nombre total de délibérations ce jour : %d\n", len(delibs))
 	fmt.Fprintf(&sb, "- budget_total : %s\n", stats.budgetFmt)
 	fmt.Fprintf(&sb, "- vote_climat : %s\n", stats.voteClimat)

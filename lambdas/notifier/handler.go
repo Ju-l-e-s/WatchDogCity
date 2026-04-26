@@ -513,6 +513,7 @@ func buildNewsletterPrompt(council *councilRec, delibs []deliberationRec, stats 
 	sb.WriteString("- VULGARISATION INDEMNITÉS : Pour les indemnités des élus, explique simplement : 'Le conseil définit légalement la rémunération des élus pour leur travail, selon un barème national basé sur la taille de la ville'.\n")
 	sb.WriteString("- PÉDAGOGIE ET NEUTRALITÉ : Agis en traducteur neutre. Bannis le jargon juridique et administratif. N'utilise aucune formulation partisane, orientée ou de jugement de valeur.\n")
 	sb.WriteString("- ANCRAGE (GROUNDING) : N'ajoute AUCUNE information qui n'est pas présente dans les données d'entrée. Ne fais pas de compliments (ex: 'plus grand club'), n'ajoute pas de faits historiques ou géographiques non mentionnés.\n")
+	sb.WriteString("- INTERDICTION FORMELLE : N'ajoute JAMAIS de liens HTML ou de texte 'En savoir plus' dans les champs context ou impact. Ils sont déjà gérés par le template.\n")
 	sb.WriteString("- CATÉGORISATION STRICTE : Classe la Police et la Vidéoprotection exclusivement dans SÉCURITÉ. Classe tous les clubs sportifs (Dojo, Handball, Foot, etc.) exclusivement dans SPORT.\n")
 	sb.WriteString("- AFFICHAGE CONDITIONNEL : Ne mentionne pas de budget ('0 €') si l'impact est nul. Laisse le champ budget vide.\n")
 	sb.WriteString("- STYLE : Journalistique, actif, précis. Vérifie la concordance sujet-verbe.\n\n")

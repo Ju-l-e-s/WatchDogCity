@@ -3,6 +3,8 @@ lambdas/orchestrator/orchestrator
 lambdas/worker/worker
 lambdas/publisher/publisher
 lambdas/subscriber/subscriber
+lambdas/notifier/notifier
+lambdas/contact/contact
 response.json
 
 # AWS CDK

@@ -247,7 +247,9 @@ class WatchdogStack(Stack):
                 "SENDER_EMAIL": sender_email,
             },
         )
-        councils_table.grant_read_data(notifier)
+        # Notifier needs write access to councils to mark newsletter_sent_at
+        # for idempotence (prevents duplicate sends on retry / re-aggregation).
+        councils_table.grant_read_write_data(notifier)
         deliberations_table.grant_read_data(notifier)
         notifier.grant_invoke(publisher)
         publisher.add_environment("NOTIFIER_FUNCTION_NAME", notifier.function_name)

@@ -35,9 +35,10 @@ type NotifierEvent struct {
 // ── DynamoDB records (minimal projection) ────────────────────────────────────
 
 type councilRec struct {
-	CouncilID string `dynamodbav:"council_id"`
-	Title     string `dynamodbav:"title"`
-	Date      string `dynamodbav:"date"`
+	CouncilID         string `dynamodbav:"council_id"`
+	Title             string `dynamodbav:"title"`
+	Date              string `dynamodbav:"date"`
+	NewsletterSentAt  string `dynamodbav:"newsletter_sent_at,omitempty"`
 }
 
 type deliberationRec struct {
@@ -109,6 +110,7 @@ type dynamoQuerier interface {
 	GetItem(ctx context.Context, params *dynamodb.GetItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.GetItemOutput, error)
 	Query(ctx context.Context, params *dynamodb.QueryInput, optFns ...func(*dynamodb.Options)) (*dynamodb.QueryOutput, error)
 	Scan(ctx context.Context, params *dynamodb.ScanInput, optFns ...func(*dynamodb.Options)) (*dynamodb.ScanOutput, error)
+	UpdateItem(ctx context.Context, params *dynamodb.UpdateItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.UpdateItemOutput, error)
 }
 
 type httpDoer interface {
@@ -165,6 +167,14 @@ func (d *notifierDeps) handle(ctx context.Context, event NotifierEvent) error {
 		return fmt.Errorf("fetch council %s: %w", event.CouncilID, err)
 	}
 
+	// Idempotence: skip if newsletter already sent for this council. The flag is
+	// only checked/written on real sends — TestListID overrides bypass it so
+	// staging tests don't lock out production.
+	if event.TestListID == nil && council.NewsletterSentAt != "" {
+		log.Printf("newsletter already sent for council %s at %s — skipping", event.CouncilID, council.NewsletterSentAt)
+		return nil
+	}
+
 	delibs, err := d.fetchDeliberations(ctx, event.CouncilID)
 	if err != nil {
 		return fmt.Errorf("fetch deliberations for %s: %w", event.CouncilID, err)
@@ -182,8 +192,29 @@ func (d *notifierDeps) handle(ctx context.Context, event NotifierEvent) error {
 		return fmt.Errorf("send brevo campaign: %w", err)
 	}
 
+	// Pose the idempotence flag only for real sends (test list bypasses it).
+	if event.TestListID == nil {
+		if err := d.markNewsletterSent(ctx, event.CouncilID); err != nil {
+			log.Printf("warn: campaign sent but failed to mark council %s as notified: %v", event.CouncilID, err)
+		}
+	}
+
 	log.Printf("newsletter campaign sent for council %s (%s)", event.CouncilID, council.Date)
 	return nil
+}
+
+func (d *notifierDeps) markNewsletterSent(ctx context.Context, councilID string) error {
+	_, err := d.ddb.UpdateItem(ctx, &dynamodb.UpdateItemInput{
+		TableName: aws.String(d.councilsTable),
+		Key: map[string]types.AttributeValue{
+			"council_id": &types.AttributeValueMemberS{Value: councilID},
+		},
+		UpdateExpression: aws.String("SET newsletter_sent_at = :ts"),
+		ExpressionAttributeValues: map[string]types.AttributeValue{
+			":ts": &types.AttributeValueMemberS{Value: time.Now().UTC().Format(time.RFC3339)},
+		},
+	})
+	return err
 }
 
 // ── DynamoDB helpers ──────────────────────────────────────────────────────────

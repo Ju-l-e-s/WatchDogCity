@@ -339,7 +339,7 @@ function renderDeliberationRow(e) {
         if (e.budget_type === 'DÉPENSE') { badgeClasses = 'bg-slate-50 text-slate-600 border-slate-200'; icon = '💰'; prefix = ''; }
         else if (e.budget_type === 'RECETTE') { badgeClasses = 'bg-emerald-50 text-emerald-700 border-emerald-200'; icon = '🟢'; prefix = '+'; }
         else if (e.budget_type === 'CAUTION') { badgeClasses = 'bg-amber-50 text-amber-700 border-amber-200'; icon = '🟠'; }
-        budgetBadge = `<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold ${badgeClasses} border ml-2 shadow-sm">${icon} ${prefix}${e.budget_impact.toLocaleString('fr-FR')} €</span>`;
+        budgetBadge = `<span class="inline-flex items-center whitespace-nowrap shrink-0 px-2 py-0.5 rounded text-[10px] font-bold ${badgeClasses} border ml-2 shadow-sm">${icon} ${prefix}${e.budget_impact.toLocaleString('fr-FR')} €</span>`;
     }
     let c = "";
     if (e.analysis_data) {
@@ -370,7 +370,7 @@ function renderDeliberationRow(e) {
             budgetDetail = `
                 <div class="mb-6">
                     <p class="text-[11px] font-semibold text-brand-600 uppercase tracking-widest mb-1.5">Impact Financier</p>
-                    <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded border ${badgeClasses} text-[13px] font-bold shadow-sm">
+                    <div class="inline-flex items-center whitespace-nowrap shrink-0 gap-1.5 px-2.5 py-1 rounded border ${badgeClasses} text-[13px] font-bold shadow-sm">
                         <span>${icon}</span>
                         <span>${e.budget_impact.toLocaleString('fr-FR')} €</span>
                         ${typeHtml}
@@ -541,7 +541,7 @@ function generateBudgetHTML(container, totalBudget, sortedThemes) {
                         <div class="flex items-center gap-2.5 mb-3">
                             <span class="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0"></span>
                             <span class="text-[11px] font-medium text-slate-600 uppercase tracking-widest">${formatDate(src.date)}</span>
-                            <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-100 ml-2 shadow-sm">💰 ${srcTotal.toLocaleString('fr-FR')} €</span>
+                            <span class="inline-flex items-center whitespace-nowrap shrink-0 px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-100 ml-2 shadow-sm">💰 ${srcTotal.toLocaleString('fr-FR')} €</span>
                         </div>
                         <h4 class="text-base font-semibold text-slate-800 mb-4">${escapeHTML(src.title)}</h4>
                         <div class="bg-slate-50/60 rounded-xl px-4 py-1">${linesHtml}</div>

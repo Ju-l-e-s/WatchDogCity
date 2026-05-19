@@ -28,17 +28,19 @@ type CouncilAnalysis struct {
 	VotesContre  int    `dynamodbav:"votes_contre" json:"votes_contre"`
 }
 
+// Vote attributes are written FLAT at the top level by worker
+// (lambdas/worker/handler.go), and read FLAT by publisher and notifier.
+// Aggregator must match that contract — a previous nested layout under a
+// "vote" map silently produced nil pointers and broke voteClimat detection.
 type Deliberation struct {
 	ID           string `dynamodbav:"id"`
 	CouncilID    string `dynamodbav:"council_id"`
 	BudgetImpact int64  `dynamodbav:"budget_impact"`
 	TopicTag     string `dynamodbav:"topic_tag"`
 	Summary      string `dynamodbav:"summary"`
-	Vote         struct {
-		Pour       *int `dynamodbav:"pour"`
-		Contre     *int `dynamodbav:"contre"`
-		Abstention *int `dynamodbav:"abstention"`
-	} `dynamodbav:"vote"`
+	VotePour     *int   `dynamodbav:"vote_pour"`
+	VoteContre   *int   `dynamodbav:"vote_contre"`
+	VoteAbst     *int   `dynamodbav:"vote_abstention"`
 }
 
 func handler(ctx context.Context, event events.DynamoDBEvent) error {
@@ -195,14 +197,14 @@ func computeStats(delibs []Deliberation) councilStats {
 		if d.TopicTag != "" {
 			s.topicBudgets[d.TopicTag] += d.BudgetImpact
 		}
-		if d.Vote.Pour != nil {
-			s.totalPour += *d.Vote.Pour
+		if d.VotePour != nil {
+			s.totalPour += *d.VotePour
 		}
-		if d.Vote.Contre != nil {
-			s.totalContre += *d.Vote.Contre
+		if d.VoteContre != nil {
+			s.totalContre += *d.VoteContre
 		}
-		if d.Vote.Abstention != nil {
-			s.totalAbst += *d.Vote.Abstention
+		if d.VoteAbst != nil {
+			s.totalAbst += *d.VoteAbst
 		}
 		if d.Summary != "" {
 			s.summaries = append(s.summaries, fmt.Sprintf("- %s", d.Summary))

@@ -3,7 +3,10 @@ package main
 import (
 	"testing"
 
+	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func intPtr(i int) *int { return &i }
@@ -74,21 +77,45 @@ func TestComputeStats_SumsBudget(t *testing.T) {
 
 func TestComputeStats_SumsVotes(t *testing.T) {
 	delibs := []Deliberation{
-		{Vote: struct {
-			Pour       *int `dynamodbav:"pour"`
-			Contre     *int `dynamodbav:"contre"`
-			Abstention *int `dynamodbav:"abstention"`
-		}{Pour: intPtr(30), Contre: intPtr(2), Abstention: intPtr(1)}},
-		{Vote: struct {
-			Pour       *int `dynamodbav:"pour"`
-			Contre     *int `dynamodbav:"contre"`
-			Abstention *int `dynamodbav:"abstention"`
-		}{Pour: intPtr(10), Contre: intPtr(3)}},
+		{VotePour: intPtr(30), VoteContre: intPtr(2), VoteAbst: intPtr(1)},
+		{VotePour: intPtr(10), VoteContre: intPtr(3)},
 	}
 	stats := computeStats(delibs)
 	assert.Equal(t, 40, stats.totalPour)
 	assert.Equal(t, 5, stats.totalContre)
 	assert.Equal(t, 1, stats.totalAbst)
+}
+
+// TestUnmarshal_FlatVoteAttributes reproduces the exact DynamoDB item shape
+// produced by the worker (lambdas/worker/handler.go) and asserts that the
+// aggregator's Deliberation struct correctly decodes flat vote_* attributes.
+// Regression guard for the silent nested-vs-flat mismatch that left every
+// Pour/Contre/Abst pointer at nil and forced voteClimat() to "consensus".
+func TestUnmarshal_FlatVoteAttributes(t *testing.T) {
+	item := map[string]types.AttributeValue{
+		"id":              &types.AttributeValueMemberS{Value: "delib-42"},
+		"council_id":      &types.AttributeValueMemberS{Value: "council-2026-05"},
+		"budget_impact":   &types.AttributeValueMemberN{Value: "12500"},
+		"topic_tag":       &types.AttributeValueMemberS{Value: "Urbanisme"},
+		"summary":         &types.AttributeValueMemberS{Value: "Vote serré sur la ZAC"},
+		"vote_pour":       &types.AttributeValueMemberN{Value: "10"},
+		"vote_contre":     &types.AttributeValueMemberN{Value: "4"},
+		"vote_abstention": &types.AttributeValueMemberN{Value: "2"},
+	}
+
+	var d Deliberation
+	require.NoError(t, attributevalue.UnmarshalMap(item, &d))
+
+	require.NotNil(t, d.VotePour, "VotePour should be populated from flat vote_pour")
+	require.NotNil(t, d.VoteContre, "VoteContre should be populated from flat vote_contre")
+	require.NotNil(t, d.VoteAbst, "VoteAbst should be populated from flat vote_abstention")
+	assert.Equal(t, 10, *d.VotePour)
+	assert.Equal(t, 4, *d.VoteContre)
+	assert.Equal(t, 2, *d.VoteAbst)
+
+	// And the downstream pipeline now flags this council as tensions.
+	stats := computeStats([]Deliberation{d})
+	assert.Equal(t, "tensions", voteClimat(stats.totalPour, stats.totalContre))
 }
 
 func TestComputeStats_CollectsSummaries(t *testing.T) {
@@ -114,4 +141,5 @@ func TestComputeStats_NilVotePointers(t *testing.T) {
 	stats := computeStats(delibs)
 	assert.Equal(t, 0, stats.totalPour)
 	assert.Equal(t, 0, stats.totalContre)
+	assert.Equal(t, 0, stats.totalAbst)
 }

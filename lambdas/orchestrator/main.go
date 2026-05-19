@@ -72,8 +72,13 @@ func handler(ctx context.Context, event OrchestratorEvent) error {
 			return fmt.Errorf("get item %s: %w", council.CouncilID, err)
 		}
 		if existing.Item != nil {
-			processed := attrInt(existing.Item, "processed_pdfs")
-			total := attrInt(existing.Item, "total_pdfs")
+			processed, okP := attrInt(existing.Item, "processed_pdfs")
+			total, okT := attrInt(existing.Item, "total_pdfs")
+
+			if !okT || !okP {
+				log.Printf("warn: council %s has invalid counters, skipping", council.CouncilID)
+				continue
+			}
 
 			if processed >= total && total > 0 {
 				log.Printf("council %s already processed, updating summary only", council.CouncilID)
@@ -188,15 +193,16 @@ func updateNextCouncilMetadata(ctx context.Context, ddb *dynamodb.Client, nextDa
 	})
 }
 
-func attrInt(m map[string]types.AttributeValue, key string) int {
+func attrInt(m map[string]types.AttributeValue, key string) (int, bool) {
 	if val, ok := m[key]; ok {
 		if n, ok := val.(*types.AttributeValueMemberN); ok {
 			var i int
-			fmt.Sscanf(n.Value, "%d", &i)
-			return i
+			if _, err := fmt.Sscanf(n.Value, "%d", &i); err == nil {
+				return i, true
+			}
 		}
 	}
-	return 0
+	return 0, false
 }
 
 func deliberationID(url string) string {

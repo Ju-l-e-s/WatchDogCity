@@ -10,8 +10,11 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/dynamodb v1.57.1
 	github.com/aws/aws-sdk-go-v2/service/lambda v1.88.5
 	github.com/stretchr/testify v1.11.1
+	github.com/watchdog/shared v0.0.0
 	google.golang.org/genai v1.52.1
 )
+
+replace github.com/watchdog/shared => ../shared
 
 require (
 	cloud.google.com/go v0.116.0 // indirect

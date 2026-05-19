@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/watchdog/shared"
 	"google.golang.org/genai"
 )
 
@@ -16,15 +17,11 @@ import (
 // occasionally emits floats (e.g. 2028913.40) instead of integers.
 var budgetAmountFloatRe = regexp.MustCompile(`("(?:budget_impact|amount)"\s*:\s*)(\d+)\.\d+`)
 
-// Enum sources — single source of truth, mirrored into the response schema
-// and re-validated after parsing.
+// Enum aliases — single source of truth lives in shared package.
 var (
-	validTopicTags = []string{
-		"Budget", "Urbanisme", "Social", "Culture", "Environnement",
-		"Éducation", "Sport", "Sécurité", "Mobilité", "Administration",
-	}
-	validBudgetTypes    = []string{"DÉPENSE", "RECETTE", "CAUTION", "AUCUN"}
-	validClimateImpacts = []string{"positif", "neutre", "negatif"}
+	validTopicTags    = shared.TopicTags
+	validBudgetTypes  = shared.BudgetTypes
+	validClimateImpacts = shared.ClimateImpacts
 )
 
 const deliberationPrompt = `Tu es un analyste juridique et financier chargé de décrypter les délibérations de la ville de Bègles.

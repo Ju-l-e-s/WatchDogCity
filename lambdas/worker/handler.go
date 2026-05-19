@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -43,8 +44,9 @@ type SQSPayload struct {
 	TotalPDFs int    `json:"total_pdfs"`
 }
 
-func (h *WorkerHandler) HandleRequest(ctx context.Context, event events.SQSEvent) error {
+func (h *WorkerHandler) HandleRequest(ctx context.Context, event events.SQSEvent) (events.SQSEventResponse, error) {
 	apiKey := os.Getenv("GEMINI_API_KEY")
+	var failures []events.SQSBatchItemFailure
 
 	for _, record := range event.Records {
 		var msg SQSPayload
@@ -54,7 +56,7 @@ func (h *WorkerHandler) HandleRequest(ctx context.Context, event events.SQSEvent
 		}
 
 		id := deliberationID(msg.PDFURL)
-		
+
 		// 0. Idempotence Check
 		existing, err := h.ddb.GetItem(ctx, &dynamodb.GetItemInput{
 			TableName: aws.String(os.Getenv("DELIBERATIONS_TABLE")),
@@ -64,7 +66,8 @@ func (h *WorkerHandler) HandleRequest(ctx context.Context, event events.SQSEvent
 		})
 		if err != nil {
 			log.Printf("error checking idempotence for %s: %v", id, err)
-			return err
+			failures = append(failures, events.SQSBatchItemFailure{ItemIdentifier: record.MessageId})
+			continue
 		}
 		if existing.Item != nil {
 			if _, ok := existing.Item["analysis_data"]; ok {
@@ -76,21 +79,24 @@ func (h *WorkerHandler) HandleRequest(ctx context.Context, event events.SQSEvent
 		pdfBytes, err := downloadPDF(msg.PDFURL)
 		if err != nil {
 			log.Printf("error downloading PDF %s: %v", msg.PDFURL, err)
-			return err
+			failures = append(failures, events.SQSBatchItemFailure{ItemIdentifier: record.MessageId})
+			continue
 		}
 
 		result, err := analyzeWithGemini(ctx, apiKey, pdfBytes)
 		if err != nil {
 			log.Printf("error analyzing with Gemini: %v", err)
-			return err
+			failures = append(failures, events.SQSBatchItemFailure{ItemIdentifier: record.MessageId})
+			continue
 		}
 
 		if err := h.handleRecord(ctx, msg, result); err != nil {
 			log.Printf("error handling record: %v", err)
-			return err
+			failures = append(failures, events.SQSBatchItemFailure{ItemIdentifier: record.MessageId})
+			continue
 		}
 	}
-	return nil
+	return events.SQSEventResponse{BatchItemFailures: failures}, nil
 }
 
 func (h *WorkerHandler) handleRecord(ctx context.Context, msg SQSPayload, result *GeminiResult) error {
@@ -205,7 +211,8 @@ func downloadPDF(url string) ([]byte, error) {
 		return nil, err
 	}
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
-	resp, err := http.DefaultClient.Do(req)
+	client := &http.Client{Timeout: 60 * time.Second}
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -213,7 +220,19 @@ func downloadPDF(url string) ([]byte, error) {
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("download PDF: HTTP %d for %s", resp.StatusCode, url)
 	}
-	return io.ReadAll(resp.Body)
+	limitedBody := http.MaxBytesReader(nil, resp.Body, 50<<20)
+	pdfBytes, err := io.ReadAll(limitedBody)
+	if err != nil {
+		return nil, err
+	}
+	if !bytes.HasPrefix(pdfBytes, []byte("%PDF-")) {
+		prefix := pdfBytes
+		if len(prefix) > 8 {
+			prefix = prefix[:8]
+		}
+		return nil, fmt.Errorf("not a PDF: got prefix %q", prefix)
+	}
+	return pdfBytes, nil
 }
 
 func deliberationID(url string) string {

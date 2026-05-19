@@ -517,7 +517,7 @@ func buildNewsletterPrompt(council *councilRec, delibs []deliberationRec, stats 
 		}
 
 		// 3. Vie Locale (500€ - 5000€ + Catégories "Plaisir") : Bonus visibilité
-		isPlaisir := d.TopicTag == "SPORT" || d.TopicTag == "CULTURE" || d.TopicTag == "SOCIAL" || d.TopicTag == "SOLIDARITÉ"
+		isPlaisir := d.TopicTag == "Sport" || d.TopicTag == "Culture" || d.TopicTag == "Social"
 		if d.BudgetImpact >= 500 && isPlaisir {
 			localLife = append(localLife, d)
 			continue
@@ -551,7 +551,7 @@ func buildNewsletterPrompt(council *councilRec, delibs []deliberationRec, stats 
   ],
   "adopted": [
     {
-      "tag": "ADMINISTRATION, SPORT, FINANCES, SÉCURITÉ, ENVIRONNEMENT, MOBILITÉ, SOLIDARITÉ ou CULTURE",
+      "tag": "Administration, Sport, Budget, Sécurité, Environnement, Mobilité, Social, Culture, Urbanisme ou Éducation",
       "title": "Titre vulgarisé",
       "context": "2 à 3 phrases maximum. Pourquoi ? Explication factuelle et pédagogique du besoin.",
       "impact": "2 à 3 phrases maximum. Concrètement ? Conséquence directe sur le quotidien, sans jargon.",
@@ -578,7 +578,7 @@ func buildNewsletterPrompt(council *councilRec, delibs []deliberationRec, stats 
 	sb.WriteString("- PÉDAGOGIE ET NEUTRALITÉ : Agis en traducteur neutre. Bannis le jargon juridique et administratif. N'utilise aucune formulation partisane, orientée ou de jugement de valeur.\n")
 	sb.WriteString("- ANCRAGE (GROUNDING) : N'ajoute AUCUNE information qui n'est pas présente dans les données d'entrée. Ne fais pas de compliments (ex: 'plus grand club'), n'ajoute pas de faits historiques ou géographiques non mentionnés.\n")
 	sb.WriteString("- INTERDICTION FORMELLE : N'ajoute JAMAIS de liens HTML ou de texte 'En savoir plus' dans les champs context ou impact. Ils sont déjà gérés par le template.\n")
-	sb.WriteString("- CATÉGORISATION STRICTE : Classe la Police et la Vidéoprotection exclusivement dans SÉCURITÉ. Classe tous les clubs sportifs (Dojo, Handball, Foot, etc.) exclusivement dans SPORT.\n")
+	sb.WriteString("- CATÉGORISATION STRICTE : Classe la Police et la Vidéoprotection exclusivement dans Sécurité. Classe tous les clubs sportifs (Dojo, Handball, Foot, etc.) exclusivement dans Sport.\n")
 	sb.WriteString("- AFFICHAGE CONDITIONNEL : Ne mentionne pas de budget ('0 €') si l'impact est nul. Laisse le champ budget vide.\n")
 	sb.WriteString("- STYLE : Journalistique, actif, précis. Vérifie la concordance sujet-verbe.\n\n")
 

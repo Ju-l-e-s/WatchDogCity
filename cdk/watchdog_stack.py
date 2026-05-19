@@ -157,6 +157,7 @@ class WatchdogStack(Stack):
         worker.add_event_source(lambda_events.SqsEventSource(
             pdf_queue,
             batch_size=1,
+            report_batch_item_failures=True,
         ))
         councils_table.grant_read_write_data(worker)
         deliberations_table.grant_read_write_data(worker)

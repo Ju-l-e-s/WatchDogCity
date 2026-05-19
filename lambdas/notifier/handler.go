@@ -141,8 +141,20 @@ func HandleRequest(ctx context.Context, event NotifierEvent) error {
 	}
 
 	d := &notifierDeps{
-		ddb:                dynamodb.NewFromConfig(cfg),
-		httpClient:         &http.Client{},
+		ddb: dynamodb.NewFromConfig(cfg),
+		// Explicit timeout — sans cela, le client utilise zero-value et peut
+		// hang indéfiniment sur une connexion Brevo malade, jusqu'à ce que
+		// Lambda timeout à 15 min. Pendant ce temps le claim DynamoDB est
+		// déjà pris, ce qui transforme un incident upstream en perte
+		// définitive de la newsletter hebdomadaire.
+		httpClient: &http.Client{
+			Timeout: 30 * time.Second,
+			Transport: &http.Transport{
+				MaxIdleConns:        10,
+				IdleConnTimeout:     90 * time.Second,
+				TLSHandshakeTimeout: 10 * time.Second,
+			},
+		},
 		geminiKey:          os.Getenv("GEMINI_API_KEY"),
 		geminiModel:        envOrDefault("GEMINI_MODEL", "gemini-2.5-pro"),
 		brevoKey:           os.Getenv("BREVO_API_KEY"),

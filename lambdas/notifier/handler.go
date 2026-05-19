@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -20,6 +21,11 @@ import (
 	"google.golang.org/genai"
 )
 
+// errClaimAlreadyHeld signals that another invocation already claimed the
+// newsletter send slot (either pending or completed). Callers should treat
+// this as a clean no-op, not an error worth retrying.
+var errClaimAlreadyHeld = errors.New("newsletter claim already held")
+
 const brevoBaseURL = "https://api.brevo.com/v3"
 
 // budgetFloatRe strips decimal parts from Gemini's numeric fields.
@@ -35,10 +41,11 @@ type NotifierEvent struct {
 // ── DynamoDB records (minimal projection) ────────────────────────────────────
 
 type councilRec struct {
-	CouncilID         string `dynamodbav:"council_id"`
-	Title             string `dynamodbav:"title"`
-	Date              string `dynamodbav:"date"`
-	NewsletterSentAt  string `dynamodbav:"newsletter_sent_at,omitempty"`
+	CouncilID           string `dynamodbav:"council_id"`
+	Title               string `dynamodbav:"title"`
+	Date                string `dynamodbav:"date"`
+	NewsletterSentAt    string `dynamodbav:"newsletter_sent_at,omitempty"`
+	NewsletterPendingAt string `dynamodbav:"newsletter_pending_at,omitempty"`
 }
 
 type deliberationRec struct {
@@ -119,6 +126,12 @@ type httpDoer interface {
 
 // ── Deps ──────────────────────────────────────────────────────────────────────
 
+// pendingClaimTTL bornes how long a pending claim is honored before being
+// considered stale and recoverable. Set well above the Lambda timeout (15 min
+// max for this function) divided by AWS async retry policy, so a crashing
+// Lambda can never park the newsletter forever.
+const pendingClaimTTL = 10 * time.Minute
+
 type notifierDeps struct {
 	ddb                dynamoQuerier
 	httpClient         httpDoer
@@ -130,6 +143,7 @@ type notifierDeps struct {
 	senderEmail        string
 	councilsTable      string
 	deliberationsTable string
+	now                func() time.Time // injectable for tests; defaults to time.Now
 }
 
 // ── Handler ───────────────────────────────────────────────────────────────────
@@ -163,6 +177,7 @@ func HandleRequest(ctx context.Context, event NotifierEvent) error {
 		senderEmail:        envOrDefault("SENDER_EMAIL", "noreply@lobservatoiredebegles.fr"),
 		councilsTable:      os.Getenv("COUNCILS_TABLE"),
 		deliberationsTable: os.Getenv("DELIBERATIONS_TABLE"),
+		now:                time.Now,
 	}
 	return d.handle(ctx, event)
 }
@@ -192,26 +207,21 @@ func (d *notifierDeps) handle(ctx context.Context, event NotifierEvent) error {
 		return fmt.Errorf("generate newsletter params: %w", err)
 	}
 
-	// Claim the send slot atomically before calling Brevo. ConditionExpression
-	// ensures exactly one concurrent invocation proceeds — the loser gets
-	// ConditionalCheckFailedException and exits cleanly. Trade-off: if DDB
-	// succeeds but Brevo fails, the newsletter is never sent (zero-duplicate
-	// policy wins over zero-loss per obs 489).
+	// Two-phase claim/commit:
+	//   1. claimPending sets newsletter_pending_at conditionally — exactly one
+	//      concurrent invocation wins. A pending claim older than
+	//      pendingClaimTTL is considered stale (crashed Lambda) and reusable.
+	//   2. sendCampaign hits Brevo.
+	//   3. confirmSent flips pending → sent on success.
+	//   4. releasePending wipes the pending flag on Brevo failure, so the
+	//      next async retry (handled by AWS Lambda + DLQ, see CDK config)
+	//      can take over without waiting for the TTL.
+	// TestListID branch keeps the legacy direct-send behaviour: tests
+	// against a Brevo list ID should never touch the claim ledger.
 	if event.TestListID == nil {
-		_, err := d.ddb.UpdateItem(ctx, &dynamodb.UpdateItemInput{
-			TableName: aws.String(d.councilsTable),
-			Key: map[string]types.AttributeValue{
-				"council_id": &types.AttributeValueMemberS{Value: event.CouncilID},
-			},
-			UpdateExpression:    aws.String("SET newsletter_sent_at = :ts"),
-			ConditionExpression: aws.String("attribute_not_exists(newsletter_sent_at)"),
-			ExpressionAttributeValues: map[string]types.AttributeValue{
-				":ts": &types.AttributeValueMemberS{Value: time.Now().UTC().Format(time.RFC3339)},
-			},
-		})
-		if err != nil {
-			if strings.Contains(err.Error(), "ConditionalCheckFailedException") {
-				log.Printf("newsletter already claimed for council %s — concurrent send blocked", event.CouncilID)
+		if err := d.claimPending(ctx, event.CouncilID); err != nil {
+			if errors.Is(err, errClaimAlreadyHeld) {
+				log.Printf("newsletter already claimed or in-flight for council %s — skipping", event.CouncilID)
 				return nil
 			}
 			return fmt.Errorf("claim newsletter slot: %w", err)
@@ -219,11 +229,80 @@ func (d *notifierDeps) handle(ctx context.Context, event NotifierEvent) error {
 	}
 
 	if err := d.sendCampaign(ctx, params); err != nil {
+		if event.TestListID == nil {
+			if relErr := d.releasePending(ctx, event.CouncilID); relErr != nil {
+				log.Printf("warn: failed to release pending claim for %s: %v", event.CouncilID, relErr)
+			}
+		}
 		return fmt.Errorf("send brevo campaign: %w", err)
+	}
+
+	if event.TestListID == nil {
+		if err := d.confirmSent(ctx, event.CouncilID); err != nil {
+			// Best-effort: Brevo accepted the campaign — losing the confirmation
+			// just risks a duplicate on next async retry, never a lost send.
+			log.Printf("warn: brevo accepted campaign but DDB confirm failed for %s: %v", event.CouncilID, err)
+		}
 	}
 
 	log.Printf("newsletter campaign sent for council %s (%s)", event.CouncilID, council.Date)
 	return nil
+}
+
+// claimPending atomically claims a send slot. Returns errClaimAlreadyHeld
+// when another invocation already holds the slot AND its pending claim has
+// not expired (or the newsletter is already sent).
+func (d *notifierDeps) claimPending(ctx context.Context, councilID string) error {
+	now := d.now().UTC()
+	staleThreshold := now.Add(-pendingClaimTTL).Format(time.RFC3339)
+
+	_, err := d.ddb.UpdateItem(ctx, &dynamodb.UpdateItemInput{
+		TableName: aws.String(d.councilsTable),
+		Key: map[string]types.AttributeValue{
+			"council_id": &types.AttributeValueMemberS{Value: councilID},
+		},
+		UpdateExpression: aws.String("SET newsletter_pending_at = :now"),
+		ConditionExpression: aws.String(
+			"attribute_not_exists(newsletter_sent_at) AND " +
+				"(attribute_not_exists(newsletter_pending_at) OR newsletter_pending_at < :stale)",
+		),
+		ExpressionAttributeValues: map[string]types.AttributeValue{
+			":now":   &types.AttributeValueMemberS{Value: now.Format(time.RFC3339)},
+			":stale": &types.AttributeValueMemberS{Value: staleThreshold},
+		},
+	})
+	if err != nil {
+		if strings.Contains(err.Error(), "ConditionalCheckFailedException") {
+			return errClaimAlreadyHeld
+		}
+		return err
+	}
+	return nil
+}
+
+func (d *notifierDeps) confirmSent(ctx context.Context, councilID string) error {
+	_, err := d.ddb.UpdateItem(ctx, &dynamodb.UpdateItemInput{
+		TableName: aws.String(d.councilsTable),
+		Key: map[string]types.AttributeValue{
+			"council_id": &types.AttributeValueMemberS{Value: councilID},
+		},
+		UpdateExpression: aws.String("SET newsletter_sent_at = :ts REMOVE newsletter_pending_at"),
+		ExpressionAttributeValues: map[string]types.AttributeValue{
+			":ts": &types.AttributeValueMemberS{Value: d.now().UTC().Format(time.RFC3339)},
+		},
+	})
+	return err
+}
+
+func (d *notifierDeps) releasePending(ctx context.Context, councilID string) error {
+	_, err := d.ddb.UpdateItem(ctx, &dynamodb.UpdateItemInput{
+		TableName: aws.String(d.councilsTable),
+		Key: map[string]types.AttributeValue{
+			"council_id": &types.AttributeValueMemberS{Value: councilID},
+		},
+		UpdateExpression: aws.String("REMOVE newsletter_pending_at"),
+	})
+	return err
 }
 
 // ── DynamoDB helpers ──────────────────────────────────────────────────────────

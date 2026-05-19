@@ -67,8 +67,6 @@ func TestParseGeminiResponseInvalidJSON(t *testing.T) {
 // --- Float sanitization regression (obs 299) ---
 
 func TestParseGeminiResponse_BudgetImpactFloat(t *testing.T) {
-	// Gemini sometimes returns floats like 2028913.40 instead of integer.
-	// The regex must strip the decimal part so int64 unmarshal succeeds.
 	raw := `{"title":"T","summary":"S","budget_impact": 2028913.40}`
 	result, err := parseGeminiResponse(raw)
 	require.NoError(t, err)
@@ -76,8 +74,6 @@ func TestParseGeminiResponse_BudgetImpactFloat(t *testing.T) {
 }
 
 func TestParseGeminiResponse_BudgetBreakdownAmountFloat(t *testing.T) {
-	// The same fix must apply to "amount" fields inside budget_breakdown items.
-	// Without the fix, unmarshaling a float into int64 would fail silently or error.
 	raw := `{
 		"title": "Budget Primitif",
 		"summary": "Vote du budget.",
@@ -99,4 +95,85 @@ func TestParseGeminiResponse_BudgetImpactZeroFloat(t *testing.T) {
 	result, err := parseGeminiResponse(raw)
 	require.NoError(t, err)
 	assert.Equal(t, int64(0), result.BudgetImpact)
+}
+
+// --- Defensive coercion: string "null" → nil pointer ---
+
+func TestParseGeminiResponse_DisagreementsLiteralNullString(t *testing.T) {
+	raw := `{"title":"T","summary":"S","disagreements":"null"}`
+	result, err := parseGeminiResponse(raw)
+	require.NoError(t, err)
+	assert.Nil(t, result.Disagreements)
+}
+
+func TestParseGeminiResponse_DisagreementsEmptyString(t *testing.T) {
+	raw := `{"title":"T","summary":"S","disagreements":""}`
+	result, err := parseGeminiResponse(raw)
+	require.NoError(t, err)
+	assert.Nil(t, result.Disagreements)
+}
+
+// --- Enum validation (defense in depth on top of API-level ResponseSchema) ---
+
+func validResultFixture() *GeminiResult {
+	r := &GeminiResult{
+		Title:         "T",
+		Summary:       "S",
+		TopicTag:      "Budget",
+		IsSubstantial: true,
+		BudgetImpact:  10000,
+		BudgetType:    "DÉPENSE",
+		ClimateImpact: "neutre",
+		KeyPoints:     []string{"k"},
+	}
+	r.Vote.HasVote = false
+	return r
+}
+
+func TestValidateGeminiResult_Valid(t *testing.T) {
+	assert.NoError(t, validateGeminiResult(validResultFixture()))
+}
+
+func TestValidateGeminiResult_InvalidTopicTag(t *testing.T) {
+	r := validResultFixture()
+	r.TopicTag = "Sport " // trailing space — exact match required
+	err := validateGeminiResult(r)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "topic_tag")
+}
+
+func TestValidateGeminiResult_InvalidBudgetType_UnaccentedDepense(t *testing.T) {
+	r := validResultFixture()
+	r.BudgetType = "DEPENSE" // missing accent — must fail
+	err := validateGeminiResult(r)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "budget_type")
+}
+
+func TestValidateGeminiResult_InvalidClimateImpact(t *testing.T) {
+	r := validResultFixture()
+	r.ClimateImpact = "positive" // English — must fail
+	err := validateGeminiResult(r)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "climate_impact")
+}
+
+func TestValidateGeminiResult_AucunWithImpact(t *testing.T) {
+	r := validResultFixture()
+	r.BudgetType = "AUCUN"
+	r.BudgetImpact = 5000 // contradicts AUCUN
+	err := validateGeminiResult(r)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "AUCUN")
+}
+
+func TestValidateGeminiResult_BreakdownInvalidTopic(t *testing.T) {
+	r := validResultFixture()
+	r.BudgetImpact = 1000
+	r.BudgetBreakdown = []BudgetBreakdownItem{
+		{TopicTag: "NotARealTopic", Label: "x", Amount: 1000},
+	}
+	err := validateGeminiResult(r)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "breakdown")
 }

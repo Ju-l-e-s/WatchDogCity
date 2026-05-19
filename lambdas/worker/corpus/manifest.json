@@ -1,0 +1,9 @@
+{
+  "fixtures": [
+    {
+      "slug": "_template",
+      "description": "Template entry — copy this block when adding a real fixture. Skipped by the harness because the slug starts with an underscore.",
+      "tags": ["template"]
+    }
+  ]
+}

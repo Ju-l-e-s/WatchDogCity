@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -32,6 +33,40 @@ type SQSMessage struct {
 	PDFTitle  string `json:"pdf_title"`
 	PDFURL    string `json:"pdf_url"`
 	TotalPDFs int    `json:"total_pdfs"`
+}
+
+// buildCouncilUpdateInput crafts the conditional UpdateItem that creates or
+// refreshes a council record without clobbering the worker-incremented
+// processed_pdfs counter or the original created_at. Extracted for tests.
+//
+// "date" is a DynamoDB reserved word — it must be aliased via
+// ExpressionAttributeNames.
+func buildCouncilUpdateInput(table string, c CouncilListing, totalPDFs, processedCount int, now time.Time) *dynamodb.UpdateItemInput {
+	return &dynamodb.UpdateItemInput{
+		TableName: aws.String(table),
+		Key: map[string]types.AttributeValue{
+			"council_id": &types.AttributeValueMemberS{Value: c.CouncilID},
+		},
+		UpdateExpression: aws.String(
+			"SET title = :t, summary = :s, category = :c, #date = :d, " +
+				"source_url = :u, total_pdfs = :tp, " +
+				"processed_pdfs = if_not_exists(processed_pdfs, :pp), " +
+				"created_at = if_not_exists(created_at, :ca)",
+		),
+		ExpressionAttributeNames: map[string]string{
+			"#date": "date",
+		},
+		ExpressionAttributeValues: map[string]types.AttributeValue{
+			":t":  &types.AttributeValueMemberS{Value: c.Title},
+			":s":  &types.AttributeValueMemberS{Value: c.Summary},
+			":c":  &types.AttributeValueMemberS{Value: c.Category},
+			":d":  &types.AttributeValueMemberS{Value: c.Date},
+			":u":  &types.AttributeValueMemberS{Value: c.URL},
+			":tp": &types.AttributeValueMemberN{Value: strconv.Itoa(totalPDFs)},
+			":pp": &types.AttributeValueMemberN{Value: strconv.Itoa(processedCount)},
+			":ca": &types.AttributeValueMemberS{Value: now.Format(time.RFC3339)},
+		},
+	}
 }
 
 func handler(ctx context.Context, event OrchestratorEvent) error {
@@ -126,28 +161,22 @@ func handler(ctx context.Context, event OrchestratorEvent) error {
 			}
 		}
 
-		// Sauvegarde des métadonnées du conseil
-		item, err := attributevalue.MarshalMap(map[string]interface{}{
-			"council_id":     council.CouncilID,
-			"category":       council.Category,
-			"date":           council.Date,
-			"title":          council.Title,
-			"summary":        council.Summary,
-			"source_url":     council.URL,
-			"total_pdfs":     len(pdfs),
-			"processed_pdfs": len(processedSet),
-			"created_at":     time.Now().UTC().Format(time.RFC3339),
-		})
-		if err != nil {
-			return fmt.Errorf("marshal council: %w", err)
+		// Sauvegarde des métadonnées du conseil via UpdateItem :
+		// un PutItem inconditionnel écrasait processed_pdfs avec un snapshot
+		// (len(processedSet)) calculé en début d'orchestration, perdant tous
+		// les ADD effectués par les workers en cours d'exécution. On utilise
+		// if_not_exists pour préserver le compteur s'il existe déjà, et
+		// pareil pour created_at.
+		if len(processedSet) > len(pdfs) {
+			log.Printf(
+				"warn: council %s — processedSet=%d > scraped pdfs=%d (source page may have removed items)",
+				council.CouncilID, len(processedSet), len(pdfs),
+			)
 		}
 
-		_, err = ddb.PutItem(ctx, &dynamodb.PutItemInput{
-			TableName: aws.String(os.Getenv("COUNCILS_TABLE")),
-			Item:      item,
-		})
-		if err != nil {
-			return fmt.Errorf("put council: %w", err)
+		input := buildCouncilUpdateInput(os.Getenv("COUNCILS_TABLE"), council, len(pdfs), len(processedSet), time.Now().UTC())
+		if _, err := ddb.UpdateItem(ctx, input); err != nil {
+			return fmt.Errorf("update council: %w", err)
 		}
 
 		queuedCount := 0

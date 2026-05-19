@@ -167,14 +167,6 @@ func (d *notifierDeps) handle(ctx context.Context, event NotifierEvent) error {
 		return fmt.Errorf("fetch council %s: %w", event.CouncilID, err)
 	}
 
-	// Idempotence: skip if newsletter already sent for this council. The flag is
-	// only checked/written on real sends — TestListID overrides bypass it so
-	// staging tests don't lock out production.
-	if event.TestListID == nil && council.NewsletterSentAt != "" {
-		log.Printf("newsletter already sent for council %s at %s — skipping", event.CouncilID, council.NewsletterSentAt)
-		return nil
-	}
-
 	delibs, err := d.fetchDeliberations(ctx, event.CouncilID)
 	if err != nil {
 		return fmt.Errorf("fetch deliberations for %s: %w", event.CouncilID, err)
@@ -188,33 +180,38 @@ func (d *notifierDeps) handle(ctx context.Context, event NotifierEvent) error {
 		return fmt.Errorf("generate newsletter params: %w", err)
 	}
 
+	// Claim the send slot atomically before calling Brevo. ConditionExpression
+	// ensures exactly one concurrent invocation proceeds — the loser gets
+	// ConditionalCheckFailedException and exits cleanly. Trade-off: if DDB
+	// succeeds but Brevo fails, the newsletter is never sent (zero-duplicate
+	// policy wins over zero-loss per obs 489).
+	if event.TestListID == nil {
+		_, err := d.ddb.UpdateItem(ctx, &dynamodb.UpdateItemInput{
+			TableName: aws.String(d.councilsTable),
+			Key: map[string]types.AttributeValue{
+				"council_id": &types.AttributeValueMemberS{Value: event.CouncilID},
+			},
+			UpdateExpression:    aws.String("SET newsletter_sent_at = :ts"),
+			ConditionExpression: aws.String("attribute_not_exists(newsletter_sent_at)"),
+			ExpressionAttributeValues: map[string]types.AttributeValue{
+				":ts": &types.AttributeValueMemberS{Value: time.Now().UTC().Format(time.RFC3339)},
+			},
+		})
+		if err != nil {
+			if strings.Contains(err.Error(), "ConditionalCheckFailedException") {
+				log.Printf("newsletter already claimed for council %s — concurrent send blocked", event.CouncilID)
+				return nil
+			}
+			return fmt.Errorf("claim newsletter slot: %w", err)
+		}
+	}
+
 	if err := d.sendCampaign(ctx, params); err != nil {
 		return fmt.Errorf("send brevo campaign: %w", err)
 	}
 
-	// Pose the idempotence flag only for real sends (test list bypasses it).
-	if event.TestListID == nil {
-		if err := d.markNewsletterSent(ctx, event.CouncilID); err != nil {
-			log.Printf("warn: campaign sent but failed to mark council %s as notified: %v", event.CouncilID, err)
-		}
-	}
-
 	log.Printf("newsletter campaign sent for council %s (%s)", event.CouncilID, council.Date)
 	return nil
-}
-
-func (d *notifierDeps) markNewsletterSent(ctx context.Context, councilID string) error {
-	_, err := d.ddb.UpdateItem(ctx, &dynamodb.UpdateItemInput{
-		TableName: aws.String(d.councilsTable),
-		Key: map[string]types.AttributeValue{
-			"council_id": &types.AttributeValueMemberS{Value: councilID},
-		},
-		UpdateExpression: aws.String("SET newsletter_sent_at = :ts"),
-		ExpressionAttributeValues: map[string]types.AttributeValue{
-			":ts": &types.AttributeValueMemberS{Value: time.Now().UTC().Format(time.RFC3339)},
-		},
-	})
-	return err
 }
 
 // ── DynamoDB helpers ──────────────────────────────────────────────────────────

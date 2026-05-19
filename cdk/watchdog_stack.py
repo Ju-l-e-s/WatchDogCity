@@ -149,6 +149,7 @@ class WatchdogStack(Stack):
             handler="bootstrap",
             code=lambda_.Code.from_asset("../dist/worker.zip"),
             timeout=Duration.minutes(5),
+            reserved_concurrent_executions=5,
             environment={
                 **common_env,
                 "GEMINI_MODEL": worker_model,
@@ -230,6 +231,12 @@ class WatchdogStack(Stack):
         brevo_newsletter_template_id = os.environ.get("BREVO_NEWSLETTER_TEMPLATE_ID", "7")
 
         # ── Lambda: Notifier ──────────────────────────────────────────────
+        notifier_dlq = sqs.Queue(
+            self, "NotifierDLQ",
+            queue_name="watchdog-notifier-dlq",
+            retention_period=Duration.days(14),
+        )
+
         notifier = lambda_.Function(
             self, "Notifier",
             runtime=lambda_.Runtime.PROVIDED_AL2023,
@@ -237,6 +244,7 @@ class WatchdogStack(Stack):
             handler="bootstrap",
             code=lambda_.Code.from_asset("../dist/notifier.zip"),
             timeout=Duration.minutes(5),
+            dead_letter_queue=notifier_dlq,
             environment={
                 "COUNCILS_TABLE": councils_table.table_name,
                 "DELIBERATIONS_TABLE": deliberations_table.table_name,

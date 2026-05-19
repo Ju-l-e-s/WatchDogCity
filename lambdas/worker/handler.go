@@ -130,6 +130,7 @@ func (h *WorkerHandler) handleRecord(ctx context.Context, msg SQSPayload, result
 		return fmt.Errorf("marshal item: %w", err)
 	}
 
+	isNewInsert := true
 	_, err = h.ddb.PutItem(ctx, &dynamodb.PutItemInput{
 		TableName:           aws.String(os.Getenv("DELIBERATIONS_TABLE")),
 		Item:                item,
@@ -139,6 +140,7 @@ func (h *WorkerHandler) handleRecord(ctx context.Context, msg SQSPayload, result
 		if !strings.Contains(err.Error(), "ConditionalCheckFailedException") {
 			return fmt.Errorf("put deliberation: %w", err)
 		}
+		isNewInsert = false
 		// Item exists — update budget_impact and budget_breakdown unconditionally
 		breakdownVal, merr := attributevalue.Marshal(result.BudgetBreakdown)
 		if merr != nil {
@@ -163,28 +165,30 @@ func (h *WorkerHandler) handleRecord(ctx context.Context, msg SQSPayload, result
 		log.Printf("deliberation %s already processed, budget fields updated", id)
 	}
 
-	// 2. Increment counter
-	out, err := h.ddb.UpdateItem(ctx, &dynamodb.UpdateItemInput{
-		TableName: aws.String(os.Getenv("COUNCILS_TABLE")),
-		Key: map[string]types.AttributeValue{
-			"council_id": &types.AttributeValueMemberS{Value: msg.CouncilID},
-		},
-		UpdateExpression: aws.String("SET processed_pdfs = processed_pdfs + :one"),
-		ExpressionAttributeValues: map[string]types.AttributeValue{
-			":one": &types.AttributeValueMemberN{Value: "1"},
-		},
-		ReturnValues: types.ReturnValueAllNew,
-	})
-	if err != nil {
-		return fmt.Errorf("update council counter: %w", err)
-	}
+	if isNewInsert {
+		// 2. Increment counter
+		out, err := h.ddb.UpdateItem(ctx, &dynamodb.UpdateItemInput{
+			TableName: aws.String(os.Getenv("COUNCILS_TABLE")),
+			Key: map[string]types.AttributeValue{
+				"council_id": &types.AttributeValueMemberS{Value: msg.CouncilID},
+			},
+			UpdateExpression: aws.String("SET processed_pdfs = processed_pdfs + :one"),
+			ExpressionAttributeValues: map[string]types.AttributeValue{
+				":one": &types.AttributeValueMemberN{Value: "1"},
+			},
+			ReturnValues: types.ReturnValueAllNew,
+		})
+		if err != nil {
+			return fmt.Errorf("update council counter: %w", err)
+		}
 
-	// 3. Complete?
-	processed := attrInt(out.Attributes, "processed_pdfs")
-	total := attrInt(out.Attributes, "total_pdfs")
-	if processed >= total && total > 0 {
-		log.Printf("council %s complete (%d/%d), invoking publisher", msg.CouncilID, processed, total)
-		h.invokePublisher(ctx, msg.CouncilID)
+		// 3. Complete?
+		processed := attrInt(out.Attributes, "processed_pdfs")
+		total := attrInt(out.Attributes, "total_pdfs")
+		if processed >= total && total > 0 {
+			log.Printf("council %s complete (%d/%d), invoking publisher", msg.CouncilID, processed, total)
+			h.invokePublisher(ctx, msg.CouncilID)
+		}
 	}
 
 	// Metrics

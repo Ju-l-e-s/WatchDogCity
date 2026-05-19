@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -170,13 +171,24 @@ func runSynthesis(ctx context.Context, ddb *dynamodb.Client, lambdaClient *lambd
 		return err
 	}
 
-	// 5. Déclenchement du Publisher pour mettre à jour le JSON front-end
+	// 5. Déclenchement du Publisher pour mettre à jour le JSON front-end.
+	// Le payload est requis : sans council_id, le publisher cascade au notifier
+	// avec une chaîne vide → fetchCouncil("") 404 → newsletter perdue.
+	payload, err := buildPublisherPayload(councilID)
+	if err != nil {
+		return fmt.Errorf("marshal publisher payload: %w", err)
+	}
 	_, err = lambdaClient.Invoke(ctx, &lambdaService.InvokeInput{
 		FunctionName:   aws.String(os.Getenv("PUBLISHER_FUNCTION_NAME")),
 		InvocationType: lambdaTypes.InvocationTypeEvent,
+		Payload:        payload,
 	})
 
 	return err
+}
+
+func buildPublisherPayload(councilID string) ([]byte, error) {
+	return json.Marshal(map[string]string{"council_id": councilID})
 }
 
 // ── Pure calculation functions (extracted for testability) ───────────────────

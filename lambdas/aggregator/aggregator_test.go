@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
@@ -133,6 +134,20 @@ func TestComputeStats_Empty(t *testing.T) {
 	assert.Equal(t, int64(0), stats.totalBudget)
 	assert.Equal(t, 0, stats.totalPour)
 	assert.Empty(t, stats.summaries)
+}
+
+// TestBuildPublisherPayload_ContainsCouncilID guards against the silent
+// regression where aggregator invoked the publisher without Payload, leaving
+// the downstream notifier with an empty council_id and dropping the
+// newsletter for every council triggered via the DynamoDB Stream path.
+func TestBuildPublisherPayload_ContainsCouncilID(t *testing.T) {
+	payload, err := buildPublisherPayload("council-2026-05")
+	require.NoError(t, err)
+	require.NotEmpty(t, payload)
+
+	var decoded map[string]string
+	require.NoError(t, json.Unmarshal(payload, &decoded))
+	assert.Equal(t, "council-2026-05", decoded["council_id"])
 }
 
 func TestComputeStats_NilVotePointers(t *testing.T) {

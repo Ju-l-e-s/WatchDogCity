@@ -148,11 +148,24 @@ func runSynthesis(ctx context.Context, ddb *dynamodb.Client, lambdaClient *lambd
 	mainTheme := dominantTheme(stats.topicBudgets)
 	climat := voteClimat(stats.totalPour, stats.totalContre)
 
-	// 3. Synthèse IA (Enjeu Clé)
-	voteSummary, err := askGeminiForSynthesis(ctx, stats.summaries)
-	if err != nil {
-		log.Printf("IA Synthesis failed, using fallback: %v", err)
-		voteSummary = "Synthèse des enjeux majeurs de la séance du conseil municipal."
+	// 3. Synthèse IA (Enjeu Clé) — short-circuited when Gemini is down for long.
+	councilsTable := os.Getenv("COUNCILS_TABLE")
+	const synthesisFallback = "Synthèse des enjeux majeurs de la séance du conseil municipal."
+	var voteSummary string
+	if open, cerr := shared.GeminiCircuitOpen(ctx, ddb, councilsTable); cerr == nil && open {
+		log.Printf("gemini circuit OPEN — skipping synthesis for %s, using fallback", councilID)
+		voteSummary = synthesisFallback
+	} else {
+		voteSummary, err = askGeminiForSynthesis(ctx, stats.summaries)
+		if err != nil {
+			log.Printf("IA Synthesis failed, using fallback: %v", err)
+			voteSummary = synthesisFallback
+			if rerr := shared.RecordGeminiError(ctx, ddb, councilsTable); rerr != nil {
+				log.Printf("warn: record gemini error: %v", rerr)
+			}
+		} else if rerr := shared.RecordGeminiSuccess(ctx, ddb, councilsTable); rerr != nil {
+			log.Printf("warn: record gemini success: %v", rerr)
+		}
 	}
 
 	// 4. Mise à jour du Conseil dans DynamoDB

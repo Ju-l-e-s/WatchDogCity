@@ -236,6 +236,15 @@ func HandleRequest(ctx context.Context, event NotifierEvent) error {
 }
 
 func (d *notifierDeps) handle(ctx context.Context, event NotifierEvent) error {
+	// If Gemini is in an extended outage, skip cleanly: the newsletter is
+	// re-triggered by a later schedule rather than failing into the DLQ.
+	if open, err := shared.GeminiCircuitOpen(ctx, d.ddb, d.councilsTable); err != nil {
+		log.Printf("gemini circuit check failed, proceeding: %v", err)
+	} else if open {
+		log.Printf("gemini circuit OPEN — skipping newsletter for council %s; will retry on next schedule", event.CouncilID)
+		return nil
+	}
+
 	// Override list ID if provided in event
 	if event.TestListID != nil {
 		d.brevoListID = *event.TestListID
@@ -472,7 +481,13 @@ func (d *notifierDeps) generateNewsletterParams(ctx context.Context, council *co
 		)
 	}, 4)
 	if err != nil {
+		if rerr := shared.RecordGeminiError(ctx, d.ddb, d.councilsTable); rerr != nil {
+			log.Printf("warn: record gemini error: %v", rerr)
+		}
 		return nil, fmt.Errorf("gemini generate: %w", err)
+	}
+	if rerr := shared.RecordGeminiSuccess(ctx, d.ddb, d.councilsTable); rerr != nil {
+		log.Printf("warn: record gemini success: %v", rerr)
 	}
 	if len(resp.Candidates) == 0 || resp.Candidates[0].Content == nil || len(resp.Candidates[0].Content.Parts) == 0 {
 		return nil, fmt.Errorf("gemini returned empty response")

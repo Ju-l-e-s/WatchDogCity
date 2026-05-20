@@ -167,7 +167,7 @@ class WatchdogStack(Stack):
             batch_size=1,
             report_batch_item_failures=True,
         ))
-        councils_table.grant(worker, "dynamodb:UpdateItem")
+        councils_table.grant(worker, "dynamodb:GetItem", "dynamodb:UpdateItem")
         deliberations_table.grant(worker, "dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:UpdateItem")
 
         # ── Lambda: Publisher ─────────────────────────────────────────────

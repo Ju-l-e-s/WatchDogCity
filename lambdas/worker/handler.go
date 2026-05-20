@@ -51,7 +51,20 @@ type SQSPayload struct {
 
 func (h *WorkerHandler) HandleRequest(ctx context.Context, event events.SQSEvent) (events.SQSEventResponse, error) {
 	apiKey := os.Getenv("GEMINI_API_KEY")
+	councilsTable := os.Getenv("COUNCILS_TABLE")
 	var failures []events.SQSBatchItemFailure
+
+	// If Gemini is in an extended outage, defer the whole batch back to SQS
+	// rather than burning attempts (and quota) on calls that will fail.
+	if open, err := shared.GeminiCircuitOpen(ctx, h.ddb, councilsTable); err != nil {
+		log.Printf("gemini circuit check failed, proceeding: %v", err)
+	} else if open {
+		log.Printf("gemini circuit OPEN — deferring %d SQS records for later retry", len(event.Records))
+		for _, record := range event.Records {
+			failures = append(failures, events.SQSBatchItemFailure{ItemIdentifier: record.MessageId})
+		}
+		return events.SQSEventResponse{BatchItemFailures: failures}, nil
+	}
 
 	for _, record := range event.Records {
 		var msg SQSPayload
@@ -95,8 +108,14 @@ func (h *WorkerHandler) HandleRequest(ctx context.Context, event events.SQSEvent
 		gemCancel()
 		if err != nil {
 			log.Printf("error analyzing with Gemini: %v", err)
+			if rerr := shared.RecordGeminiError(ctx, h.ddb, councilsTable); rerr != nil {
+				log.Printf("warn: record gemini error: %v", rerr)
+			}
 			failures = append(failures, events.SQSBatchItemFailure{ItemIdentifier: record.MessageId})
 			continue
+		}
+		if rerr := shared.RecordGeminiSuccess(ctx, h.ddb, councilsTable); rerr != nil {
+			log.Printf("warn: record gemini success: %v", rerr)
 		}
 
 		if err := h.handleRecord(ctx, msg, result); err != nil {

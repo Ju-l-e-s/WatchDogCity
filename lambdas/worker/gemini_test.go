@@ -142,12 +142,12 @@ func TestValidateGeminiResult_InvalidTopicTag(t *testing.T) {
 	assert.Contains(t, err.Error(), "topic_tag")
 }
 
-func TestValidateGeminiResult_InvalidBudgetType_UnaccentedDepense(t *testing.T) {
+func TestValidateGeminiResult_BudgetType_UnaccentedDepense(t *testing.T) {
 	r := validResultFixture()
-	r.BudgetType = "DEPENSE" // missing accent — must fail
+	r.BudgetType = "DEPENSE" // missing accent — normalized to canonical form
 	err := validateGeminiResult(r)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "budget_type")
+	assert.NoError(t, err)
+	assert.Equal(t, "DÉPENSE", r.BudgetType)
 }
 
 func TestValidateGeminiResult_InvalidClimateImpact(t *testing.T) {

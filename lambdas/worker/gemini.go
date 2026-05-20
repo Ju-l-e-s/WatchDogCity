@@ -268,27 +268,39 @@ func parseGeminiResponse(raw string) (*GeminiResult, error) {
 }
 
 // validateGeminiResult enforces enum membership and basic invariants beyond
-// what the API-level schema guarantees. Defense in depth — surfaces silent
-// drift (e.g. Gemini returning "DEPENSE" without accent) as hard errors.
+// what the API-level schema guarantees. Defense in depth — normalizes accent
+// and case drift (e.g. "DEPENSE" → "DÉPENSE") before validating.
 func validateGeminiResult(r *GeminiResult) error {
-	if !contains(validTopicTags, r.TopicTag) {
+	canonical, ok := shared.MatchTopicTag(r.TopicTag)
+	if !ok {
 		return fmt.Errorf("invalid topic_tag %q (must be one of %v)", r.TopicTag, validTopicTags)
 	}
-	if !contains(validBudgetTypes, r.BudgetType) {
+	r.TopicTag = canonical
+
+	canonical, ok = shared.MatchBudgetType(r.BudgetType)
+	if !ok {
 		return fmt.Errorf("invalid budget_type %q (must be one of %v)", r.BudgetType, validBudgetTypes)
 	}
-	if !contains(validClimateImpacts, r.ClimateImpact) {
+	r.BudgetType = canonical
+
+	canonical, ok = shared.MatchClimateImpact(r.ClimateImpact)
+	if !ok {
 		return fmt.Errorf("invalid climate_impact %q (must be one of %v)", r.ClimateImpact, validClimateImpacts)
 	}
+	r.ClimateImpact = canonical
+
 	if r.BudgetType == "AUCUN" && r.BudgetImpact != 0 {
 		return fmt.Errorf("budget_type=AUCUN but budget_impact=%d", r.BudgetImpact)
 	}
 	if len(r.BudgetBreakdown) > 0 {
 		var sum int64
-		for _, b := range r.BudgetBreakdown {
-			if !contains(validTopicTags, b.TopicTag) {
+		for i := range r.BudgetBreakdown {
+			b := &r.BudgetBreakdown[i]
+			canonical, ok := shared.MatchTopicTag(b.TopicTag)
+			if !ok {
 				return fmt.Errorf("invalid breakdown topic_tag %q", b.TopicTag)
 			}
+			b.TopicTag = canonical
 			sum += b.Amount
 		}
 		// Allow 1€ rounding tolerance.
@@ -304,13 +316,4 @@ func validateGeminiResult(r *GeminiResult) error {
 		}
 	}
 	return nil
-}
-
-func contains(list []string, s string) bool {
-	for _, v := range list {
-		if v == s {
-			return true
-		}
-	}
-	return false
 }

@@ -3,7 +3,10 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -18,6 +21,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	ddbtypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	awslambda "github.com/aws/aws-sdk-go-v2/service/lambda"
 	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 )
@@ -137,10 +141,12 @@ func (h *WorkerHandler) handleRecord(ctx context.Context, msg SQSPayload, result
 		ConditionExpression: aws.String("attribute_not_exists(id)"),
 	})
 	if err != nil {
-		if !strings.Contains(err.Error(), "ConditionalCheckFailedException") {
+		var ccfe *ddbtypes.ConditionalCheckFailedException
+		if errors.As(err, &ccfe) {
+			isNewInsert = false
+		} else {
 			return fmt.Errorf("put deliberation: %w", err)
 		}
-		isNewInsert = false
 		// Item exists — update budget_impact and budget_breakdown unconditionally
 		breakdownVal, merr := attributevalue.Marshal(result.BudgetBreakdown)
 		if merr != nil {
@@ -229,7 +235,11 @@ func downloadPDF(url string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	if !bytes.HasPrefix(pdfBytes, []byte("%PDF-")) {
+	head := pdfBytes
+	if len(head) > 128 {
+		head = head[:128]
+	}
+	if !bytes.Contains(head, []byte("%PDF-")) {
 		prefix := pdfBytes
 		if len(prefix) > 8 {
 			prefix = prefix[:8]
@@ -240,8 +250,14 @@ func downloadPDF(url string) ([]byte, error) {
 }
 
 func deliberationID(url string) string {
-	parts := strings.Split(url, "/")
-	return parts[len(parts)-1]
+	u := strings.TrimRight(url, "/")
+	parts := strings.Split(u, "/")
+	last := parts[len(parts)-1]
+	if last == "" {
+		sum := sha256.Sum256([]byte(url))
+		return hex.EncodeToString(sum[:8])
+	}
+	return last
 }
 
 func attrInt(m map[string]types.AttributeValue, key string) int {

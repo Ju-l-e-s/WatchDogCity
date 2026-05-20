@@ -19,8 +19,8 @@ var budgetAmountFloatRe = regexp.MustCompile(`("(?:budget_impact|amount)"\s*:\s*
 
 // Enum aliases — single source of truth lives in shared package.
 var (
-	validTopicTags    = shared.TopicTags
-	validBudgetTypes  = shared.BudgetTypes
+	validTopicTags      = shared.TopicTags
+	validBudgetTypes    = shared.BudgetTypes
 	validClimateImpacts = shared.ClimateImpacts
 )
 
@@ -167,8 +167,9 @@ var deliberationSchema = &genai.Schema{
 	},
 }
 
-func ptrBool(b bool) *bool       { return &b }
+func ptrBool(b bool) *bool          { return &b }
 func ptrFloat32(f float32) *float32 { return &f }
+func ptrInt32(i int32) *int32       { return &i }
 
 func analyzeWithGemini(ctx context.Context, apiKey string, pdfBytes []byte) (*GeminiResult, error) {
 	modelName := os.Getenv("GEMINI_MODEL")
@@ -209,6 +210,7 @@ func analyzeWithGemini(ctx context.Context, apiKey string, pdfBytes []byte) (*Ge
 			Temperature:      ptrFloat32(0),
 			ResponseMIMEType: "application/json",
 			ResponseSchema:   deliberationSchema,
+			MaxOutputTokens:  8192,
 		},
 	)
 	if err != nil {

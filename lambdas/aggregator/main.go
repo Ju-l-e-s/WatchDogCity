@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
@@ -19,6 +20,8 @@ import (
 	lambdaTypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 	"google.golang.org/genai"
 )
+
+func ptrInt32(i int32) *int32 { return &i }
 
 type CouncilAnalysis struct {
 	BudgetImpact int64  `dynamodbav:"budget_impact" json:"budget_impact"`
@@ -164,7 +167,7 @@ func runSynthesis(ctx context.Context, ddb *dynamodb.Client, lambdaClient *lambd
 		UpdateExpression: aws.String("SET analysis = :a, updated_at = :u"),
 		ExpressionAttributeValues: map[string]types.AttributeValue{
 			":a": &types.AttributeValueMemberM{Value: analysisMap},
-			":u": &types.AttributeValueMemberS{Value: "now"}, // Placeholder for simplicity
+			":u": &types.AttributeValueMemberS{Value: time.Now().UTC().Format(time.RFC3339)},
 		},
 	})
 	if err != nil {
@@ -271,7 +274,9 @@ Ne commence pas par "Enjeu Clé :". Ne sois pas trop court. Sois précis sur l'i
 	resp, err := client.Models.GenerateContent(ctx, modelName, []*genai.Content{{
 		Role:  "user",
 		Parts: []*genai.Part{{Text: prompt}},
-	}}, nil)
+	}}, &genai.GenerateContentConfig{
+		MaxOutputTokens: 8192,
+	})
 	if err != nil {
 		return "", err
 	}

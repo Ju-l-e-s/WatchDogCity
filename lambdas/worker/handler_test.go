@@ -54,11 +54,11 @@ func TestHandleRecord_TopicTagPersistence(t *testing.T) {
 	mockD := &mockDDB{}
 	mockL := &mockLambda{}
 	h := &WorkerHandler{
-		ddb: mockD,
+		ddb:    mockD,
 		lambda: mockL,
 	}
 	msg := SQSPayload{CouncilID: "C1", PDFURL: "https://example.com/D01.pdf"}
-	
+
 	pour, contre, abs := 20, 5, 2
 	result := &GeminiResult{
 		Title:    "Budget 2026",
@@ -109,8 +109,36 @@ func TestHandleRecord_LastPDFDetection(t *testing.T) {
 }
 
 func TestDeliberationID(t *testing.T) {
-	id := deliberationID("https://example.com/D01.pdf")
-	assert.Equal(t, "D01.pdf", id)
+	tests := []struct {
+		name    string
+		url     string
+		checkFn func(string) bool
+	}{
+		{
+			name:    "normal URL",
+			url:     "https://example.com/D01.pdf",
+			checkFn: func(id string) bool { return id == "D01.pdf" },
+		},
+		{
+			name:    "URL with trailing slash",
+			url:     "https://example.com/D01.pdf/",
+			checkFn: func(id string) bool { return id == "D01.pdf" },
+		},
+		{
+			name: "empty last segment (double slash)",
+			url:  "https://example.com/D01.pdf//",
+			checkFn: func(id string) bool {
+				// Should fall back to SHA256 hash instead of empty string
+				return id != "" && len(id) == 16 // hex of 8 bytes
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			id := deliberationID(tt.url)
+			assert.True(t, tt.checkFn(id), "deliberationID(%q) = %q", tt.url, id)
+		})
+	}
 }
 
 var _ = time.Now

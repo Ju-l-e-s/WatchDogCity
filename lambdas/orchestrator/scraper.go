@@ -46,7 +46,7 @@ func (sc *Scraper) ScrapeCouncilList() ([]CouncilListing, error) {
 			return
 		}
 		title := strings.TrimSpace(link.Text())
-		
+
 		// Tentative d'extraction du résumé avec plusieurs sélecteurs possibles
 		summary := strings.TrimSpace(s.Find(".publications-list-item__excerpt").Text())
 		if summary == "" {
@@ -95,7 +95,7 @@ func (sc *Scraper) ScrapePDFLinks(councilURL string) ([]PDFItem, error) {
 		title := strings.TrimSpace(s.Find(".telecharger-item__title").Text())
 		link := s.Find("a.telecharger-item__link")
 		href, exists := link.Attr("href")
-		
+
 		if exists && strings.HasSuffix(strings.ToLower(href), ".pdf") {
 			items = append(items, PDFItem{
 				Title: title,

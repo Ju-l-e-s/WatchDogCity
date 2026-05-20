@@ -43,9 +43,9 @@ func TestDominantTheme_SingleTopic(t *testing.T) {
 
 func TestDominantTheme_PicksHighest(t *testing.T) {
 	topics := map[string]int64{
-		"Sport":    100_000,
-		"Culture":  200_000,
-		"Social":   50_000,
+		"Sport":   100_000,
+		"Culture": 200_000,
+		"Social":  50_000,
 	}
 	assert.Equal(t, "Culture", dominantTheme(topics))
 }

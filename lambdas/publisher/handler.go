@@ -216,7 +216,10 @@ func HandleRequest(ctx context.Context, event PublisherEvent) error {
 	}
 
 	// Upload data.json to S3
-	jsonBytes, _ := json.MarshalIndent(data, "", "  ")
+	jsonBytes, err := json.MarshalIndent(data, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshal data.json: %w", err)
+	}
 	s3Client := s3.NewFromConfig(cfg)
 	_, err = s3Client.PutObject(ctx, &s3.PutObjectInput{
 		Bucket:       aws.String(os.Getenv("WEBSITE_BUCKET")),
@@ -266,7 +269,9 @@ func fetchAllData(ctx context.Context, ddb *dynamodb.Client) ([]CouncilRecord, m
 			return nil, nil, err
 		}
 		var batch []CouncilRecord
-		attributevalue.UnmarshalListOfMaps(cOut.Items, &batch)
+		if err := attributevalue.UnmarshalListOfMaps(cOut.Items, &batch); err != nil {
+			return nil, nil, fmt.Errorf("unmarshal council batch: %w", err)
+		}
 		councils = append(councils, batch...)
 
 		if cOut.LastEvaluatedKey == nil {
@@ -287,7 +292,9 @@ func fetchAllData(ctx context.Context, ddb *dynamodb.Client) ([]CouncilRecord, m
 			return nil, nil, err
 		}
 		var batch []DeliberationRecord
-		attributevalue.UnmarshalListOfMaps(dOut.Items, &batch)
+		if err := attributevalue.UnmarshalListOfMaps(dOut.Items, &batch); err != nil {
+			return nil, nil, fmt.Errorf("unmarshal deliberation batch: %w", err)
+		}
 		delibs = append(delibs, batch...)
 
 		if dOut.LastEvaluatedKey == nil {

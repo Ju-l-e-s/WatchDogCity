@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -18,6 +19,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	ddbtypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"google.golang.org/genai"
 )
 
@@ -49,17 +51,17 @@ type councilRec struct {
 }
 
 type deliberationRec struct {
-	ID           string  `dynamodbav:"id"`
-	CouncilID    string  `dynamodbav:"council_id"`
-	Title        string  `dynamodbav:"title"`
-	TopicTag     string  `dynamodbav:"topic_tag"`
-	Summary      string  `dynamodbav:"summary"`
-	BudgetImpact int64   `dynamodbav:"budget_impact"`
-	VotePour     *int    `dynamodbav:"vote_pour"`
-	VoteContre   *int    `dynamodbav:"vote_contre"`
-	VoteAbst     *int    `dynamodbav:"vote_abstention"`
+	ID            string  `dynamodbav:"id"`
+	CouncilID     string  `dynamodbav:"council_id"`
+	Title         string  `dynamodbav:"title"`
+	TopicTag      string  `dynamodbav:"topic_tag"`
+	Summary       string  `dynamodbav:"summary"`
+	BudgetImpact  int64   `dynamodbav:"budget_impact"`
+	VotePour      *int    `dynamodbav:"vote_pour"`
+	VoteContre    *int    `dynamodbav:"vote_contre"`
+	VoteAbst      *int    `dynamodbav:"vote_abstention"`
 	Disagreements *string `dynamodbav:"disagreements"`
-	AnalysisData struct {
+	AnalysisData  struct {
 		Contexte *string `dynamodbav:"contexte"`
 		Decision *string `dynamodbav:"decision"`
 		Impacts  *string `dynamodbav:"impacts"`
@@ -69,23 +71,23 @@ type deliberationRec struct {
 // ── Newsletter params (exact Brevo template schema) ───────────────────────────
 
 type NewsletterParams struct {
-	EmailSubject          string        `json:"email_subject"`
-	CouncilTitle          string        `json:"council_title"`
-	CouncilDate           string        `json:"council_date"`
-	MainIssue             string        `json:"main_issue"`
-	BudgetTotal           string        `json:"budget_total"`
-	HasGlobalBudget       bool          `json:"has_global_budget"`
-	VoteClimat            string        `json:"vote_climat"`
-	ClimatColor           string        `json:"climat_color"`
-	VoteStats             string        `json:"vote_stats"`
-	TotalDelibsInCouncil  int           `json:"total_delibs_in_council"`
-	Tensions              []TensionItem `json:"tensions"`
-	Adopted               []AdoptedItem `json:"adopted"`
-	Briefs                []BriefItem   `json:"briefs"`
-	NextMeeting           string        `json:"next_meeting"`
-	WebsiteURL            string        `json:"website_url"`
-	TotalCouncils         int           `json:"total_councils"`
-	TotalDelibs           int           `json:"total_delibs"`
+	EmailSubject         string        `json:"email_subject"`
+	CouncilTitle         string        `json:"council_title"`
+	CouncilDate          string        `json:"council_date"`
+	MainIssue            string        `json:"main_issue"`
+	BudgetTotal          string        `json:"budget_total"`
+	HasGlobalBudget      bool          `json:"has_global_budget"`
+	VoteClimat           string        `json:"vote_climat"`
+	ClimatColor          string        `json:"climat_color"`
+	VoteStats            string        `json:"vote_stats"`
+	TotalDelibsInCouncil int           `json:"total_delibs_in_council"`
+	Tensions             []TensionItem `json:"tensions"`
+	Adopted              []AdoptedItem `json:"adopted"`
+	Briefs               []BriefItem   `json:"briefs"`
+	NextMeeting          string        `json:"next_meeting"`
+	WebsiteURL           string        `json:"website_url"`
+	TotalCouncils        int           `json:"total_councils"`
+	TotalDelibs          int           `json:"total_delibs"`
 }
 
 type TensionItem struct {
@@ -131,6 +133,8 @@ type httpDoer interface {
 // max for this function) divided by AWS async retry policy, so a crashing
 // Lambda can never park the newsletter forever.
 const pendingClaimTTL = 10 * time.Minute
+
+func ptrInt32(i int32) *int32 { return &i }
 
 type notifierDeps struct {
 	ddb                dynamoQuerier
@@ -272,7 +276,8 @@ func (d *notifierDeps) claimPending(ctx context.Context, councilID string) error
 		},
 	})
 	if err != nil {
-		if strings.Contains(err.Error(), "ConditionalCheckFailedException") {
+		var ccfe *ddbtypes.ConditionalCheckFailedException
+		if errors.As(err, &ccfe) {
 			return errClaimAlreadyHeld
 		}
 		return err
@@ -413,6 +418,7 @@ func (d *notifierDeps) generateNewsletterParams(ctx context.Context, council *co
 		}},
 		&genai.GenerateContentConfig{
 			ResponseMIMEType: "application/json",
+			MaxOutputTokens:  8192,
 		},
 	)
 	if err != nil {
@@ -444,9 +450,8 @@ func (d *notifierDeps) generateNewsletterParams(ctx context.Context, council *co
 		if digitsOnly == "" {
 			return ""
 		}
-		var val int64
-		fmt.Sscanf(digitsOnly, "%d", &val)
-		if val == 0 {
+		val, err := strconv.ParseInt(digitsOnly, 10, 64)
+		if err != nil || val == 0 {
 			return ""
 		}
 		return formatBudgetFR(val)
@@ -499,15 +504,23 @@ func computeNewsletterStats(delibs []deliberationRec) newsletterStats {
 
 	for _, d := range delibs {
 		s.totalBudget += d.BudgetImpact
-		
+
 		contre := 0
-		if d.VoteContre != nil { contre = *d.VoteContre }
+		if d.VoteContre != nil {
+			contre = *d.VoteContre
+		}
 		abst := 0
-		if d.VoteAbst != nil { abst = *d.VoteAbst }
-		
-		if contre > maxOpposition { maxOpposition = contre }
-		if abst > maxAbst { maxAbst = abst }
-		
+		if d.VoteAbst != nil {
+			abst = *d.VoteAbst
+		}
+
+		if contre > maxOpposition {
+			maxOpposition = contre
+		}
+		if abst > maxAbst {
+			maxAbst = abst
+		}
+
 		if contre > 0 || abst > 0 {
 			nonUnanimousCount++
 		}
@@ -591,7 +604,7 @@ func buildNewsletterPrompt(council *councilRec, delibs []deliberationRec, stats 
 			contre = *d.VoteContre
 		}
 		hasDisagreement := d.Disagreements != nil && *d.Disagreements != ""
-		
+
 		// 1. Priorité Politique (Tensions) : Toujours inclus même pour 1€
 		if contre > 0 || hasDisagreement {
 			politicalTensions = append(politicalTensions, d)
@@ -610,7 +623,7 @@ func buildNewsletterPrompt(council *councilRec, delibs []deliberationRec, stats 
 			localLife = append(localLife, d)
 			continue
 		}
-		
+
 		// Le reste (ex: Bureaucratie < 500€ unanime) est considéré comme du "bruit" et exclu de la newsletter.
 	}
 
@@ -685,17 +698,27 @@ func buildNewsletterPrompt(council *councilRec, delibs []deliberationRec, stats 
 	sb.WriteString("\nDÉLIBÉRATIONS AVEC OPPOSITION (A METTRE DANS tensions[]) :\n")
 	for _, d := range politicalTensions {
 		contre := 0
-		if d.VoteContre != nil { contre = *d.VoteContre }
+		if d.VoteContre != nil {
+			contre = *d.VoteContre
+		}
 		abst := 0
-		if d.VoteAbst != nil { abst = *d.VoteAbst }
+		if d.VoteAbst != nil {
+			abst = *d.VoteAbst
+		}
 		pour := 0
-		if d.VotePour != nil { pour = *d.VotePour }
+		if d.VotePour != nil {
+			pour = *d.VotePour
+		}
 		dis := "aucun"
-		if d.Disagreements != nil { dis = *d.Disagreements }
-		
+		if d.Disagreements != nil {
+			dis = *d.Disagreements
+		}
+
 		fmt.Fprintf(&sb, "- %s | Budget: %d€ | Vote: %d/%d/%d | Désaccords: %s\n", d.Title, d.BudgetImpact, pour, contre, abst, dis)
 	}
-	if len(politicalTensions) == 0 { sb.WriteString("(néant)\n") }
+	if len(politicalTensions) == 0 {
+		sb.WriteString("(néant)\n")
+	}
 
 	// Injecter les impacts majeurs et vie locale
 	sb.WriteString("\nDÉLIBÉRATIONS ADOPTÉES SIGNIFICATIVES (A FILTRER POUR adopted[] et briefs[]) :\n")
@@ -742,9 +765,14 @@ func (d *notifierDeps) sendCampaign(ctx context.Context, params *NewsletterParam
 
 func (d *notifierDeps) createCampaign(ctx context.Context, params *NewsletterParams) (int, error) {
 	// Convert params struct → map[string]interface{} for the Brevo params field
-	paramsJSON, _ := json.Marshal(params)
+	paramsJSON, err := json.Marshal(params)
+	if err != nil {
+		return 0, fmt.Errorf("marshal newsletter params: %w", err)
+	}
 	var paramsMap map[string]interface{}
-	json.Unmarshal(paramsJSON, &paramsMap)
+	if err := json.Unmarshal(paramsJSON, &paramsMap); err != nil {
+		return 0, fmt.Errorf("unmarshal newsletter params to map: %w", err)
+	}
 
 	payload, err := json.Marshal(map[string]interface{}{
 		"name":       fmt.Sprintf("Newsletter - %s", params.CouncilDate),

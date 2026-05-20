@@ -75,9 +75,9 @@ func TestContactHandler_MissingFields(t *testing.T) {
 		{"", "user@example.com", "message"},
 		{"Alice", "", "message"},
 		{"Alice", "user@example.com", ""},
-		{"  ", "user@example.com", "message"},  // whitespace-only name
-		{"Alice", "  ", "message"},             // whitespace-only email
-		{"Alice", "user@example.com", "   "},   // whitespace-only message
+		{"  ", "user@example.com", "message"}, // whitespace-only name
+		{"Alice", "  ", "message"},            // whitespace-only email
+		{"Alice", "user@example.com", "   "},  // whitespace-only message
 	}
 	for _, tc := range cases {
 		resp, err := d.handler(context.Background(), contactPostRequest(tc.name, tc.email, tc.message))

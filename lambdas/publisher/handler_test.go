@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func intPtr(i int) *int { return &i }
+func intPtr(i int) *int       { return &i }
 func strPtr(s string) *string { return &s }
 
 // --- JSON schema contract ---

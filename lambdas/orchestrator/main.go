@@ -17,6 +17,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
+	sqstypes "github.com/aws/aws-sdk-go-v2/service/sqs/types"
 	"github.com/watchdog/shared"
 )
 
@@ -34,6 +35,35 @@ type SQSMessage struct {
 	PDFTitle  string `json:"pdf_title"`
 	PDFURL    string `json:"pdf_url"`
 	TotalPDFs int    `json:"total_pdfs"`
+}
+
+// ddbClient is satisfied by *dynamodb.Client and test mocks.
+type ddbClient interface {
+	GetItem(ctx context.Context, in *dynamodb.GetItemInput, opts ...func(*dynamodb.Options)) (*dynamodb.GetItemOutput, error)
+	UpdateItem(ctx context.Context, in *dynamodb.UpdateItemInput, opts ...func(*dynamodb.Options)) (*dynamodb.UpdateItemOutput, error)
+	PutItem(ctx context.Context, in *dynamodb.PutItemInput, opts ...func(*dynamodb.Options)) (*dynamodb.PutItemOutput, error)
+	Query(ctx context.Context, in *dynamodb.QueryInput, opts ...func(*dynamodb.Options)) (*dynamodb.QueryOutput, error)
+}
+
+// sqsClientAPI is satisfied by *sqs.Client and test mocks.
+type sqsClientAPI interface {
+	SendMessageBatch(ctx context.Context, in *sqs.SendMessageBatchInput, opts ...func(*sqs.Options)) (*sqs.SendMessageBatchOutput, error)
+}
+
+// scraperAPI is satisfied by *Scraper and test mocks.
+type scraperAPI interface {
+	ScrapeCouncilList(ctx context.Context) ([]CouncilListing, error)
+	ScrapePDFLinks(ctx context.Context, url string) ([]PDFItem, error)
+	ScrapeNextCouncilDate(ctx context.Context, url string) (string, error)
+}
+
+type orchestrator struct {
+	ddb                ddbClient
+	sqs                sqsClientAPI
+	scraper            scraperAPI
+	councilsTable      string
+	deliberationsTable string
+	queueURL           string
 }
 
 // buildCouncilUpdateInput crafts the conditional UpdateItem that creates or
@@ -70,56 +100,60 @@ func buildCouncilUpdateInput(table string, c CouncilListing, totalPDFs, processe
 	}
 }
 
-func handler(ctx context.Context, event OrchestratorEvent) error {
-	cfg, err := config.LoadDefaultConfig(ctx)
-	if err != nil {
-		return fmt.Errorf("load aws config: %w", err)
+func (o *orchestrator) getCouncilWithRetry(ctx context.Context, councilID string) (*dynamodb.GetItemOutput, error) {
+	input := &dynamodb.GetItemInput{
+		TableName: aws.String(o.councilsTable),
+		Key: map[string]types.AttributeValue{
+			"council_id": &types.AttributeValueMemberS{Value: councilID},
+		},
 	}
+	out, err := o.ddb.GetItem(ctx, input)
+	if err == nil {
+		return out, nil
+	}
+	time.Sleep(500 * time.Millisecond)
+	return o.ddb.GetItem(ctx, input)
+}
 
-	ddb := dynamodb.NewFromConfig(cfg)
-	sqsClient := sqs.NewFromConfig(cfg)
-	scraper := NewScraper(deliberationsListURL)
-
+func (o *orchestrator) handle(ctx context.Context, event OrchestratorEvent) error {
 	// 1. Gérer la date du prochain conseil
-	nextDate, err := scraper.ScrapeNextCouncilDate(ctx, nextCouncilURL)
+	nextDate, err := o.scraper.ScrapeNextCouncilDate(ctx, nextCouncilURL)
 	if err != nil {
 		log.Printf("warn: failed to scrape next council date: %v", err)
 	} else {
 		log.Printf("Found next council date: %s", nextDate)
-		updateNextCouncilMetadata(ctx, ddb, nextDate)
+		o.updateNextCouncilMetadata(ctx, nextDate)
 	}
 
 	// 2. Gérer la liste des délibérations
-	listings, err := scraper.ScrapeCouncilList(ctx)
+	listings, err := o.scraper.ScrapeCouncilList(ctx)
 	if err != nil {
 		return fmt.Errorf("scrape council list: %w", err)
 	}
 	log.Printf("found %d councils on page", len(listings))
 
+	var errs []error
 	for _, council := range listings {
-		// Vérification de changement (URL unique)
-		existing, err := ddb.GetItem(ctx, &dynamodb.GetItemInput{
-			TableName: aws.String(os.Getenv("COUNCILS_TABLE")),
-			Key: map[string]types.AttributeValue{
-				"council_id": &types.AttributeValueMemberS{Value: council.CouncilID},
-			},
-		})
+		existing, err := o.getCouncilWithRetry(ctx, council.CouncilID)
 		if err != nil {
-			return fmt.Errorf("get item %s: %w", council.CouncilID, err)
+			log.Printf("error processing council %s: %v", council.CouncilID, err)
+			errs = append(errs, fmt.Errorf("council %s: %w", council.CouncilID, err))
+			continue
 		}
 		if existing.Item != nil {
 			processed, okP := attrInt(existing.Item, "processed_pdfs")
 			total, okT := attrInt(existing.Item, "total_pdfs")
 
 			if !okT || !okP {
-				log.Printf("warn: council %s has invalid counters, skipping", council.CouncilID)
+				log.Printf(`{"_aws":{"Timestamp":%d,"CloudWatchMetrics":[{"Namespace":"Watchdog","Dimensions":[["FunctionName"]],"Metrics":[{"Name":"CouncilCountersInvalid","Unit":"Count"}]}]},"FunctionName":"orchestrator","CouncilCountersInvalid":1,"CouncilID":"%s"}`,
+					time.Now().UnixMilli(), council.CouncilID)
 				continue
 			}
 
 			if processed >= total && total > 0 {
 				log.Printf("council %s already processed, updating summary only", council.CouncilID)
-				_, _ = ddb.UpdateItem(ctx, &dynamodb.UpdateItemInput{
-					TableName: aws.String(os.Getenv("COUNCILS_TABLE")),
+				_, _ = o.ddb.UpdateItem(ctx, &dynamodb.UpdateItemInput{
+					TableName: aws.String(o.councilsTable),
 					Key: map[string]types.AttributeValue{
 						"council_id": &types.AttributeValueMemberS{Value: council.CouncilID},
 					},
@@ -133,8 +167,7 @@ func handler(ctx context.Context, event OrchestratorEvent) error {
 			log.Printf("council %s is incomplete (%d/%d), forcing rescan", council.CouncilID, processed, total)
 		}
 
-		// Nouveau conseil détecté ! Téléchargement de tous les PDF
-		pdfs, err := scraper.ScrapePDFLinks(ctx, council.URL)
+		pdfs, err := o.scraper.ScrapePDFLinks(ctx, council.URL)
 		if err != nil {
 			log.Printf("warn: failed to scrape PDFs for %s: %v", council.CouncilID, err)
 			continue
@@ -144,10 +177,9 @@ func handler(ctx context.Context, event OrchestratorEvent) error {
 			continue
 		}
 
-		// Query existing processed PDFs
 		processedSet := make(map[string]bool)
-		qItems, err := shared.PaginateQuery(ctx, ddb, &dynamodb.QueryInput{
-			TableName:              aws.String(os.Getenv("DELIBERATIONS_TABLE")),
+		qItems, err := shared.PaginateQuery(ctx, o.ddb, &dynamodb.QueryInput{
+			TableName:              aws.String(o.deliberationsTable),
 			IndexName:              aws.String("council_id-index"),
 			KeyConditionExpression: aws.String("council_id = :cid"),
 			ExpressionAttributeValues: map[string]types.AttributeValue{
@@ -162,12 +194,6 @@ func handler(ctx context.Context, event OrchestratorEvent) error {
 			}
 		}
 
-		// Sauvegarde des métadonnées du conseil via UpdateItem :
-		// un PutItem inconditionnel écrasait processed_pdfs avec un snapshot
-		// (len(processedSet)) calculé en début d'orchestration, perdant tous
-		// les ADD effectués par les workers en cours d'exécution. On utilise
-		// if_not_exists pour préserver le compteur s'il existe déjà, et
-		// pareil pour created_at.
 		if len(processedSet) > len(pdfs) {
 			log.Printf(
 				"warn: council %s — processedSet=%d > scraped pdfs=%d (source page may have removed items)",
@@ -175,18 +201,22 @@ func handler(ctx context.Context, event OrchestratorEvent) error {
 			)
 		}
 
-		input := buildCouncilUpdateInput(os.Getenv("COUNCILS_TABLE"), council, len(pdfs), len(processedSet), time.Now().UTC())
-		if _, err := ddb.UpdateItem(ctx, input); err != nil {
-			return fmt.Errorf("update council: %w", err)
+		input := buildCouncilUpdateInput(o.councilsTable, council, len(pdfs), len(processedSet), time.Now().UTC())
+		if _, err := o.ddb.UpdateItem(ctx, input); err != nil {
+			log.Printf("error processing council %s: %v", council.CouncilID, err)
+			errs = append(errs, fmt.Errorf("council %s: %w", council.CouncilID, err))
+			continue
 		}
 
-		queuedCount := 0
-		// Envoi de chaque PDF manquant vers le Worker via SQS
+		type pendingMsg struct {
+			id   string
+			body string
+		}
+		var pending []pendingMsg
 		for _, pdf := range pdfs {
 			if processedSet[deliberationID(pdf.URL)] {
 				continue
 			}
-
 			msg := SQSMessage{
 				CouncilID: council.CouncilID,
 				PDFTitle:  pdf.Title,
@@ -194,31 +224,58 @@ func handler(ctx context.Context, event OrchestratorEvent) error {
 				TotalPDFs: len(pdfs),
 			}
 			body, _ := json.Marshal(msg)
-			_, err = sqsClient.SendMessage(ctx, &sqs.SendMessageInput{
-				QueueUrl:    aws.String(os.Getenv("PDF_QUEUE_URL")),
-				MessageBody: aws.String(string(body)),
+			pending = append(pending, pendingMsg{
+				id:   deliberationID(pdf.URL),
+				body: string(body),
+			})
+		}
+
+		queuedCount := 0
+		for i := 0; i < len(pending); i += 10 {
+			end := i + 10
+			if end > len(pending) {
+				end = len(pending)
+			}
+			entries := make([]sqstypes.SendMessageBatchRequestEntry, 0, end-i)
+			for j, m := range pending[i:end] {
+				entries = append(entries, sqstypes.SendMessageBatchRequestEntry{
+					Id:          aws.String(fmt.Sprintf("%d", i+j)),
+					MessageBody: aws.String(m.body),
+				})
+			}
+			out, err := o.sqs.SendMessageBatch(ctx, &sqs.SendMessageBatchInput{
+				QueueUrl: aws.String(o.queueURL),
+				Entries:  entries,
 			})
 			if err != nil {
-				log.Printf("error sending msg to SQS: %v", err)
-			} else {
-				queuedCount++
+				log.Printf("error sending SQS batch (council %s): %v", council.CouncilID, err)
+				continue
+			}
+			queuedCount += len(out.Successful)
+			for _, f := range out.Failed {
+				log.Printf("warn: SQS batch entry %s failed: code=%s msg=%s", aws.ToString(f.Id), aws.ToString(f.Code), aws.ToString(f.Message))
 			}
 		}
 		log.Printf("Queued %d new PDFs for council %s (already processed: %d/%d)", queuedCount, council.Title, len(processedSet), len(pdfs))
 	}
 
+	if len(errs) > 0 {
+		log.Printf("orchestrator finished with %d council errors (continued best-effort):", len(errs))
+		for _, e := range errs {
+			log.Printf("  - %v", e)
+		}
+	}
 	return nil
 }
 
-func updateNextCouncilMetadata(ctx context.Context, ddb *dynamodb.Client, nextDate string) {
-	// Stockage dans un item spécial pour le front-end
+func (o *orchestrator) updateNextCouncilMetadata(ctx context.Context, nextDate string) {
 	item, _ := attributevalue.MarshalMap(map[string]interface{}{
 		"council_id": "metadata#next_council",
 		"date_text":  nextDate,
 		"updated_at": time.Now().UTC().Format(time.RFC3339),
 	})
-	ddb.PutItem(ctx, &dynamodb.PutItemInput{
-		TableName: aws.String(os.Getenv("COUNCILS_TABLE")),
+	o.ddb.PutItem(ctx, &dynamodb.PutItemInput{
+		TableName: aws.String(o.councilsTable),
 		Item:      item,
 	})
 }
@@ -241,5 +298,18 @@ func deliberationID(url string) string {
 }
 
 func main() {
-	lambda.Start(handler)
+	ctx := context.Background()
+	cfg, err := config.LoadDefaultConfig(ctx)
+	if err != nil {
+		log.Fatalf("load aws config: %v", err)
+	}
+	o := &orchestrator{
+		ddb:                dynamodb.NewFromConfig(cfg),
+		sqs:                sqs.NewFromConfig(cfg),
+		scraper:            NewScraper(deliberationsListURL),
+		councilsTable:      os.Getenv("COUNCILS_TABLE"),
+		deliberationsTable: os.Getenv("DELIBERATIONS_TABLE"),
+		queueURL:           os.Getenv("PDF_QUEUE_URL"),
+	}
+	lambda.Start(o.handle)
 }

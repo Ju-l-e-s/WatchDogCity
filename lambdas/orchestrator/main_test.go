@@ -1,14 +1,74 @@
 package main
 
 import (
+	"context"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	"github.com/aws/aws-sdk-go-v2/service/sqs"
+	sqstypes "github.com/aws/aws-sdk-go-v2/service/sqs/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// mockDDB implements ddbClient for tests.
+type mockDDB struct {
+	getItemFn   func(ctx context.Context, in *dynamodb.GetItemInput, opts ...func(*dynamodb.Options)) (*dynamodb.GetItemOutput, error)
+	updateCount int
+}
+
+func (m *mockDDB) GetItem(ctx context.Context, in *dynamodb.GetItemInput, opts ...func(*dynamodb.Options)) (*dynamodb.GetItemOutput, error) {
+	return m.getItemFn(ctx, in, opts...)
+}
+
+func (m *mockDDB) UpdateItem(ctx context.Context, in *dynamodb.UpdateItemInput, opts ...func(*dynamodb.Options)) (*dynamodb.UpdateItemOutput, error) {
+	m.updateCount++
+	return &dynamodb.UpdateItemOutput{}, nil
+}
+
+func (m *mockDDB) PutItem(ctx context.Context, in *dynamodb.PutItemInput, opts ...func(*dynamodb.Options)) (*dynamodb.PutItemOutput, error) {
+	return &dynamodb.PutItemOutput{}, nil
+}
+
+func (m *mockDDB) Query(ctx context.Context, in *dynamodb.QueryInput, opts ...func(*dynamodb.Options)) (*dynamodb.QueryOutput, error) {
+	return &dynamodb.QueryOutput{}, nil
+}
+
+// mockSQS implements sqsClientAPI for tests.
+type mockSQS struct {
+	batchCount int
+}
+
+func (m *mockSQS) SendMessageBatch(ctx context.Context, in *sqs.SendMessageBatchInput, opts ...func(*sqs.Options)) (*sqs.SendMessageBatchOutput, error) {
+	m.batchCount++
+	entries := make([]sqstypes.SendMessageBatchResultEntry, len(in.Entries))
+	for i, e := range in.Entries {
+		entries[i] = sqstypes.SendMessageBatchResultEntry{Id: e.Id}
+	}
+	return &sqs.SendMessageBatchOutput{Successful: entries}, nil
+}
+
+// mockScraper implements scraperAPI for tests.
+type mockScraper struct {
+	councils []CouncilListing
+	pdfs     map[string][]PDFItem
+}
+
+func (m *mockScraper) ScrapeCouncilList(ctx context.Context) ([]CouncilListing, error) {
+	return m.councils, nil
+}
+
+func (m *mockScraper) ScrapePDFLinks(ctx context.Context, url string) ([]PDFItem, error) {
+	return m.pdfs[url], nil
+}
+
+func (m *mockScraper) ScrapeNextCouncilDate(ctx context.Context, url string) (string, error) {
+	return "", fmt.Errorf("skipped in test")
+}
 
 // TestBuildCouncilUpdateInput_FirstDiscovery covers the path where a council
 // is seen for the first time: processed_pdfs and created_at must be seeded
@@ -87,4 +147,47 @@ func TestBuildCouncilUpdateInput_AllowsShrinkingTotal(t *testing.T) {
 	)
 	assert.Equal(t, "2", in.ExpressionAttributeValues[":tp"].(*types.AttributeValueMemberN).Value)
 	assert.Equal(t, "3", in.ExpressionAttributeValues[":pp"].(*types.AttributeValueMemberN).Value)
+}
+
+// TestHandleIsolatesPerCouncilErrors verifies that a GetItem failure on one
+// council does not abort the entire cycle: councils before and after the
+// failing one must still be processed (UpdateItem called for each).
+func TestHandleIsolatesPerCouncilErrors(t *testing.T) {
+	councils := []CouncilListing{
+		{CouncilID: "c1", Title: "Council 1", URL: "https://example.test/c1", Category: "Conseil municipal", Date: "2026-01-01"},
+		{CouncilID: "c2", Title: "Council 2", URL: "https://example.test/c2", Category: "Conseil municipal", Date: "2026-02-01"},
+		{CouncilID: "c3", Title: "Council 3", URL: "https://example.test/c3", Category: "Conseil municipal", Date: "2026-03-01"},
+	}
+
+	db := &mockDDB{
+		getItemFn: func(ctx context.Context, in *dynamodb.GetItemInput, opts ...func(*dynamodb.Options)) (*dynamodb.GetItemOutput, error) {
+			id := in.Key["council_id"].(*types.AttributeValueMemberS).Value
+			if id == "c2" {
+				return nil, fmt.Errorf("simulated DynamoDB error")
+			}
+			return &dynamodb.GetItemOutput{}, nil
+		},
+	}
+	sqsMock := &mockSQS{}
+	scraperMock := &mockScraper{
+		councils: councils,
+		pdfs: map[string][]PDFItem{
+			"https://example.test/c1": {{Title: "PDF1", URL: "https://example.test/c1/doc.pdf"}},
+			"https://example.test/c3": {{Title: "PDF3", URL: "https://example.test/c3/doc.pdf"}},
+		},
+	}
+
+	o := &orchestrator{
+		ddb:                db,
+		sqs:                sqsMock,
+		scraper:            scraperMock,
+		councilsTable:      "councils-test",
+		deliberationsTable: "deliberations-test",
+		queueURL:           "https://sqs.test/queue",
+	}
+
+	err := o.handle(context.Background(), OrchestratorEvent{})
+	require.NoError(t, err, "handle must return nil even when one council fails")
+	assert.Equal(t, 2, db.updateCount, "UpdateItem must be called for c1 and c3, not c2")
+	assert.Equal(t, 2, sqsMock.batchCount, "one SQS batch per successfully processed council")
 }

@@ -113,6 +113,85 @@ type BriefItem struct {
 	Summary string `json:"summary"`
 }
 
+// newsletterSchema is the output contract enforced at the Gemini API boundary.
+// It mirrors NewsletterParams exactly; tag enums reuse shared.TopicTags so the
+// model can only emit one of the ten canonical categories. Post-processing
+// (stripLinks/formatStr) still runs on top — the schema constrains shape, not
+// editorial drift.
+var newsletterSchema = &genai.Schema{
+	Type: genai.TypeObject,
+	Properties: map[string]*genai.Schema{
+		"email_subject":           {Type: genai.TypeString},
+		"council_title":           {Type: genai.TypeString},
+		"council_date":            {Type: genai.TypeString},
+		"main_issue":              {Type: genai.TypeString},
+		"budget_total":            {Type: genai.TypeString},
+		"has_global_budget":       {Type: genai.TypeBoolean},
+		"vote_climat":             {Type: genai.TypeString},
+		"climat_color":            {Type: genai.TypeString},
+		"vote_stats":              {Type: genai.TypeString},
+		"total_delibs_in_council": {Type: genai.TypeInteger},
+		"tensions": {
+			Type: genai.TypeArray,
+			Items: &genai.Schema{
+				Type: genai.TypeObject,
+				Properties: map[string]*genai.Schema{
+					"title":        {Type: genai.TypeString},
+					"context":      {Type: genai.TypeString},
+					"impact":       {Type: genai.TypeString},
+					"budget":       {Type: genai.TypeString},
+					"has_budget":   {Type: genai.TypeBoolean},
+					"vote_details": {Type: genai.TypeString},
+				},
+				PropertyOrdering: []string{"title", "context", "impact", "budget", "has_budget", "vote_details"},
+				Required:         []string{"title", "context", "impact"},
+			},
+		},
+		"adopted": {
+			Type: genai.TypeArray,
+			Items: &genai.Schema{
+				Type: genai.TypeObject,
+				Properties: map[string]*genai.Schema{
+					"tag":        {Type: genai.TypeString, Format: "enum", Enum: shared.TopicTags},
+					"title":      {Type: genai.TypeString},
+					"context":    {Type: genai.TypeString},
+					"impact":     {Type: genai.TypeString},
+					"budget":     {Type: genai.TypeString},
+					"has_budget": {Type: genai.TypeBoolean},
+				},
+				PropertyOrdering: []string{"tag", "title", "context", "impact", "budget", "has_budget"},
+				Required:         []string{"tag", "title", "context", "impact"},
+			},
+		},
+		"briefs": {
+			Type: genai.TypeArray,
+			Items: &genai.Schema{
+				Type: genai.TypeObject,
+				Properties: map[string]*genai.Schema{
+					"tag":     {Type: genai.TypeString, Format: "enum", Enum: shared.TopicTags},
+					"summary": {Type: genai.TypeString},
+				},
+				PropertyOrdering: []string{"tag", "summary"},
+				Required:         []string{"tag", "summary"},
+			},
+		},
+		"next_meeting":   {Type: genai.TypeString},
+		"website_url":    {Type: genai.TypeString},
+		"total_councils": {Type: genai.TypeInteger},
+		"total_delibs":   {Type: genai.TypeInteger},
+	},
+	PropertyOrdering: []string{
+		"email_subject", "council_title", "council_date", "main_issue",
+		"budget_total", "has_global_budget", "vote_climat", "climat_color",
+		"vote_stats", "total_delibs_in_council", "tensions", "adopted", "briefs",
+		"next_meeting", "website_url", "total_councils", "total_delibs",
+	},
+	Required: []string{
+		"email_subject", "council_title", "council_date", "main_issue",
+		"tensions", "adopted", "briefs",
+	},
+}
+
 // ── Interfaces (for testability) ──────────────────────────────────────────────
 
 type dynamoQuerier interface {
@@ -386,6 +465,7 @@ func (d *notifierDeps) generateNewsletterParams(ctx context.Context, council *co
 		}},
 		&genai.GenerateContentConfig{
 			ResponseMIMEType: "application/json",
+			ResponseSchema:   newsletterSchema,
 			MaxOutputTokens:  8192,
 		},
 	)

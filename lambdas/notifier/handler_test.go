@@ -10,6 +10,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	"github.com/watchdog/shared"
 )
 
 // fakeDDB captures UpdateItem inputs and replays scripted responses.
@@ -99,7 +100,7 @@ func TestClaimPending_BuildsExpectedUpdate(t *testing.T) {
 func TestClaimPending_AlreadyHeld(t *testing.T) {
 	ddb := &fakeDDB{
 		updateResponse: func(_ int, _ *dynamodb.UpdateItemInput) (*dynamodb.UpdateItemOutput, error) {
-			return nil, errors.New("ConditionalCheckFailedException: condition not met")
+			return nil, &types.ConditionalCheckFailedException{}
 		},
 	}
 	d := newDeps(ddb, time.Now())
@@ -181,7 +182,7 @@ func TestClaimPending_ConcurrentRace(t *testing.T) {
 				atomicStore(&winner, 1)
 				return &dynamodb.UpdateItemOutput{}, nil
 			}
-			return nil, errors.New("ConditionalCheckFailedException")
+			return nil, &types.ConditionalCheckFailedException{}
 		},
 	}
 	d := newDeps(ddb, time.Now())
@@ -217,3 +218,88 @@ func TestClaimPending_ConcurrentRace(t *testing.T) {
 // atomicStore is a tiny helper to keep the race test self-contained without
 // pulling sync/atomic int aliasing details into the readers' eyeline.
 func atomicStore(p *int32, v int32) { *p = v }
+
+// TestParseNewsletterParams_SchemaConformant feeds a JSON payload shaped exactly
+// like newsletterSchema permits (enum tags from shared.TopicTags, string budgets,
+// bool flags, integer counters) through the parser and asserts the fields land
+// on NewsletterParams. Guards that the ResponseSchema contract and the Go struct
+// stay in sync. No network call.
+func TestParseNewsletterParams_SchemaConformant(t *testing.T) {
+	const fixture = `{
+  "email_subject": "Conseil du 14 mai",
+  "council_title": "Conseil Municipal de Bègles",
+  "council_date": "14 mai 2026",
+  "main_issue": "Vote du budget primitif et débat sur la vidéoprotection.",
+  "budget_total": "1 250 000",
+  "has_global_budget": true,
+  "vote_climat": "VOTES PARTAGÉS",
+  "climat_color": "#E11D48",
+  "vote_stats": "2 délib. non unanimes / jusqu'à 5 voix contre",
+  "total_delibs_in_council": 12,
+  "tensions": [
+    {
+      "title": "Extension de la vidéoprotection",
+      "context": "La ville installe douze caméras supplémentaires.",
+      "impact": "Surveillance accrue de l'espace public.",
+      "budget": "180000",
+      "has_budget": true,
+      "vote_details": "5 votes contre"
+    }
+  ],
+  "adopted": [
+    {
+      "tag": "Sport",
+      "title": "Subvention au club de handball",
+      "context": "Soutien à la saison sportive.",
+      "impact": "Maintien des créneaux jeunes.",
+      "budget": "20000",
+      "has_budget": true
+    }
+  ],
+  "briefs": [
+    {"tag": "Administration", "summary": "Désignation des représentants en commission."}
+  ],
+  "next_meeting": "18 juin 2026",
+  "website_url": "https://lobservatoiredebegles.fr",
+  "total_councils": 7,
+  "total_delibs": 84
+}`
+
+	p, err := parseNewsletterParams(fixture)
+	if err != nil {
+		t.Fatalf("parseNewsletterParams: %v", err)
+	}
+
+	if p.EmailSubject != "Conseil du 14 mai" {
+		t.Errorf("email_subject = %q", p.EmailSubject)
+	}
+	if !p.HasGlobalBudget {
+		t.Errorf("has_global_budget should be true")
+	}
+	if p.TotalDelibsInCouncil != 12 || p.TotalCouncils != 7 || p.TotalDelibs != 84 {
+		t.Errorf("counters = %d/%d/%d", p.TotalDelibsInCouncil, p.TotalCouncils, p.TotalDelibs)
+	}
+	if len(p.Tensions) != 1 || p.Tensions[0].VoteDetails != "5 votes contre" || !p.Tensions[0].HasBudget {
+		t.Errorf("tensions parsed incorrectly: %+v", p.Tensions)
+	}
+	if len(p.Adopted) != 1 || p.Adopted[0].Tag != "Sport" {
+		t.Errorf("adopted parsed incorrectly: %+v", p.Adopted)
+	}
+	if len(p.Briefs) != 1 || p.Briefs[0].Tag != "Administration" {
+		t.Errorf("briefs parsed incorrectly: %+v", p.Briefs)
+	}
+
+	// Every emitted tag must be a canonical TopicTag (the schema enum source).
+	for _, tag := range []string{p.Adopted[0].Tag, p.Briefs[0].Tag} {
+		found := false
+		for _, valid := range shared.TopicTags {
+			if tag == valid {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("tag %q not in shared.TopicTags", tag)
+		}
+	}
+}

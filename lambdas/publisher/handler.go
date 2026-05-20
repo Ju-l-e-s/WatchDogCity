@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
@@ -198,12 +197,6 @@ func fetchNextCouncilDate(ctx context.Context, ddb *dynamodb.Client) string {
 // ── Lambda Handler ───────────────────────────────────────────────────────────
 
 func HandleRequest(ctx context.Context, event PublisherEvent) error {
-	cfg, err := config.LoadDefaultConfig(ctx)
-	if err != nil {
-		return fmt.Errorf("load aws config: %w", err)
-	}
-	ddb := dynamodb.NewFromConfig(cfg)
-
 	// Build all councils for the full data.json
 	allCouncils, allDelibs, err := fetchAllData(ctx, ddb)
 	if err != nil {
@@ -220,7 +213,6 @@ func HandleRequest(ctx context.Context, event PublisherEvent) error {
 	if err != nil {
 		return fmt.Errorf("marshal data.json: %w", err)
 	}
-	s3Client := s3.NewFromConfig(cfg)
 	_, err = s3Client.PutObject(ctx, &s3.PutObjectInput{
 		Bucket:       aws.String(os.Getenv("WEBSITE_BUCKET")),
 		Key:          aws.String("data.json"),
@@ -236,7 +228,6 @@ func HandleRequest(ctx context.Context, event PublisherEvent) error {
 	// Trigger newsletter Notifier asynchronously — last instruction, after S3.
 	if fn := os.Getenv("NOTIFIER_FUNCTION_NAME"); fn != "" {
 		notifierPayload, _ := json.Marshal(map[string]string{"council_id": event.CouncilID})
-		lambdaClient := lambdaSvc.NewFromConfig(cfg)
 		_, err := lambdaClient.Invoke(ctx, &lambdaSvc.InvokeInput{
 			FunctionName:   aws.String(fn),
 			InvocationType: lambdaTypes.InvocationTypeEvent,

@@ -297,13 +297,14 @@ func deliberationID(url string) string {
 	return parts[len(parts)-1]
 }
 
-func main() {
-	ctx := context.Background()
-	cfg, err := config.LoadDefaultConfig(ctx)
+var orch *orchestrator
+
+func init() {
+	cfg, err := config.LoadDefaultConfig(context.Background())
 	if err != nil {
 		log.Fatalf("load aws config: %v", err)
 	}
-	o := &orchestrator{
+	orch = &orchestrator{
 		ddb:                dynamodb.NewFromConfig(cfg),
 		sqs:                sqs.NewFromConfig(cfg),
 		scraper:            NewScraper(deliberationsListURL),
@@ -311,5 +312,8 @@ func main() {
 		deliberationsTable: os.Getenv("DELIBERATIONS_TABLE"),
 		queueURL:           os.Getenv("PDF_QUEUE_URL"),
 	}
-	lambda.Start(o.handle)
+}
+
+func main() {
+	lambda.Start(orch.handle)
 }

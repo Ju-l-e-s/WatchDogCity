@@ -23,6 +23,20 @@ import (
 
 func ptrInt32(i int32) *int32 { return &i }
 
+var (
+	ddb          *dynamodb.Client
+	lambdaClient *lambdaService.Client
+)
+
+func init() {
+	cfg, err := config.LoadDefaultConfig(context.Background())
+	if err != nil {
+		log.Fatalf("init: load aws config: %v", err)
+	}
+	ddb = dynamodb.NewFromConfig(cfg)
+	lambdaClient = lambdaService.NewFromConfig(cfg)
+}
+
 type CouncilAnalysis struct {
 	BudgetImpact int64  `dynamodbav:"budget_impact" json:"budget_impact"`
 	BudgetLabel  string `dynamodbav:"budget_label" json:"budget_label"`
@@ -48,14 +62,6 @@ type Deliberation struct {
 }
 
 func handler(ctx context.Context, event events.DynamoDBEvent) error {
-	cfg, err := config.LoadDefaultConfig(ctx)
-	if err != nil {
-		return fmt.Errorf("load config: %w", err)
-	}
-
-	ddb := dynamodb.NewFromConfig(cfg)
-	lambdaClient := lambdaService.NewFromConfig(cfg)
-
 	for _, record := range event.Records {
 		// On ne traite que les nouvelles délibérations
 		if record.EventName != "INSERT" {

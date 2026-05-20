@@ -14,6 +14,9 @@ from aws_cdk import (
     aws_cloudfront as cloudfront,
     aws_cloudfront_origins as origins,
     aws_cloudwatch as cloudwatch,
+    aws_cloudwatch_actions as cw_actions,
+    aws_sns as sns,
+    aws_sns_subscriptions as sns_subs,
     aws_s3_deployment as s3_deploy,
     aws_certificatemanager as acm,
 )
@@ -140,7 +143,8 @@ class WatchdogStack(Stack):
             log_retention=logs.RetentionDays.TWO_WEEKS,
             environment=common_env,
         )
-        councils_table.grant_read_write_data(orchestrator)
+        councils_table.grant(orchestrator, "dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:UpdateItem")
+        deliberations_table.grant(orchestrator, "dynamodb:Query")
         pdf_queue.grant_send_messages(orchestrator)
 
         # ── Lambda: Worker ────────────────────────────────────────────────
@@ -163,8 +167,8 @@ class WatchdogStack(Stack):
             batch_size=1,
             report_batch_item_failures=True,
         ))
-        councils_table.grant_read_write_data(worker)
-        deliberations_table.grant_read_write_data(worker)
+        councils_table.grant(worker, "dynamodb:UpdateItem")
+        deliberations_table.grant(worker, "dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:UpdateItem")
 
         # ── Lambda: Publisher ─────────────────────────────────────────────
         publisher = lambda_.Function(
@@ -182,7 +186,7 @@ class WatchdogStack(Stack):
                 "CLOUDFRONT_DISTRIBUTION_ID": distribution.distribution_id,
             },
         )
-        councils_table.grant_read_write_data(publisher)
+        councils_table.grant(publisher, "dynamodb:Scan", "dynamodb:GetItem", "dynamodb:UpdateItem")
         deliberations_table.grant_read_data(publisher)
         subscribers_table.grant_read_data(publisher)
         website_bucket.grant_put(publisher)
@@ -212,7 +216,7 @@ class WatchdogStack(Stack):
             batch_size=1,
             retry_attempts=2,
         ))
-        councils_table.grant_read_write_data(aggregator)
+        councils_table.grant(aggregator, "dynamodb:GetItem", "dynamodb:UpdateItem")
         deliberations_table.grant_read_data(aggregator)
         publisher.grant_invoke(aggregator)
 
@@ -242,6 +246,29 @@ class WatchdogStack(Stack):
             retention_period=Duration.days(14),
         )
 
+        # ── Notifier DLQ Alarm ────────────────────────────────────────────
+        notifier_dlq_alarm_topic = sns.Topic(self, "NotifierDLQAlarmTopic")
+        ops_email = self.node.try_get_context("ops_email")
+        if ops_email:
+            notifier_dlq_alarm_topic.add_subscription(
+                sns_subs.EmailSubscription(ops_email)
+            )
+        else:
+            print("WARN: no ops_email context provided; DLQ alarm topic has no subscriber")
+
+        cloudwatch.Alarm(
+            self, "NotifierDLQAlarm",
+            metric=notifier_dlq.metric_approximate_number_of_messages_visible(
+                period=Duration.minutes(5),
+                statistic="Maximum",
+            ),
+            threshold=0,
+            evaluation_periods=1,
+            comparison_operator=cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
+            treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING,
+            alarm_description="Notifier DLQ non-empty: at least one newsletter failed.",
+        ).add_alarm_action(cw_actions.SnsAction(notifier_dlq_alarm_topic))
+
         notifier = lambda_.Function(
             self, "Notifier",
             runtime=lambda_.Runtime.PROVIDED_AL2023,
@@ -264,7 +291,7 @@ class WatchdogStack(Stack):
         )
         # Notifier needs write access to councils to mark newsletter_sent_at
         # for idempotence (prevents duplicate sends on retry / re-aggregation).
-        councils_table.grant_read_write_data(notifier)
+        councils_table.grant(notifier, "dynamodb:GetItem", "dynamodb:UpdateItem", "dynamodb:Scan")
         deliberations_table.grant_read_data(notifier)
         notifier.grant_invoke(publisher)
         publisher.add_environment("NOTIFIER_FUNCTION_NAME", notifier.function_name)

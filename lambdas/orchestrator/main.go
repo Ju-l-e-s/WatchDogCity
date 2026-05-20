@@ -17,6 +17,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
+	"github.com/watchdog/shared"
 )
 
 const (
@@ -145,7 +146,7 @@ func handler(ctx context.Context, event OrchestratorEvent) error {
 
 		// Query existing processed PDFs
 		processedSet := make(map[string]bool)
-		qOutput, err := ddb.Query(ctx, &dynamodb.QueryInput{
+		qItems, err := shared.PaginateQuery(ctx, ddb, &dynamodb.QueryInput{
 			TableName:              aws.String(os.Getenv("DELIBERATIONS_TABLE")),
 			IndexName:              aws.String("council_id-index"),
 			KeyConditionExpression: aws.String("council_id = :cid"),
@@ -154,7 +155,7 @@ func handler(ctx context.Context, event OrchestratorEvent) error {
 			},
 		})
 		if err == nil {
-			for _, pitem := range qOutput.Items {
+			for _, pitem := range qItems {
 				if idAttr, ok := pitem["id"].(*types.AttributeValueMemberS); ok {
 					processedSet[idAttr.Value] = true
 				}

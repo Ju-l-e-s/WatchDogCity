@@ -11,7 +11,10 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/dynamodb v1.57.1
 	github.com/aws/aws-sdk-go-v2/service/sqs v1.42.25
 	github.com/stretchr/testify v1.11.1
+	github.com/watchdog/shared v0.0.0
 )
+
+replace github.com/watchdog/shared => ../shared
 
 require (
 	github.com/andybalholm/cascadia v1.3.3 // indirect

@@ -20,6 +20,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	ddbtypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	"github.com/watchdog/shared"
 	"google.golang.org/genai"
 )
 
@@ -333,7 +334,7 @@ func (d *notifierDeps) fetchCouncil(ctx context.Context, councilID string) (*cou
 }
 
 func (d *notifierDeps) fetchDeliberations(ctx context.Context, councilID string) ([]deliberationRec, error) {
-	out, err := d.ddb.Query(ctx, &dynamodb.QueryInput{
+	items, err := shared.PaginateQuery(ctx, d.ddb, &dynamodb.QueryInput{
 		TableName:              aws.String(d.deliberationsTable),
 		IndexName:              aws.String("council_id-index"),
 		KeyConditionExpression: aws.String("council_id = :cid"),
@@ -345,7 +346,7 @@ func (d *notifierDeps) fetchDeliberations(ctx context.Context, councilID string)
 		return nil, err
 	}
 	var delibs []deliberationRec
-	if err := attributevalue.UnmarshalListOfMaps(out.Items, &delibs); err != nil {
+	if err := attributevalue.UnmarshalListOfMaps(items, &delibs); err != nil {
 		return nil, err
 	}
 	return delibs, nil
@@ -371,24 +372,22 @@ func (d *notifierDeps) fetchNextMeeting(ctx context.Context) string {
 }
 
 func (d *notifierDeps) fetchGlobalStats(ctx context.Context) (councils int, delibs int) {
-	cOut, err := d.ddb.Scan(ctx, &dynamodb.ScanInput{
+	if n, err := shared.PaginateScanCount(ctx, d.ddb, &dynamodb.ScanInput{
 		TableName:        aws.String(d.councilsTable),
 		FilterExpression: aws.String("NOT (council_id = :meta)"),
 		ExpressionAttributeValues: map[string]types.AttributeValue{
 			":meta": &types.AttributeValueMemberS{Value: "metadata#next_council"},
 		},
 		Select: types.SelectCount,
-	})
-	if err == nil {
-		councils = int(cOut.Count)
+	}); err == nil {
+		councils = int(n)
 	}
 
-	dOut, err := d.ddb.Scan(ctx, &dynamodb.ScanInput{
+	if n, err := shared.PaginateScanCount(ctx, d.ddb, &dynamodb.ScanInput{
 		TableName: aws.String(d.deliberationsTable),
 		Select:    types.SelectCount,
-	})
-	if err == nil {
-		delibs = int(dOut.Count)
+	}); err == nil {
+		delibs = int(n)
 	}
 
 	return councils, delibs

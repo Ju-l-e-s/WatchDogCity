@@ -456,19 +456,21 @@ func (d *notifierDeps) generateNewsletterParams(ctx context.Context, council *co
 		return nil, fmt.Errorf("create gemini client: %w", err)
 	}
 
-	resp, err := client.Models.GenerateContent(
-		ctx,
-		d.geminiModel,
-		[]*genai.Content{{
-			Role:  "user",
-			Parts: []*genai.Part{{Text: prompt}},
-		}},
-		&genai.GenerateContentConfig{
-			ResponseMIMEType: "application/json",
-			ResponseSchema:   newsletterSchema,
-			MaxOutputTokens:  8192,
-		},
-	)
+	resp, err := shared.CallGeminiWithRetry(ctx, func(ctx context.Context) (*genai.GenerateContentResponse, error) {
+		return client.Models.GenerateContent(
+			ctx,
+			d.geminiModel,
+			[]*genai.Content{{
+				Role:  "user",
+				Parts: []*genai.Part{{Text: prompt}},
+			}},
+			&genai.GenerateContentConfig{
+				ResponseMIMEType: "application/json",
+				ResponseSchema:   newsletterSchema,
+				MaxOutputTokens:  8192,
+			},
+		)
+	}, 4)
 	if err != nil {
 		return nil, fmt.Errorf("gemini generate: %w", err)
 	}

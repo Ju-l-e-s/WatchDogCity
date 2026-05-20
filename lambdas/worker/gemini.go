@@ -202,17 +202,19 @@ func analyzeWithGemini(ctx context.Context, apiKey string, pdfBytes []byte) (*Ge
 		},
 	}
 
-	resp, err := client.Models.GenerateContent(
-		ctx,
-		modelName,
-		contents,
-		&genai.GenerateContentConfig{
-			Temperature:      ptrFloat32(0),
-			ResponseMIMEType: "application/json",
-			ResponseSchema:   deliberationSchema,
-			MaxOutputTokens:  8192,
-		},
-	)
+	resp, err := shared.CallGeminiWithRetry(ctx, func(ctx context.Context) (*genai.GenerateContentResponse, error) {
+		return client.Models.GenerateContent(
+			ctx,
+			modelName,
+			contents,
+			&genai.GenerateContentConfig{
+				Temperature:      ptrFloat32(0),
+				ResponseMIMEType: "application/json",
+				ResponseSchema:   deliberationSchema,
+				MaxOutputTokens:  8192,
+			},
+		)
+	}, 4)
 	if err != nil {
 		return nil, fmt.Errorf("gemini generate: %w", err)
 	}

@@ -18,6 +18,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	lambdaService "github.com/aws/aws-sdk-go-v2/service/lambda"
 	lambdaTypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
+	"github.com/watchdog/shared"
 	"google.golang.org/genai"
 )
 
@@ -279,12 +280,14 @@ func askGeminiForSynthesis(ctx context.Context, summaries []string) (string, err
 Rédige une synthèse de 1 à 2 phrases complètes (entre 25 et 45 mots) identifiant l'enjeu politique ou social majeur de cette séance.
 Ne commence pas par "Enjeu Clé :". Ne sois pas trop court. Sois précis sur l'impact citoyen.`, strings.Join(summaries, "\n"))
 
-	resp, err := client.Models.GenerateContent(ctx, modelName, []*genai.Content{{
-		Role:  "user",
-		Parts: []*genai.Part{{Text: prompt}},
-	}}, &genai.GenerateContentConfig{
-		MaxOutputTokens: 8192,
-	})
+	resp, err := shared.CallGeminiWithRetry(ctx, func(ctx context.Context) (*genai.GenerateContentResponse, error) {
+		return client.Models.GenerateContent(ctx, modelName, []*genai.Content{{
+			Role:  "user",
+			Parts: []*genai.Part{{Text: prompt}},
+		}}, &genai.GenerateContentConfig{
+			MaxOutputTokens: 8192,
+		})
+	}, 4)
 	if err != nil {
 		return "", err
 	}

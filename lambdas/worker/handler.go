@@ -24,6 +24,7 @@ import (
 	ddbtypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	awslambda "github.com/aws/aws-sdk-go-v2/service/lambda"
 	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
+	"github.com/watchdog/shared"
 )
 
 type DynamoDBAPI interface {
@@ -55,7 +56,7 @@ func (h *WorkerHandler) HandleRequest(ctx context.Context, event events.SQSEvent
 	for _, record := range event.Records {
 		var msg SQSPayload
 		if err := json.Unmarshal([]byte(record.Body), &msg); err != nil {
-			log.Printf("error unmarshaling SQS body: %v", record.Body)
+			log.Printf("error unmarshaling SQS body: %v", shared.TruncForLog(record.Body, 200))
 			continue
 		}
 

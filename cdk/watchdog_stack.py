@@ -2,6 +2,7 @@ import os
 from aws_cdk import (
     Stack, Duration, RemovalPolicy, CfnOutput,
     aws_dynamodb as dynamodb,
+    aws_logs as logs,
     aws_s3 as s3,
     aws_sqs as sqs,
     aws_lambda as lambda_,
@@ -136,6 +137,7 @@ class WatchdogStack(Stack):
             handler="bootstrap",
             code=lambda_.Code.from_asset("../dist/orchestrator.zip"),
             timeout=Duration.minutes(3),
+            log_retention=logs.RetentionDays.TWO_WEEKS,
             environment=common_env,
         )
         councils_table.grant_read_write_data(orchestrator)
@@ -150,6 +152,7 @@ class WatchdogStack(Stack):
             code=lambda_.Code.from_asset("../dist/worker.zip"),
             timeout=Duration.minutes(5),
             reserved_concurrent_executions=5,
+            log_retention=logs.RetentionDays.TWO_WEEKS,
             environment={
                 **common_env,
                 "GEMINI_MODEL": worker_model,
@@ -171,6 +174,7 @@ class WatchdogStack(Stack):
             handler="bootstrap",
             code=lambda_.Code.from_asset("../dist/publisher.zip"),
             timeout=Duration.minutes(5),
+            log_retention=logs.RetentionDays.TWO_WEEKS,
             environment={
                 **common_env,
                 "FROM_EMAIL": "watchdog@begles.citoyen",
@@ -195,6 +199,7 @@ class WatchdogStack(Stack):
             handler="bootstrap",
             code=lambda_.Code.from_asset("../dist/aggregator.zip"),
             timeout=Duration.minutes(5),
+            log_retention=logs.RetentionDays.TWO_WEEKS,
             environment={
                 **common_env,
                 "GEMINI_MODEL": aggregator_model,
@@ -245,6 +250,7 @@ class WatchdogStack(Stack):
             code=lambda_.Code.from_asset("../dist/notifier.zip"),
             timeout=Duration.minutes(5),
             dead_letter_queue=notifier_dlq,
+            log_retention=logs.RetentionDays.TWO_WEEKS,
             environment={
                 "COUNCILS_TABLE": councils_table.table_name,
                 "DELIBERATIONS_TABLE": deliberations_table.table_name,
@@ -281,6 +287,7 @@ class WatchdogStack(Stack):
             handler="bootstrap",
             code=lambda_.Code.from_asset("../dist/subscriber.zip"),
             timeout=Duration.seconds(10),
+            log_retention=logs.RetentionDays.TWO_WEEKS,
             environment={
                 "TABLE_NAME": subscribers_table.table_name,
                 "SENDER_EMAIL": sender_email,
@@ -299,6 +306,7 @@ class WatchdogStack(Stack):
             handler="bootstrap",
             code=lambda_.Code.from_asset("../dist/confirmer.zip"),
             timeout=Duration.seconds(10),
+            log_retention=logs.RetentionDays.TWO_WEEKS,
             environment={
                 "TABLE_NAME": subscribers_table.table_name,
                 "MAIL_API_KEY": mail_api_key,
@@ -316,6 +324,7 @@ class WatchdogStack(Stack):
             handler="bootstrap",
             code=lambda_.Code.from_asset("../dist/contact.zip"),
             timeout=Duration.seconds(10),
+            log_retention=logs.RetentionDays.TWO_WEEKS,
             environment={
                 "SENDER_EMAIL": contact_sender,
                 "ADMIN_EMAIL": admin_email,

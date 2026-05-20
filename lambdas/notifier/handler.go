@@ -682,7 +682,9 @@ func buildNewsletterPrompt(council *councilRec, delibs []deliberationRec, stats 
 			dis = *d.Disagreements
 		}
 
-		fmt.Fprintf(&sb, "- %s | Budget: %d€ | Vote: %d/%d/%d | Désaccords: %s\n", d.Title, d.BudgetImpact, pour, contre, abst, dis)
+		fmt.Fprintf(&sb, "- %s | Budget: %d€ | Vote: %d/%d/%d | Désaccords: %s\n",
+			shared.TruncForLog(d.Title, 80), d.BudgetImpact, pour, contre, abst,
+			shared.TruncForLog(dis, 80))
 	}
 	if len(politicalTensions) == 0 {
 		sb.WriteString("(néant)\n")
@@ -692,7 +694,9 @@ func buildNewsletterPrompt(council *councilRec, delibs []deliberationRec, stats 
 	sb.WriteString("\nDÉLIBÉRATIONS ADOPTÉES SIGNIFICATIVES (A FILTRER POUR adopted[] et briefs[]) :\n")
 	allSignificant := append(majorImpact, localLife...)
 	for _, d := range allSignificant {
-		fmt.Fprintf(&sb, "- %s | Tag: %s | Budget: %d€ | Résumé: %s\n", d.Title, d.TopicTag, d.BudgetImpact, d.Summary)
+		fmt.Fprintf(&sb, "- %s | Tag: %s | Budget: %d€ | Résumé: %s\n",
+			shared.TruncForLog(d.Title, 80), d.TopicTag, d.BudgetImpact,
+			shared.TruncForLog(d.Summary, 80))
 	}
 
 	return sb.String()

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"regexp"
@@ -32,8 +33,8 @@ func NewScraper(listURL string) *Scraper {
 	return &Scraper{listURL: listURL}
 }
 
-func (sc *Scraper) ScrapeCouncilList() ([]CouncilListing, error) {
-	doc, err := fetchDocument(sc.listURL)
+func (sc *Scraper) ScrapeCouncilList(ctx context.Context) ([]CouncilListing, error) {
+	doc, err := fetchDocument(ctx, sc.listURL)
 	if err != nil {
 		return nil, fmt.Errorf("http get list page: %w", err)
 	}
@@ -84,8 +85,8 @@ func (sc *Scraper) ScrapeCouncilList() ([]CouncilListing, error) {
 	return listings, nil
 }
 
-func (sc *Scraper) ScrapePDFLinks(councilURL string) ([]PDFItem, error) {
-	doc, err := fetchDocument(councilURL)
+func (sc *Scraper) ScrapePDFLinks(ctx context.Context, councilURL string) ([]PDFItem, error) {
+	doc, err := fetchDocument(ctx, councilURL)
 	if err != nil {
 		return nil, err
 	}
@@ -106,8 +107,8 @@ func (sc *Scraper) ScrapePDFLinks(councilURL string) ([]PDFItem, error) {
 	return items, nil
 }
 
-func (sc *Scraper) ScrapeNextCouncilDate(url string) (string, error) {
-	doc, err := fetchDocument(url)
+func (sc *Scraper) ScrapeNextCouncilDate(ctx context.Context, url string) (string, error) {
+	doc, err := fetchDocument(ctx, url)
 	if err != nil {
 		return "", err
 	}
@@ -117,9 +118,9 @@ func (sc *Scraper) ScrapeNextCouncilDate(url string) (string, error) {
 	return nextDate, nil
 }
 
-func fetchDocument(url string) (*goquery.Document, error) {
+func fetchDocument(ctx context.Context, url string) (*goquery.Document, error) {
 	client := &http.Client{Timeout: 15 * time.Second}
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -131,7 +132,8 @@ func fetchDocument(url string) (*goquery.Document, error) {
 	}
 	defer resp.Body.Close()
 
-	return goquery.NewDocumentFromReader(resp.Body)
+	limited := http.MaxBytesReader(nil, resp.Body, 10<<20)
+	return goquery.NewDocumentFromReader(limited)
 }
 
 var frMonthMap = map[string]string{

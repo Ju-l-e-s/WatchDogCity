@@ -251,6 +251,8 @@ func voteClimat(totalPour, totalContre int) string {
 }
 
 func askGeminiForSynthesis(ctx context.Context, summaries []string) (string, error) {
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
 	apiKey := os.Getenv("GEMINI_API_KEY")
 	modelName := os.Getenv("GEMINI_MODEL")
 	if modelName == "" {

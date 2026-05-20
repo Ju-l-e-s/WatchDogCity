@@ -1,9 +1,11 @@
 package main
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -57,7 +59,7 @@ func TestScrapeCouncilList(t *testing.T) {
 	defer server.Close()
 
 	s := NewScraper(server.URL)
-	listings, err := s.ScrapeCouncilList()
+	listings, err := s.ScrapeCouncilList(context.Background())
 	require.NoError(t, err)
 	require.Len(t, listings, 2)
 
@@ -77,13 +79,31 @@ func TestScrapePDFLinks(t *testing.T) {
 	defer server.Close()
 
 	s := NewScraper("unused")
-	pdfs, err := s.ScrapePDFLinks(server.URL)
+	pdfs, err := s.ScrapePDFLinks(context.Background(), server.URL)
 	require.NoError(t, err)
 	require.Len(t, pdfs, 2)
 
 	assert.Equal(t, "https://example.com/D01.pdf", pdfs[0].URL)
 	assert.Equal(t, "D01-2026_020 Élection du Maire", pdfs[0].Title)
 	assert.Equal(t, "https://example.com/D02.pdf", pdfs[1].URL)
+}
+
+func TestFetchDocumentCancelledContext(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(500 * time.Millisecond)
+		w.Write([]byte("<html></html>"))
+	}))
+	defer server.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	start := time.Now()
+	_, err := fetchDocument(ctx, server.URL)
+	elapsed := time.Since(start)
+
+	require.Error(t, err)
+	assert.Less(t, elapsed, 100*time.Millisecond)
 }
 
 func TestNormalizeCategory(t *testing.T) {

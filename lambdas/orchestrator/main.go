@@ -80,7 +80,7 @@ func handler(ctx context.Context, event OrchestratorEvent) error {
 	scraper := NewScraper(deliberationsListURL)
 
 	// 1. Gérer la date du prochain conseil
-	nextDate, err := scraper.ScrapeNextCouncilDate(nextCouncilURL)
+	nextDate, err := scraper.ScrapeNextCouncilDate(ctx, nextCouncilURL)
 	if err != nil {
 		log.Printf("warn: failed to scrape next council date: %v", err)
 	} else {
@@ -89,7 +89,7 @@ func handler(ctx context.Context, event OrchestratorEvent) error {
 	}
 
 	// 2. Gérer la liste des délibérations
-	listings, err := scraper.ScrapeCouncilList()
+	listings, err := scraper.ScrapeCouncilList(ctx)
 	if err != nil {
 		return fmt.Errorf("scrape council list: %w", err)
 	}
@@ -133,7 +133,7 @@ func handler(ctx context.Context, event OrchestratorEvent) error {
 		}
 
 		// Nouveau conseil détecté ! Téléchargement de tous les PDF
-		pdfs, err := scraper.ScrapePDFLinks(council.URL)
+		pdfs, err := scraper.ScrapePDFLinks(ctx, council.URL)
 		if err != nil {
 			log.Printf("warn: failed to scrape PDFs for %s: %v", council.CouncilID, err)
 			continue

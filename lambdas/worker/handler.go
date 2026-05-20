@@ -80,14 +80,18 @@ func (h *WorkerHandler) HandleRequest(ctx context.Context, event events.SQSEvent
 			}
 		}
 
-		pdfBytes, err := downloadPDF(msg.PDFURL)
+		dlCtx, dlCancel := context.WithTimeout(ctx, 60*time.Second)
+		pdfBytes, err := downloadPDF(dlCtx, msg.PDFURL)
+		dlCancel()
 		if err != nil {
 			log.Printf("error downloading PDF %s: %v", msg.PDFURL, err)
 			failures = append(failures, events.SQSBatchItemFailure{ItemIdentifier: record.MessageId})
 			continue
 		}
 
-		result, err := analyzeWithGemini(ctx, apiKey, pdfBytes)
+		gemCtx, gemCancel := context.WithTimeout(ctx, 120*time.Second)
+		result, err := analyzeWithGemini(gemCtx, apiKey, pdfBytes)
+		gemCancel()
 		if err != nil {
 			log.Printf("error analyzing with Gemini: %v", err)
 			failures = append(failures, events.SQSBatchItemFailure{ItemIdentifier: record.MessageId})
@@ -215,13 +219,13 @@ func (h *WorkerHandler) invokePublisher(ctx context.Context, councilID string) {
 	}
 }
 
-func downloadPDF(url string) ([]byte, error) {
-	req, err := http.NewRequest("GET", url, nil)
+func downloadPDF(ctx context.Context, url string) ([]byte, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
-	client := &http.Client{Timeout: 60 * time.Second}
+	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err

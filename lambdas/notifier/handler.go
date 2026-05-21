@@ -3,6 +3,8 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -290,7 +292,7 @@ func (d *notifierDeps) handle(ctx context.Context, event NotifierEvent) error {
 		}
 	}
 
-	if err := d.sendCampaign(ctx, params); err != nil {
+	if err := d.sendCampaign(ctx, params, event.CouncilID, council.Date); err != nil {
 		if event.TestListID == nil {
 			if relErr := d.releasePending(ctx, event.CouncilID); relErr != nil {
 				log.Printf("warn: failed to release pending claim for %s: %v", event.CouncilID, relErr)
@@ -818,13 +820,35 @@ func parseNewsletterParams(raw string) (*NewsletterParams, error) {
 
 // ── Brevo campaign ────────────────────────────────────────────────────────────
 
-func (d *notifierDeps) sendCampaign(ctx context.Context, params *NewsletterParams) error {
-	campaignID, err := d.createCampaign(ctx, params)
+func (d *notifierDeps) sendCampaign(ctx context.Context, params *NewsletterParams, councilID, councilDate string) error {
+	// A deterministic name keyed on (councilID, councilDate) lets us recognise a
+	// campaign a previous — possibly transparently retried — invocation already
+	// created, so a client-side HTTP retry can never create a second campaign.
+	name := fmt.Sprintf("Newsletter-%s-%s", councilID, councilDate)
+	idemKey := idempotencyKey(councilID, councilDate)
+
+	existingID, status, err := d.lookupCampaign(ctx, name)
 	if err != nil {
-		return fmt.Errorf("create campaign: %w", err)
+		return fmt.Errorf("lookup campaign %q: %w", name, err)
 	}
 
-	if err := d.triggerSend(ctx, campaignID); err != nil {
+	var campaignID int
+	switch {
+	case existingID != 0 && (status == "sent" || status == "queued" || status == "in_process"):
+		log.Printf("Brevo campaign %d (%q) already %s — skipping send", existingID, name, status)
+		return nil
+	case existingID != 0:
+		// A leftover draft from an aborted run: reuse it instead of creating a duplicate.
+		log.Printf("reusing existing Brevo campaign %d (%q, status %q)", existingID, name, status)
+		campaignID = existingID
+	default:
+		campaignID, err = d.createCampaign(ctx, params, name, idemKey)
+		if err != nil {
+			return fmt.Errorf("create campaign: %w", err)
+		}
+	}
+
+	if err := d.triggerSend(ctx, campaignID, idemKey); err != nil {
 		return fmt.Errorf("send campaign %d: %w", campaignID, err)
 	}
 
@@ -832,7 +856,57 @@ func (d *notifierDeps) sendCampaign(ctx context.Context, params *NewsletterParam
 	return nil
 }
 
-func (d *notifierDeps) createCampaign(ctx context.Context, params *NewsletterParams) (int, error) {
+// idempotencyKey derives a stable key from the council identity so that two
+// requests for the same newsletter carry an identical Idempotency-Key header.
+// Brevo may ignore the header; if so this is a harmless no-op and the
+// lookupCampaign/pre-send-status guards still prevent a double send.
+func idempotencyKey(councilID, councilDate string) string {
+	sum := sha256.Sum256([]byte(councilID + "|" + councilDate))
+	return hex.EncodeToString(sum[:16])
+}
+
+// lookupCampaign returns the id and status of the first campaign whose name
+// matches exactly. Brevo offers no server-side name filter, so we page the
+// most recent campaigns and match locally. (0, "", nil) means no match.
+func (d *notifierDeps) lookupCampaign(ctx context.Context, name string) (int, string, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, brevoBaseURL+"/emailCampaigns?limit=50&offset=0", nil)
+	if err != nil {
+		return 0, "", err
+	}
+	req.Header.Set("api-key", d.brevoKey)
+	req.Header.Set("accept", "application/json")
+
+	resp, err := d.httpClient.Do(req)
+	if err != nil {
+		return 0, "", fmt.Errorf("list campaigns request: %w", err)
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+
+	if resp.StatusCode >= 300 {
+		return 0, "", fmt.Errorf("brevo list campaigns status %d: %s", resp.StatusCode, body)
+	}
+
+	var result struct {
+		Campaigns []struct {
+			ID     int    `json:"id"`
+			Name   string `json:"name"`
+			Status string `json:"status"`
+		} `json:"campaigns"`
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return 0, "", fmt.Errorf("decode campaign list: %w", err)
+	}
+
+	for _, c := range result.Campaigns {
+		if c.Name == name {
+			return c.ID, c.Status, nil
+		}
+	}
+	return 0, "", nil
+}
+
+func (d *notifierDeps) createCampaign(ctx context.Context, params *NewsletterParams, name, idemKey string) (int, error) {
 	// Convert params struct → map[string]interface{} for the Brevo params field
 	paramsJSON, err := json.Marshal(params)
 	if err != nil {
@@ -844,7 +918,7 @@ func (d *notifierDeps) createCampaign(ctx context.Context, params *NewsletterPar
 	}
 
 	payload, err := json.Marshal(map[string]interface{}{
-		"name":       fmt.Sprintf("Newsletter - %s", params.CouncilDate),
+		"name":       name,
 		"subject":    params.EmailSubject,
 		"templateId": d.brevoTemplateID,
 		"sender": map[string]string{
@@ -867,6 +941,7 @@ func (d *notifierDeps) createCampaign(ctx context.Context, params *NewsletterPar
 	req.Header.Set("api-key", d.brevoKey)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("accept", "application/json")
+	req.Header.Set("Idempotency-Key", idemKey)
 
 	resp, err := d.httpClient.Do(req)
 	if err != nil {
@@ -890,7 +965,48 @@ func (d *notifierDeps) createCampaign(ctx context.Context, params *NewsletterPar
 	return result.ID, nil
 }
 
-func (d *notifierDeps) triggerSend(ctx context.Context, campaignID int) error {
+// getCampaignStatus returns the current status of a single campaign.
+func (d *notifierDeps) getCampaignStatus(ctx context.Context, campaignID int) (string, error) {
+	url := fmt.Sprintf("%s/emailCampaigns/%d", brevoBaseURL, campaignID)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("api-key", d.brevoKey)
+	req.Header.Set("accept", "application/json")
+
+	resp, err := d.httpClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("get campaign request: %w", err)
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+
+	if resp.StatusCode >= 300 {
+		return "", fmt.Errorf("brevo get campaign status %d: %s", resp.StatusCode, body)
+	}
+
+	var result struct {
+		Status string `json:"status"`
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return "", fmt.Errorf("decode campaign: %w", err)
+	}
+	return result.Status, nil
+}
+
+func (d *notifierDeps) triggerSend(ctx context.Context, campaignID int, idemKey string) error {
+	// Pre-send guard: if Brevo already accepted this campaign for delivery, a
+	// transparent HTTP retry must not fire sendNow a second time. A failed
+	// status check is non-fatal — we'd rather risk Brevo's own dedup than drop
+	// the newsletter on a transient read error.
+	if status, err := d.getCampaignStatus(ctx, campaignID); err != nil {
+		log.Printf("warn: pre-send status check failed for campaign %d, proceeding: %v", campaignID, err)
+	} else if status == "sent" || status == "queued" || status == "in_process" {
+		log.Printf("Brevo campaign %d already %s — skipping sendNow", campaignID, status)
+		return nil
+	}
+
 	url := fmt.Sprintf("%s/emailCampaigns/%d/sendNow", brevoBaseURL, campaignID)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, nil)
 	if err != nil {
@@ -898,6 +1014,7 @@ func (d *notifierDeps) triggerSend(ctx context.Context, campaignID int) error {
 	}
 	req.Header.Set("api-key", d.brevoKey)
 	req.Header.Set("accept", "application/json")
+	req.Header.Set("Idempotency-Key", idemKey)
 
 	resp, err := d.httpClient.Do(req)
 	if err != nil {

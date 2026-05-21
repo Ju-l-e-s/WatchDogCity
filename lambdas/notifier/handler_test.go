@@ -3,6 +3,9 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
+	"io"
+	"net/http"
 	"strings"
 	"sync"
 	"testing"
@@ -12,6 +15,55 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/watchdog/shared"
 )
+
+// fakeResp is a scripted HTTP response for fakeHTTP.
+type fakeResp struct {
+	status int
+	body   string
+}
+
+// fakeHTTP records outbound requests and replays scripted responses routed by
+// the caller-supplied route func. It matches the httpDoer interface.
+type fakeHTTP struct {
+	mu       sync.Mutex
+	requests []*http.Request
+	route    func(req *http.Request) fakeResp
+}
+
+func (f *fakeHTTP) Do(req *http.Request) (*http.Response, error) {
+	f.mu.Lock()
+	f.requests = append(f.requests, req)
+	f.mu.Unlock()
+	r := fakeResp{status: 200, body: "{}"}
+	if f.route != nil {
+		r = f.route(req)
+	}
+	return &http.Response{
+		StatusCode: r.status,
+		Body:       io.NopCloser(strings.NewReader(r.body)),
+		Header:     make(http.Header),
+	}, nil
+}
+
+func (f *fakeHTTP) count(pred func(*http.Request) bool) int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	n := 0
+	for _, r := range f.requests {
+		if pred(r) {
+			n++
+		}
+	}
+	return n
+}
+
+func isCreatePOST(r *http.Request) bool {
+	return r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/emailCampaigns")
+}
+
+func isSendNowPOST(r *http.Request) bool {
+	return r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/sendNow")
+}
 
 // fakeDDB captures UpdateItem inputs and replays scripted responses.
 type fakeDDB struct {
@@ -301,5 +353,79 @@ func TestParseNewsletterParams_SchemaConformant(t *testing.T) {
 		if !found {
 			t.Errorf("tag %q not in shared.TopicTags", tag)
 		}
+	}
+}
+
+// TestSendCampaign_SkipsWhenAlreadySent verifies that an existing campaign in a
+// terminal/in-flight status short-circuits both the create and sendNow POSTs.
+func TestSendCampaign_SkipsWhenAlreadySent(t *testing.T) {
+	const councilID, councilDate = "council-7", "2026-05-19"
+	name := fmt.Sprintf("Newsletter-%s-%s", councilID, councilDate)
+
+	h := &fakeHTTP{route: func(req *http.Request) fakeResp {
+		if req.Method == http.MethodGet && strings.Contains(req.URL.RawQuery, "limit=50") {
+			return fakeResp{200, fmt.Sprintf(`{"campaigns":[{"id":777,"name":%q,"status":"sent"}],"count":1}`, name)}
+		}
+		return fakeResp{200, "{}"}
+	}}
+	d := &notifierDeps{httpClient: h, brevoKey: "k"}
+
+	if err := d.sendCampaign(context.Background(), &NewsletterParams{}, councilID, councilDate); err != nil {
+		t.Fatalf("sendCampaign: %v", err)
+	}
+	if n := h.count(isCreatePOST); n != 0 {
+		t.Errorf("expected 0 create POSTs, got %d", n)
+	}
+	if n := h.count(isSendNowPOST); n != 0 {
+		t.Errorf("expected 0 sendNow POSTs, got %d", n)
+	}
+}
+
+// TestSendCampaign_ReusesDraft verifies that a leftover draft is reused: no new
+// campaign is created and exactly one sendNow is issued.
+func TestSendCampaign_ReusesDraft(t *testing.T) {
+	const councilID, councilDate = "council-7", "2026-05-19"
+	name := fmt.Sprintf("Newsletter-%s-%s", councilID, councilDate)
+
+	h := &fakeHTTP{route: func(req *http.Request) fakeResp {
+		switch {
+		case req.Method == http.MethodGet && strings.Contains(req.URL.RawQuery, "limit=50"):
+			return fakeResp{200, fmt.Sprintf(`{"campaigns":[{"id":42,"name":%q,"status":"draft"}],"count":1}`, name)}
+		case req.Method == http.MethodGet && strings.HasSuffix(req.URL.Path, "/emailCampaigns/42"):
+			return fakeResp{200, `{"status":"draft"}`}
+		case isSendNowPOST(req):
+			return fakeResp{204, ""}
+		}
+		return fakeResp{200, "{}"}
+	}}
+	d := &notifierDeps{httpClient: h, brevoKey: "k"}
+
+	if err := d.sendCampaign(context.Background(), &NewsletterParams{}, councilID, councilDate); err != nil {
+		t.Fatalf("sendCampaign: %v", err)
+	}
+	if n := h.count(isCreatePOST); n != 0 {
+		t.Errorf("expected 0 create POSTs (draft reused), got %d", n)
+	}
+	if n := h.count(isSendNowPOST); n != 1 {
+		t.Errorf("expected exactly 1 sendNow POST, got %d", n)
+	}
+}
+
+// TestTriggerSend_SkipsIfAlreadyQueued verifies the pre-send status guard:
+// a campaign already queued must not be dispatched again.
+func TestTriggerSend_SkipsIfAlreadyQueued(t *testing.T) {
+	h := &fakeHTTP{route: func(req *http.Request) fakeResp {
+		if req.Method == http.MethodGet && strings.HasSuffix(req.URL.Path, "/emailCampaigns/99") {
+			return fakeResp{200, `{"status":"queued"}`}
+		}
+		return fakeResp{200, "{}"}
+	}}
+	d := &notifierDeps{httpClient: h, brevoKey: "k"}
+
+	if err := d.triggerSend(context.Background(), 99, "idem-key"); err != nil {
+		t.Fatalf("triggerSend: %v", err)
+	}
+	if n := h.count(isSendNowPOST); n != 0 {
+		t.Errorf("expected 0 sendNow POSTs when already queued, got %d", n)
 	}
 }

@@ -3,12 +3,17 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"os"
+	"strconv"
 	"time"
 
+	"github.com/aws/aws-lambda-go/lambdacontext"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
@@ -17,6 +22,10 @@ import (
 	lambdaTypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
+
+// publisherLockKey is the councils-table metadata row used as a short-lived
+// mutex so concurrent publishers can't clobber each other's data.json write.
+const publisherLockKey = "metadata#publisher_lock"
 
 type PublisherEvent struct {
 	CouncilID string `json:"council_id"`
@@ -197,6 +206,34 @@ func fetchNextCouncilDate(ctx context.Context, ddb *dynamodb.Client) string {
 // ── Lambda Handler ───────────────────────────────────────────────────────────
 
 func HandleRequest(ctx context.Context, event PublisherEvent) error {
+	// Serialize publishers behind a short-lived DynamoDB lock. data.json is a
+	// single S3 object overwritten in full; two concurrent publishers would
+	// otherwise race and the slower write would silently win (last-write-wins).
+	owner := lambdaRequestID(ctx)
+	lockTTL := time.Now().Add(2 * time.Minute).Unix()
+	_, lerr := ddb.UpdateItem(ctx, &dynamodb.UpdateItemInput{
+		TableName: aws.String(os.Getenv("COUNCILS_TABLE")),
+		Key: map[string]types.AttributeValue{
+			"council_id": &types.AttributeValueMemberS{Value: publisherLockKey},
+		},
+		UpdateExpression:    aws.String("SET lock_ttl = :ttl, lock_owner = :owner"),
+		ConditionExpression: aws.String("attribute_not_exists(lock_ttl) OR lock_ttl < :now"),
+		ExpressionAttributeValues: map[string]types.AttributeValue{
+			":ttl":   &types.AttributeValueMemberN{Value: strconv.FormatInt(lockTTL, 10)},
+			":now":   &types.AttributeValueMemberN{Value: strconv.FormatInt(time.Now().Unix(), 10)},
+			":owner": &types.AttributeValueMemberS{Value: owner},
+		},
+	})
+	if lerr != nil {
+		var ccfe *types.ConditionalCheckFailedException
+		if errors.As(lerr, &ccfe) {
+			log.Printf("publisher lock held by another instance, skipping (it will publish the latest state)")
+			return nil
+		}
+		return fmt.Errorf("acquire publisher lock: %w", lerr)
+	}
+	defer releasePublisherLock(ctx, owner)
+
 	// Build all councils for the full data.json
 	allCouncils, allDelibs, err := fetchAllData(ctx, ddb)
 	if err != nil {
@@ -243,6 +280,43 @@ func HandleRequest(ctx context.Context, event PublisherEvent) error {
 	return nil
 }
 
+// lambdaRequestID returns the current Lambda invocation id, used as the lock
+// owner token. Falls back to a random id outside the Lambda runtime.
+func lambdaRequestID(ctx context.Context) string {
+	if lc, ok := lambdacontext.FromContext(ctx); ok && lc.AwsRequestID != "" {
+		return lc.AwsRequestID
+	}
+	var b [16]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		return fmt.Sprintf("publisher-%d", time.Now().UnixNano())
+	}
+	return hex.EncodeToString(b[:])
+}
+
+// releasePublisherLock clears the lock only if we still own it. If it expired
+// and was re-acquired by another instance, the owner guard fails and we leave
+// it alone.
+func releasePublisherLock(ctx context.Context, owner string) {
+	_, err := ddb.UpdateItem(ctx, &dynamodb.UpdateItemInput{
+		TableName: aws.String(os.Getenv("COUNCILS_TABLE")),
+		Key: map[string]types.AttributeValue{
+			"council_id": &types.AttributeValueMemberS{Value: publisherLockKey},
+		},
+		UpdateExpression:    aws.String("REMOVE lock_ttl, lock_owner"),
+		ConditionExpression: aws.String("lock_owner = :owner"),
+		ExpressionAttributeValues: map[string]types.AttributeValue{
+			":owner": &types.AttributeValueMemberS{Value: owner},
+		},
+	})
+	if err != nil {
+		var ccfe *types.ConditionalCheckFailedException
+		if errors.As(err, &ccfe) {
+			return
+		}
+		log.Printf("warn: could not release publisher lock: %v", err)
+	}
+}
+
 func fetchAllData(ctx context.Context, ddb *dynamodb.Client) ([]CouncilRecord, map[string][]DeliberationRecord, error) {
 	// Scan councils with pagination
 	var councils []CouncilRecord
@@ -250,9 +324,9 @@ func fetchAllData(ctx context.Context, ddb *dynamodb.Client) ([]CouncilRecord, m
 	for {
 		cOut, err := ddb.Scan(ctx, &dynamodb.ScanInput{
 			TableName:        aws.String(os.Getenv("COUNCILS_TABLE")),
-			FilterExpression: aws.String("NOT (council_id = :meta)"),
+			FilterExpression: aws.String("NOT begins_with(council_id, :metaprefix)"),
 			ExpressionAttributeValues: map[string]types.AttributeValue{
-				":meta": &types.AttributeValueMemberS{Value: "metadata#next_council"},
+				":metaprefix": &types.AttributeValueMemberS{Value: "metadata#"},
 			},
 			ExclusiveStartKey: lastKey,
 		})

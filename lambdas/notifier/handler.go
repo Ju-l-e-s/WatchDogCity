@@ -11,9 +11,6 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"regexp"
-	"strconv"
-	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -22,7 +19,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	ddbtypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/watchdog/shared"
-	"google.golang.org/genai"
 )
 
 // errClaimAlreadyHeld signals that another invocation already claimed the
@@ -32,14 +28,17 @@ var errClaimAlreadyHeld = errors.New("newsletter claim already held")
 
 const brevoBaseURL = "https://api.brevo.com/v3"
 
-// budgetFloatRe strips decimal parts from Gemini's numeric fields.
-var budgetFloatRe = regexp.MustCompile(`("(?:budget_total|total_councils|total_delibs)"\s*:\s*)(\d+)\.\d+`)
+// NewsletterParams is a transparent alias for the type that lives in shared.
+// Kept here so package-level tests can reference the type without an explicit
+// shared. prefix — the test file predates the hoist and must not be changed.
+type NewsletterParams = shared.NewsletterParams
 
 // ── Input event ───────────────────────────────────────────────────────────────
 
 type NotifierEvent struct {
-	CouncilID  string `json:"council_id"`
-	TestListID *int   `json:"test_list_id"`
+	CouncilID        string                  `json:"council_id"`
+	TestListID       *int                    `json:"test_list_id"`
+	NewsletterParams *shared.NewsletterParams `json:"newsletter_params,omitempty"`
 }
 
 // ── DynamoDB records (minimal projection) ────────────────────────────────────
@@ -52,146 +51,22 @@ type councilRec struct {
 	NewsletterPendingAt string `dynamodbav:"newsletter_pending_at,omitempty"`
 }
 
+// deliberationRec is the minimal cold projection used to build ColdDeliberation.
+// Prose fields (summary, analysis_data.*) are intentionally absent: the newsletter
+// LLM must not receive source prose.
 type deliberationRec struct {
 	ID            string  `dynamodbav:"id"`
 	CouncilID     string  `dynamodbav:"council_id"`
 	Title         string  `dynamodbav:"title"`
 	TopicTag      string  `dynamodbav:"topic_tag"`
-	Summary       string  `dynamodbav:"summary"`
 	BudgetImpact  int64   `dynamodbav:"budget_impact"`
+	BudgetType    string  `dynamodbav:"budget_type"`
 	VotePour      *int    `dynamodbav:"vote_pour"`
 	VoteContre    *int    `dynamodbav:"vote_contre"`
 	VoteAbst      *int    `dynamodbav:"vote_abstention"`
 	Disagreements *string `dynamodbav:"disagreements"`
-	AnalysisData  struct {
-		Contexte *string `dynamodbav:"contexte"`
-		Decision *string `dynamodbav:"decision"`
-		Impacts  *string `dynamodbav:"impacts"`
-	} `dynamodbav:"analysis_data"`
-}
-
-// ── Newsletter params (exact Brevo template schema) ───────────────────────────
-
-type NewsletterParams struct {
-	EmailSubject         string        `json:"email_subject"`
-	CouncilTitle         string        `json:"council_title"`
-	CouncilDate          string        `json:"council_date"`
-	MainIssue            string        `json:"main_issue"`
-	BudgetTotal          string        `json:"budget_total"`
-	HasGlobalBudget      bool          `json:"has_global_budget"`
-	VoteClimat           string        `json:"vote_climat"`
-	ClimatColor          string        `json:"climat_color"`
-	VoteStats            string        `json:"vote_stats"`
-	TotalDelibsInCouncil int           `json:"total_delibs_in_council"`
-	Tensions             []TensionItem `json:"tensions"`
-	Adopted              []AdoptedItem `json:"adopted"`
-	Briefs               []BriefItem   `json:"briefs"`
-	NextMeeting          string        `json:"next_meeting"`
-	WebsiteURL           string        `json:"website_url"`
-	TotalCouncils        int           `json:"total_councils"`
-	TotalDelibs          int           `json:"total_delibs"`
-}
-
-type TensionItem struct {
-	Title       string `json:"title"`
-	Context     string `json:"context"`
-	Impact      string `json:"impact"`
-	Budget      string `json:"budget"`
-	HasBudget   bool   `json:"has_budget"`
-	VoteDetails string `json:"vote_details"`
-}
-
-type AdoptedItem struct {
-	Tag       string `json:"tag"`
-	Title     string `json:"title"`
-	Context   string `json:"context"`
-	Impact    string `json:"impact"`
-	Budget    string `json:"budget"`
-	HasBudget bool   `json:"has_budget"`
-}
-
-type BriefItem struct {
-	Tag     string `json:"tag"`
-	Summary string `json:"summary"`
-}
-
-// newsletterSchema is the output contract enforced at the Gemini API boundary.
-// It mirrors NewsletterParams exactly; tag enums reuse shared.TopicTags so the
-// model can only emit one of the ten canonical categories. Post-processing
-// (stripLinks/formatStr) still runs on top — the schema constrains shape, not
-// editorial drift.
-var newsletterSchema = &genai.Schema{
-	Type: genai.TypeObject,
-	Properties: map[string]*genai.Schema{
-		"email_subject":           {Type: genai.TypeString},
-		"council_title":           {Type: genai.TypeString},
-		"council_date":            {Type: genai.TypeString},
-		"main_issue":              {Type: genai.TypeString},
-		"budget_total":            {Type: genai.TypeString},
-		"has_global_budget":       {Type: genai.TypeBoolean},
-		"vote_climat":             {Type: genai.TypeString},
-		"climat_color":            {Type: genai.TypeString},
-		"vote_stats":              {Type: genai.TypeString},
-		"total_delibs_in_council": {Type: genai.TypeInteger},
-		"tensions": {
-			Type: genai.TypeArray,
-			Items: &genai.Schema{
-				Type: genai.TypeObject,
-				Properties: map[string]*genai.Schema{
-					"title":        {Type: genai.TypeString},
-					"context":      {Type: genai.TypeString},
-					"impact":       {Type: genai.TypeString},
-					"budget":       {Type: genai.TypeString},
-					"has_budget":   {Type: genai.TypeBoolean},
-					"vote_details": {Type: genai.TypeString},
-				},
-				PropertyOrdering: []string{"title", "context", "impact", "budget", "has_budget", "vote_details"},
-				Required:         []string{"title", "context", "impact"},
-			},
-		},
-		"adopted": {
-			Type: genai.TypeArray,
-			Items: &genai.Schema{
-				Type: genai.TypeObject,
-				Properties: map[string]*genai.Schema{
-					"tag":        {Type: genai.TypeString, Format: "enum", Enum: shared.TopicTags},
-					"title":      {Type: genai.TypeString},
-					"context":    {Type: genai.TypeString},
-					"impact":     {Type: genai.TypeString},
-					"budget":     {Type: genai.TypeString},
-					"has_budget": {Type: genai.TypeBoolean},
-				},
-				PropertyOrdering: []string{"tag", "title", "context", "impact", "budget", "has_budget"},
-				Required:         []string{"tag", "title", "context", "impact"},
-			},
-		},
-		"briefs": {
-			Type: genai.TypeArray,
-			Items: &genai.Schema{
-				Type: genai.TypeObject,
-				Properties: map[string]*genai.Schema{
-					"tag":     {Type: genai.TypeString, Format: "enum", Enum: shared.TopicTags},
-					"summary": {Type: genai.TypeString},
-				},
-				PropertyOrdering: []string{"tag", "summary"},
-				Required:         []string{"tag", "summary"},
-			},
-		},
-		"next_meeting":   {Type: genai.TypeString},
-		"website_url":    {Type: genai.TypeString},
-		"total_councils": {Type: genai.TypeInteger},
-		"total_delibs":   {Type: genai.TypeInteger},
-	},
-	PropertyOrdering: []string{
-		"email_subject", "council_title", "council_date", "main_issue",
-		"budget_total", "has_global_budget", "vote_climat", "climat_color",
-		"vote_stats", "total_delibs_in_council", "tensions", "adopted", "briefs",
-		"next_meeting", "website_url", "total_councils", "total_delibs",
-	},
-	Required: []string{
-		"email_subject", "council_title", "council_date", "main_issue",
-		"tensions", "adopted", "briefs",
-	},
+	ClimateImpact string  `dynamodbav:"climate_impact"`
+	IsSubstantial bool    `dynamodbav:"is_substantial"`
 }
 
 // ── Interfaces (for testability) ──────────────────────────────────────────────
@@ -209,7 +84,7 @@ type httpDoer interface {
 
 // ── Deps ──────────────────────────────────────────────────────────────────────
 
-// pendingClaimTTL bornes how long a pending claim is honored before being
+// pendingClaimTTL bounds how long a pending claim is honored before being
 // considered stale and recoverable. Set well above the Lambda timeout (15 min
 // max for this function) divided by AWS async retry policy, so a crashing
 // Lambda can never park the newsletter forever.
@@ -238,13 +113,15 @@ func HandleRequest(ctx context.Context, event NotifierEvent) error {
 }
 
 func (d *notifierDeps) handle(ctx context.Context, event NotifierEvent) error {
-	// If Gemini is in an extended outage, skip cleanly: the newsletter is
-	// re-triggered by a later schedule rather than failing into the DLQ.
-	if open, err := shared.GeminiCircuitOpen(ctx, d.ddb, d.councilsTable); err != nil {
-		log.Printf("gemini circuit check failed, proceeding: %v", err)
-	} else if open {
-		log.Printf("gemini circuit OPEN — skipping newsletter for council %s; will retry on next schedule", event.CouncilID)
-		return nil
+	// Only check the Gemini circuit when we are about to call Gemini.
+	// If the validator already generated newsletter_params, skip Gemini entirely.
+	if event.NewsletterParams == nil {
+		if open, err := shared.GeminiCircuitOpen(ctx, d.ddb, d.councilsTable); err != nil {
+			log.Printf("gemini circuit check failed, proceeding: %v", err)
+		} else if open {
+			log.Printf("gemini circuit OPEN — skipping newsletter for council %s; will retry on next schedule", event.CouncilID)
+			return nil
+		}
 	}
 
 	// Override list ID if provided in event
@@ -258,17 +135,22 @@ func (d *notifierDeps) handle(ctx context.Context, event NotifierEvent) error {
 		return fmt.Errorf("fetch council %s: %w", event.CouncilID, err)
 	}
 
-	delibs, err := d.fetchDeliberations(ctx, event.CouncilID)
-	if err != nil {
-		return fmt.Errorf("fetch deliberations for %s: %w", event.CouncilID, err)
-	}
-
-	nextMeeting := d.fetchNextMeeting(ctx)
-	totalCouncils, totalDelibs := d.fetchGlobalStats(ctx)
-
-	params, err := d.generateNewsletterParams(ctx, council, delibs, nextMeeting, totalCouncils, totalDelibs)
-	if err != nil {
-		return fmt.Errorf("generate newsletter params: %w", err)
+	var params *shared.NewsletterParams
+	if event.NewsletterParams != nil {
+		// Fast path: validator pre-generated the params; no Gemini call needed.
+		params = event.NewsletterParams
+	} else {
+		// Legacy / test path: generate via Gemini.
+		delibs, err := d.fetchDeliberations(ctx, event.CouncilID)
+		if err != nil {
+			return fmt.Errorf("fetch deliberations for %s: %w", event.CouncilID, err)
+		}
+		nextMeeting := d.fetchNextMeeting(ctx)
+		totalCouncils, totalDelibs := d.fetchGlobalStats(ctx)
+		params, err = d.generateNewsletterParams(ctx, council, delibs, nextMeeting, totalCouncils, totalDelibs)
+		if err != nil {
+			return fmt.Errorf("generate newsletter params: %w", err)
+		}
 	}
 
 	// Two-phase claim/commit:
@@ -452,36 +334,46 @@ func (d *notifierDeps) fetchGlobalStats(ctx context.Context) (councils int, deli
 	return councils, delibs
 }
 
-// ── Gemini integration ────────────────────────────────────────────────────────
+// ── Newsletter generation (thin wrapper — delegates to shared) ─────────────────
 
-func (d *notifierDeps) generateNewsletterParams(ctx context.Context, council *councilRec, delibs []deliberationRec, nextMeeting string, totalCouncils, totalDelibs int) (*NewsletterParams, error) {
-	// Pre-compute stats so Gemini focuses on editorial content only
-	stats := computeNewsletterStats(delibs)
-	prompt := buildNewsletterPrompt(council, delibs, stats, nextMeeting, totalCouncils, totalDelibs)
-
-	client, err := genai.NewClient(ctx, &genai.ClientConfig{
-		APIKey:      d.geminiKey,
-		HTTPOptions: genai.HTTPOptions{APIVersion: "v1beta"},
-	})
-	if err != nil {
-		return nil, fmt.Errorf("create gemini client: %w", err)
+// toColdDelibs projects deliberation records into the whitelist struct that
+// the newsletter LLM may see. No prose fields (summary, analysis_data) are
+// forwarded — sensory deprivation is enforced here.
+func toColdDelibs(delibs []deliberationRec) []shared.ColdDeliberation {
+	cold := make([]shared.ColdDeliberation, len(delibs))
+	for i, d := range delibs {
+		cold[i] = shared.ColdDeliberation{
+			Title:           d.Title,
+			TopicTag:        d.TopicTag,
+			BudgetImpact:    d.BudgetImpact,
+			BudgetType:      d.BudgetType,
+			HasVote:         d.VotePour != nil || d.VoteContre != nil || d.VoteAbst != nil,
+			Pour:            d.VotePour,
+			Contre:          d.VoteContre,
+			Abstention:      d.VoteAbst,
+			ClimateImpact:   d.ClimateImpact,
+			IsSubstantial:   d.IsSubstantial,
+			HasDisagreement: d.Disagreements != nil && *d.Disagreements != "",
+		}
 	}
+	return cold
+}
 
-	resp, err := shared.CallGeminiWithRetry(ctx, func(ctx context.Context) (*genai.GenerateContentResponse, error) {
-		return client.Models.GenerateContent(
-			ctx,
-			d.geminiModel,
-			[]*genai.Content{{
-				Role:  "user",
-				Parts: []*genai.Part{{Text: prompt}},
-			}},
-			&genai.GenerateContentConfig{
-				ResponseMIMEType: "application/json",
-				ResponseSchema:   newsletterSchema,
-				MaxOutputTokens:  8192,
-			},
-		)
-	}, 4)
+func (d *notifierDeps) generateNewsletterParams(
+	ctx context.Context,
+	council *councilRec,
+	delibs []deliberationRec,
+	nextMeeting string,
+	totalCouncils, totalDelibs int,
+) (*shared.NewsletterParams, error) {
+	cold := toColdDelibs(delibs)
+	params, err := shared.GenerateNewsletterParams(
+		ctx,
+		shared.GeminiDeps{APIKey: d.geminiKey, Model: d.geminiModel},
+		council.Title, council.Date,
+		cold,
+		nextMeeting, totalCouncils, totalDelibs,
+	)
 	if err != nil {
 		if rerr := shared.RecordGeminiError(ctx, d.ddb, d.councilsTable); rerr != nil {
 			log.Printf("warn: record gemini error: %v", rerr)
@@ -491,331 +383,14 @@ func (d *notifierDeps) generateNewsletterParams(ctx context.Context, council *co
 	if rerr := shared.RecordGeminiSuccess(ctx, d.ddb, d.councilsTable); rerr != nil {
 		log.Printf("warn: record gemini success: %v", rerr)
 	}
-	if len(resp.Candidates) == 0 || resp.Candidates[0].Content == nil || len(resp.Candidates[0].Content.Parts) == 0 {
-		return nil, fmt.Errorf("gemini returned empty response")
-	}
-
-	raw := resp.Candidates[0].Content.Parts[0].Text
-	params, err := parseNewsletterParams(raw)
-	if err != nil {
-		return nil, err
-	}
-	params.EmailSubject = "L'Essentiel du Conseil"
-	params.WebsiteURL = "https://lobservatoiredebegles.fr"
-
-	// Post-process flags and formatting for template logic
-	params.HasGlobalBudget = params.BudgetTotal != "" && params.BudgetTotal != "0"
-
-	// Re-format budgets from the raw integer (strips Gemini's thousands formatting
-	// which breaks FindString — "20 000 €" → FindString returns "20" not "20000").
-	reNonDigit := regexp.MustCompile(`\D`)
-	formatStr := func(s string) string {
-		if s == "" {
-			return ""
-		}
-		digitsOnly := reNonDigit.ReplaceAllString(s, "")
-		if digitsOnly == "" {
-			return ""
-		}
-		val, err := strconv.ParseInt(digitsOnly, 10, 64)
-		if err != nil || val == 0 {
-			return ""
-		}
-		return formatBudgetFR(val)
-	}
-
-	// Strip any "En savoir plus" / link text Gemini may have appended despite the rule.
-	reLink := regexp.MustCompile(`(?i)\s*(en savoir plus[^.]*|voir sur le site[^.]*|→[^\n]*)$`)
-	stripLinks := func(s string) string {
-		return strings.TrimSpace(reLink.ReplaceAllString(s, ""))
-	}
-
-	for i := range params.Tensions {
-		params.Tensions[i].Budget = formatStr(params.Tensions[i].Budget)
-		params.Tensions[i].HasBudget = params.Tensions[i].Budget != ""
-		params.Tensions[i].Context = stripLinks(params.Tensions[i].Context)
-		params.Tensions[i].Impact = stripLinks(params.Tensions[i].Impact)
-	}
-	for i := range params.Adopted {
-		params.Adopted[i].Budget = formatStr(params.Adopted[i].Budget)
-		params.Adopted[i].HasBudget = params.Adopted[i].Budget != ""
-		params.Adopted[i].Context = stripLinks(params.Adopted[i].Context)
-		params.Adopted[i].Impact = stripLinks(params.Adopted[i].Impact)
-	}
-	for i := range params.Briefs {
-		params.Briefs[i].Summary = stripLinks(params.Briefs[i].Summary)
-	}
-
 	return params, nil
 }
 
-// ── Pure helpers (testable) ────────────────────────────────────────────────────
-
-type newsletterStats struct {
-	totalBudget int64
-	totalPour   int
-	totalContre int
-	totalAbst   int
-	voteClimat  string
-	climatColor string
-	voteStats   string
-	budgetFmt   string
-}
-
-func computeNewsletterStats(delibs []deliberationRec) newsletterStats {
-	var s newsletterStats
-	hasIndividualTension := false
-	nonUnanimousCount := 0
-	maxOpposition := 0
-	maxAbst := 0
-
-	for _, d := range delibs {
-		s.totalBudget += d.BudgetImpact
-
-		contre := 0
-		if d.VoteContre != nil {
-			contre = *d.VoteContre
-		}
-		abst := 0
-		if d.VoteAbst != nil {
-			abst = *d.VoteAbst
-		}
-
-		if contre > maxOpposition {
-			maxOpposition = contre
-		}
-		if abst > maxAbst {
-			maxAbst = abst
-		}
-
-		if contre > 0 || abst > 0 {
-			nonUnanimousCount++
-		}
-
-		// Aligned with website: detect any individual tension
-		if contre > 0 || (d.Disagreements != nil && *d.Disagreements != "") {
-			hasIndividualTension = true
-		}
-	}
-
-	if hasIndividualTension || nonUnanimousCount > 0 {
-		s.voteClimat = "VOTES PARTAGÉS"
-		s.climatColor = "#E11D48" // Rose 600
-	} else {
-		s.voteClimat = "CONSENSUS"
-		s.climatColor = "#059669" // Emerald 600
-	}
-
-	s.budgetFmt = formatBudgetFR(s.totalBudget)
-
-	// Clearer stats: "X délibs non unanimes"
-	parts := []string{}
-	if nonUnanimousCount > 0 {
-		parts = append(parts, fmt.Sprintf("%d délib. non unanime%s", nonUnanimousCount, plural(nonUnanimousCount)))
-		if maxOpposition > 0 {
-			parts = append(parts, fmt.Sprintf("jusqu'à %d voix contre", maxOpposition))
-		}
-	} else {
-		parts = append(parts, "Unanimité totale")
-	}
-	s.voteStats = strings.Join(parts, " / ")
-
-	return s
-}
-
-var frMonths = [13]string{"", "janvier", "février", "mars", "avril", "mai", "juin",
-	"juillet", "août", "septembre", "octobre", "novembre", "décembre"}
-
-func formatDateFR(isoDate string) string {
-	t, err := time.Parse("2006-01-02", isoDate)
-	if err != nil {
-		return isoDate
-	}
-	return fmt.Sprintf("%d %s %d", t.Day(), frMonths[t.Month()], t.Year())
-}
-
-func formatBudgetFR(amount int64) string {
-	if amount == 0 {
-		return "0"
-	}
-	s := fmt.Sprintf("%d", amount)
-	// Insert spaces as thousands separators
-	result := []byte{}
-	for i, c := range s {
-		if i > 0 && (len(s)-i)%3 == 0 {
-			result = append(result, ' ')
-		}
-		result = append(result, byte(c))
-	}
-	return string(result)
-}
-
-func plural(n int) string {
-	if n > 1 {
-		return "s"
-	}
-	return ""
-}
-
-func buildNewsletterPrompt(council *councilRec, delibs []deliberationRec, stats newsletterStats, nextMeeting string, totalCouncils, totalDelibs int) string {
-	var sb strings.Builder
-
-	// --- LOGIQUE DE FILTRAGE (Entonnoir de pertinence) ---
-	var politicalTensions []deliberationRec
-	var majorImpact []deliberationRec
-	var localLife []deliberationRec
-
-	for _, d := range delibs {
-		contre := 0
-		if d.VoteContre != nil {
-			contre = *d.VoteContre
-		}
-		hasDisagreement := d.Disagreements != nil && *d.Disagreements != ""
-
-		// 1. Priorité Politique (Tensions) : Toujours inclus même pour 1€
-		if contre > 0 || hasDisagreement {
-			politicalTensions = append(politicalTensions, d)
-			continue
-		}
-
-		// 2. Impact Majeur (> 5000€) : Inclus d'office
-		if d.BudgetImpact >= 5000 {
-			majorImpact = append(majorImpact, d)
-			continue
-		}
-
-		// 3. Vie Locale (500€ - 5000€ + Catégories "Plaisir") : Bonus visibilité
-		isPlaisir := d.TopicTag == "Sport" || d.TopicTag == "Culture" || d.TopicTag == "Social"
-		if d.BudgetImpact >= 500 && isPlaisir {
-			localLife = append(localLife, d)
-			continue
-		}
-
-		// Le reste (ex: Bureaucratie < 500€ unanime) est considéré comme du "bruit" et exclu de la newsletter.
-	}
-
-	sb.WriteString("Tu es rédacteur en chef de L'Observatoire de Bègles, une newsletter de transparence citoyenne.\n")
-	sb.WriteString("Génère un objet JSON avec EXACTEMENT ce schéma (ne génère aucun texte en dehors) :\n\n")
-	sb.WriteString(`{
-  "email_subject": "accrocheur, < 60 caractères, reflète l'enjeu politique majeur",
-  "council_title": "copie verbatim du council_title fourni ci-dessous",
-  "council_date": "copie verbatim du council_date fourni ci-dessous",
-  "main_issue": "Analyse journalistique (2 à 3 phrases maximum). Pourquoi ce conseil est-il important ? Utilise le pluriel si plusieurs sujets majeurs. Reste strictement neutre et objectif. Aucun jargon administratif.",
-  "budget_total": "montant total voté (fourni ci-dessous, copie verbatim)",
-  "has_global_budget": true,
-  "vote_climat": "VOTES PARTAGÉS ou CONSENSUS (fourni ci-dessous, copie verbatim)",
-  "climat_color": "code hex couleur (fourni ci-dessous, copie verbatim)",
-  "vote_stats": "résumé votes (fourni ci-dessous, copie verbatim)",
-  "total_delibs_in_council": 0,
-  "tensions": [
-    {
-      "title": "Titre explicite et percutant",
-      "context": "Analyse neutre en 2 à 3 phrases maximum : l'historique du dossier, pourquoi la ville prend cette décision maintenant.",
-      "impact": "Analyse neutre en 2 à 3 phrases maximum : que se passe-t-il concrètement pour le citoyen ? Explication simple, sans jargon. Pourquoi l'opposition a voté contre ?",
-      "budget": "X € (LAISSER VIDE '' SI IMPACT NUL)",
-      "has_budget": true,
-      "vote_details": "Y votes contre"
-    }
-  ],
-  "adopted": [
-    {
-      "tag": "Administration, Sport, Budget, Sécurité, Environnement, Mobilité, Social, Culture, Urbanisme ou Éducation",
-      "title": "Titre vulgarisé",
-      "context": "2 à 3 phrases maximum. Pourquoi ? Explication factuelle et pédagogique du besoin.",
-      "impact": "2 à 3 phrases maximum. Concrètement ? Conséquence directe sur le quotidien, sans jargon.",
-      "budget": "X € (LAISSER VIDE '' SI IMPACT NUL)",
-      "has_budget": true
-    }
-  ],
-  "briefs": [
-    {
-      "tag": "Catégorie exacte",
-      "summary": "Résumé ultra-court (1 à 2 phrases) focalisé sur l'essentiel, factuel et neutre."
-    }
-  ],
-  "next_meeting": "Date du prochain conseil (fourni ci-dessous, copie verbatim)",
-  "website_url": "https://lobservatoiredebegles.fr",
-  "total_councils": 0,
-  "total_delibs": 0
-}`)
-
-	sb.WriteString("\n\nCONSIGNES ÉDITORIALES ET LOGIQUES :\n")
-	sb.WriteString("- PRIORITÉ ABSOLUE : Toute délibération avec des votes contre ou abstentions DOIT figurer dans 'tensions', quel que soit son montant financier.\n")
-	sb.WriteString("- ENJEU CLÉ : Si le VOTE DES TAUX d'imposition est présent, il doit être le sujet prioritaire.\n")
-	sb.WriteString("- VULGARISATION INDEMNITÉS : Pour les indemnités des élus, explique simplement : 'Le conseil définit légalement la rémunération des élus pour leur travail, selon un barème national basé sur la taille de la ville'.\n")
-	sb.WriteString("- PÉDAGOGIE ET NEUTRALITÉ : Agis en traducteur neutre. Bannis le jargon juridique et administratif. N'utilise aucune formulation partisane, orientée ou de jugement de valeur.\n")
-	sb.WriteString("- ANCRAGE (GROUNDING) : N'ajoute AUCUNE information qui n'est pas présente dans les données d'entrée. Ne fais pas de compliments (ex: 'plus grand club'), n'ajoute pas de faits historiques ou géographiques non mentionnés.\n")
-	sb.WriteString("- INTERDICTION FORMELLE : N'ajoute JAMAIS de liens HTML ou de texte 'En savoir plus' dans les champs context ou impact. Ils sont déjà gérés par le template.\n")
-	sb.WriteString("- CATÉGORISATION STRICTE : Classe la Police et la Vidéoprotection exclusivement dans Sécurité. Classe tous les clubs sportifs (Dojo, Handball, Foot, etc.) exclusivement dans Sport.\n")
-	sb.WriteString("- AFFICHAGE CONDITIONNEL : Ne mentionne pas de budget ('0 €') si l'impact est nul. Laisse le champ budget vide.\n")
-	sb.WriteString("- STYLE : Journalistique, actif, précis. Vérifie la concordance sujet-verbe.\n\n")
-
-	fmt.Fprintf(&sb, "DONNÉES D'ENTRÉE :\n")
-	fmt.Fprintf(&sb, "- council_title : %s (copie verbatim)\n", council.Title)
-	fmt.Fprintf(&sb, "- council_date : %s (copie verbatim)\n", formatDateFR(council.Date))
-	fmt.Fprintf(&sb, "- Nombre total de délibérations ce jour : %d\n", len(delibs))
-	fmt.Fprintf(&sb, "- budget_total : %s\n", stats.budgetFmt)
-	fmt.Fprintf(&sb, "- vote_climat : %s\n", stats.voteClimat)
-	fmt.Fprintf(&sb, "- vote_stats : %s\n", stats.voteStats)
-	fmt.Fprintf(&sb, "- next_meeting : %s\n", nextMeeting)
-	fmt.Fprintf(&sb, "- total_councils : %d\n", totalCouncils)
-	fmt.Fprintf(&sb, "- total_delibs : %d\n\n", totalDelibs)
-
-	// Injecter les tensions
-	sb.WriteString("\nDÉLIBÉRATIONS AVEC OPPOSITION (A METTRE DANS tensions[]) :\n")
-	for _, d := range politicalTensions {
-		contre := 0
-		if d.VoteContre != nil {
-			contre = *d.VoteContre
-		}
-		abst := 0
-		if d.VoteAbst != nil {
-			abst = *d.VoteAbst
-		}
-		pour := 0
-		if d.VotePour != nil {
-			pour = *d.VotePour
-		}
-		dis := "aucun"
-		if d.Disagreements != nil {
-			dis = *d.Disagreements
-		}
-
-		fmt.Fprintf(&sb, "- %s | Budget: %d€ | Vote: %d/%d/%d | Désaccords: %s\n",
-			shared.TruncForLog(d.Title, 80), d.BudgetImpact, pour, contre, abst,
-			shared.TruncForLog(dis, 80))
-	}
-	if len(politicalTensions) == 0 {
-		sb.WriteString("(néant)\n")
-	}
-
-	// Injecter les impacts majeurs et vie locale
-	sb.WriteString("\nDÉLIBÉRATIONS ADOPTÉES SIGNIFICATIVES (A FILTRER POUR adopted[] et briefs[]) :\n")
-	allSignificant := append(majorImpact, localLife...)
-	for _, d := range allSignificant {
-		fmt.Fprintf(&sb, "- %s | Tag: %s | Budget: %d€ | Résumé: %s\n",
-			shared.TruncForLog(d.Title, 80), d.TopicTag, d.BudgetImpact,
-			shared.TruncForLog(d.Summary, 80))
-	}
-
-	return sb.String()
-}
-
+// parseNewsletterParams is a thin shim kept for backward compatibility with
+// the existing test file (which calls the unexported name directly). All logic
+// lives in shared.ParseNewsletterParams.
 func parseNewsletterParams(raw string) (*NewsletterParams, error) {
-	raw = strings.TrimSpace(raw)
-	raw = strings.TrimPrefix(raw, "```json")
-	raw = strings.TrimPrefix(raw, "```")
-	raw = strings.TrimSuffix(raw, "```")
-	raw = strings.TrimSpace(raw)
-	// Normalize any floats in numeric integer fields
-	raw = budgetFloatRe.ReplaceAllString(raw, "${1}${2}")
-
-	var p NewsletterParams
-	dec := json.NewDecoder(strings.NewReader(raw))
-	if err := dec.Decode(&p); err != nil {
-		return nil, fmt.Errorf("unmarshal newsletter params: %w (raw: %.200s)", err, raw)
-	}
-	return &p, nil
+	return shared.ParseNewsletterParams(raw)
 }
 
 // ── Brevo campaign ────────────────────────────────────────────────────────────

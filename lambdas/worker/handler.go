@@ -31,6 +31,7 @@ type DynamoDBAPI interface {
 	PutItem(ctx context.Context, params *dynamodb.PutItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.PutItemOutput, error)
 	UpdateItem(ctx context.Context, params *dynamodb.UpdateItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.UpdateItemOutput, error)
 	GetItem(ctx context.Context, params *dynamodb.GetItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.GetItemOutput, error)
+	TransactWriteItems(ctx context.Context, params *dynamodb.TransactWriteItemsInput, optFns ...func(*dynamodb.Options)) (*dynamodb.TransactWriteItemsOutput, error)
 }
 
 type LambdaAPI interface {
@@ -164,61 +165,103 @@ func (h *WorkerHandler) handleRecord(ctx context.Context, msg SQSPayload, result
 		if gerr != nil {
 			return fmt.Errorf("get deliberation %s after conflict: %w", id, gerr)
 		}
-		if hasAnalysisData(existing.Item) {
-			log.Printf("deliberation %s already analyzed, skipping", id)
+		// `counted` — not analysis_data — is the source of truth for "already
+		// accounted". A worker that crashed after PutItem leaves analysis_data
+		// behind but never counted; keying off counted lets us recover it.
+		if isCounted(existing.Item) {
+			log.Printf("deliberation %s already counted, skipping", id)
 			return nil
 		}
-		// Partial state: fill the analysis fields, guarding against a third
-		// worker that may complete the same item concurrently.
-		setExpr, names, values := buildSetExpression(item, "id")
-		_, uerr := h.ddb.UpdateItem(ctx, &dynamodb.UpdateItemInput{
-			TableName: aws.String(os.Getenv("DELIBERATIONS_TABLE")),
-			Key: map[string]types.AttributeValue{
-				"id": &types.AttributeValueMemberS{Value: id},
-			},
-			UpdateExpression:          aws.String(setExpr),
-			ConditionExpression:       aws.String("attribute_not_exists(analysis_data)"),
-			ExpressionAttributeNames:  names,
-			ExpressionAttributeValues: values,
-		})
-		if uerr != nil {
-			if errors.As(uerr, &ccfe) {
-				log.Printf("deliberation %s completed by another worker, skipping", id)
-				return nil
+		// Not yet counted. If analysis is missing this is a bare/partial claim —
+		// fill the fields (guarded so a concurrent worker can't be clobbered).
+		// Either way we proceed to the counting transaction below, which is
+		// itself idempotent via attribute_not_exists(counted).
+		if !hasAnalysisData(existing.Item) {
+			setExpr, names, values := buildSetExpression(item, "id")
+			_, uerr := h.ddb.UpdateItem(ctx, &dynamodb.UpdateItemInput{
+				TableName: aws.String(os.Getenv("DELIBERATIONS_TABLE")),
+				Key: map[string]types.AttributeValue{
+					"id": &types.AttributeValueMemberS{Value: id},
+				},
+				UpdateExpression:          aws.String(setExpr),
+				ConditionExpression:       aws.String("attribute_not_exists(analysis_data)"),
+				ExpressionAttributeNames:  names,
+				ExpressionAttributeValues: values,
+			})
+			if uerr != nil && !errors.As(uerr, &ccfe) {
+				return fmt.Errorf("recover partial deliberation %s: %w", id, uerr)
 			}
-			return fmt.Errorf("recover partial deliberation %s: %w", id, uerr)
 		}
 	}
 
 	if shouldCount {
-		// 2. Increment counter, capped at total_pdfs. The condition stops a
-		//    late retry from pushing processed past total and re-triggering
-		//    completion.
-		out, err := h.ddb.UpdateItem(ctx, &dynamodb.UpdateItemInput{
+		// 2. Count this pdf atomically: bump the council counter (capped at
+		//    total_pdfs) AND mark the deliberation counted, in one transaction.
+		//    The attribute_not_exists(counted) guard makes counting idempotent —
+		//    a retry of the same pdf can never double-count, and a council can
+		//    never be pushed past total.
+		_, terr := h.ddb.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{
+			TransactItems: []types.TransactWriteItem{
+				{
+					Update: &types.Update{
+						TableName: aws.String(os.Getenv("COUNCILS_TABLE")),
+						Key: map[string]types.AttributeValue{
+							"council_id": &types.AttributeValueMemberS{Value: msg.CouncilID},
+						},
+						UpdateExpression:    aws.String("ADD processed_pdfs :one"),
+						ConditionExpression: aws.String("processed_pdfs < total_pdfs"),
+						ExpressionAttributeValues: map[string]types.AttributeValue{
+							":one": &types.AttributeValueMemberN{Value: "1"},
+						},
+					},
+				},
+				{
+					Update: &types.Update{
+						TableName: aws.String(os.Getenv("DELIBERATIONS_TABLE")),
+						Key: map[string]types.AttributeValue{
+							"id": &types.AttributeValueMemberS{Value: id},
+						},
+						UpdateExpression:    aws.String("SET counted = :true"),
+						ConditionExpression: aws.String("attribute_not_exists(counted)"),
+						ExpressionAttributeValues: map[string]types.AttributeValue{
+							":true": &types.AttributeValueMemberBOOL{Value: true},
+						},
+					},
+				},
+			},
+		})
+		if terr != nil {
+			var tce *ddbtypes.TransactionCanceledException
+			if !errors.As(terr, &tce) {
+				return fmt.Errorf("transact counter for %s: %w", msg.CouncilID, terr)
+			}
+			// reasons[0] = council update, reasons[1] = deliberation update.
+			reasons := tce.CancellationReasons
+			switch {
+			case len(reasons) > 1 && reasons[1].Code != nil && *reasons[1].Code == "ConditionalCheckFailed":
+				log.Printf("deliberation %s already counted, skipping increment", id)
+			case len(reasons) > 0 && reasons[0].Code != nil && *reasons[0].Code == "ConditionalCheckFailed":
+				log.Printf("council %s already capped, skipping increment", msg.CouncilID)
+			default:
+				return fmt.Errorf("transact counter for %s: %w", msg.CouncilID, terr)
+			}
+			return nil
+		}
+
+		// 3. Complete? The transaction returns no attributes, so re-read the
+		//    council, then claim the publish slot so a single worker fans out to
+		//    the Publisher even when several cross the boundary together.
+		cur, gerr := h.ddb.GetItem(ctx, &dynamodb.GetItemInput{
 			TableName: aws.String(os.Getenv("COUNCILS_TABLE")),
 			Key: map[string]types.AttributeValue{
 				"council_id": &types.AttributeValueMemberS{Value: msg.CouncilID},
 			},
-			UpdateExpression:    aws.String("ADD processed_pdfs :one"),
-			ConditionExpression: aws.String("processed_pdfs < total_pdfs"),
-			ExpressionAttributeValues: map[string]types.AttributeValue{
-				":one": &types.AttributeValueMemberN{Value: "1"},
-			},
-			ReturnValues: types.ReturnValueAllNew,
 		})
-		if err != nil {
-			var ccfe *ddbtypes.ConditionalCheckFailedException
-			if errors.As(err, &ccfe) {
-				log.Printf("council %s already capped, skipping counter increment", msg.CouncilID)
-				return nil
-			}
-			return fmt.Errorf("update council counter: %w", err)
+		if gerr != nil {
+			return fmt.Errorf("read council %s after counting: %w", msg.CouncilID, gerr)
 		}
-
-		// 3. Complete? Claim the publish slot so a single worker fans out to the
-		//    Publisher even when several cross the boundary together.
-		processed := attrInt(out.Attributes, "processed_pdfs")
-		total := attrInt(out.Attributes, "total_pdfs")
+		processed := attrInt(cur.Item, "processed_pdfs")
+		total := attrInt(cur.Item, "total_pdfs")
 		if processed >= total && total > 0 {
 			_, perr := h.ddb.UpdateItem(ctx, &dynamodb.UpdateItemInput{
 				TableName: aws.String(os.Getenv("COUNCILS_TABLE")),
@@ -335,6 +378,16 @@ func hasAnalysisData(item map[string]types.AttributeValue) bool {
 	default:
 		return true
 	}
+}
+
+// isCounted reports whether a deliberation has already been tallied into its
+// council counter. It is the authoritative "already accounted" signal,
+// independent of whether analysis_data was written.
+func isCounted(item map[string]types.AttributeValue) bool {
+	if v, ok := item["counted"].(*types.AttributeValueMemberBOOL); ok {
+		return v.Value
+	}
+	return false
 }
 
 // buildSetExpression renders a DynamoDB SET update writing every attribute in

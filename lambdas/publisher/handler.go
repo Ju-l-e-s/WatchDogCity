@@ -262,6 +262,14 @@ func HandleRequest(ctx context.Context, event PublisherEvent) error {
 	}
 	log.Printf("data.json uploaded (%d bytes)", len(jsonBytes))
 
+	// A missing council_id means the Notifier would fetch council "" → 404 and
+	// silently drop the newsletter. Bail before invoking; data.json is already
+	// published, which is the side effect that matters.
+	if event.CouncilID == "" {
+		log.Printf("notifier skip: empty council_id (probably invoked by aggregator without payload)")
+		return nil
+	}
+
 	// Trigger newsletter Notifier asynchronously — last instruction, after S3.
 	if fn := os.Getenv("NOTIFIER_FUNCTION_NAME"); fn != "" {
 		notifierPayload, _ := json.Marshal(map[string]string{"council_id": event.CouncilID})
@@ -272,6 +280,10 @@ func HandleRequest(ctx context.Context, event PublisherEvent) error {
 		})
 		if err != nil {
 			log.Printf("warn: could not invoke notifier for council %s: %v", event.CouncilID, err)
+			// Emit a CloudWatch EMF metric so a failed fan-out is alarmable
+			// rather than buried in a warn log.
+			log.Printf(`{"_aws":{"Timestamp":%d,"CloudWatchMetrics":[{"Namespace":"Watchdog","Dimensions":[["FunctionName"]],"Metrics":[{"Name":"NotifierInvokeFailed","Unit":"Count"}]}]},"FunctionName":"publisher","NotifierInvokeFailed":1}`,
+				time.Now().UnixMilli())
 		} else {
 			log.Printf("notifier invoked async for council %s", event.CouncilID)
 		}

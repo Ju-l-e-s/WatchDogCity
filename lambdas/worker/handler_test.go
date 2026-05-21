@@ -3,10 +3,12 @@ package main
 import (
 	"context"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	awslambda "github.com/aws/aws-sdk-go-v2/service/lambda"
@@ -151,6 +153,7 @@ type concurrentMockDDB struct {
 	delibs    map[string]map[string]types.AttributeValue
 	processed int
 	total     int
+	published bool
 }
 
 func newConcurrentMock(total int) *concurrentMockDDB {
@@ -185,8 +188,20 @@ func (m *concurrentMockDDB) GetItem(_ context.Context, p *dynamodb.GetItemInput,
 func (m *concurrentMockDDB) UpdateItem(_ context.Context, p *dynamodb.UpdateItemInput, _ ...func(*dynamodb.Options)) (*dynamodb.UpdateItemOutput, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	// Council counter increment.
 	if _, ok := p.Key["council_id"]; ok {
+		expr := aws.ToString(p.UpdateExpression)
+		// Publish-slot claim, guarded by attribute_not_exists(published_at).
+		if strings.Contains(expr, "published_at") {
+			if m.published {
+				return nil, &types.ConditionalCheckFailedException{}
+			}
+			m.published = true
+			return &dynamodb.UpdateItemOutput{}, nil
+		}
+		// Counter increment, capped by processed_pdfs < total_pdfs.
+		if m.processed >= m.total {
+			return nil, &types.ConditionalCheckFailedException{}
+		}
 		m.processed++
 		return &dynamodb.UpdateItemOutput{Attributes: map[string]types.AttributeValue{
 			"processed_pdfs": &types.AttributeValueMemberN{Value: strconv.Itoa(m.processed)},
@@ -238,6 +253,53 @@ func TestHandleRecord_ConcurrentDuplicateCountsOnce(t *testing.T) {
 	defer m.mu.Unlock()
 	assert.Equal(t, 1, m.processed, "counter must be incremented exactly once")
 	assert.True(t, hasAnalysisData(m.delibs["D01.pdf"]), "analysis_data must be present")
+}
+
+// countingLambda counts Invoke calls thread-safely.
+type countingLambda struct {
+	mu    sync.Mutex
+	count int
+}
+
+func (l *countingLambda) Invoke(_ context.Context, p *awslambda.InvokeInput, _ ...func(*awslambda.Options)) (*awslambda.InvokeOutput, error) {
+	l.mu.Lock()
+	l.count++
+	l.mu.Unlock()
+	return &awslambda.InvokeOutput{}, nil
+}
+
+// Several workers crossing the completion boundary together must invoke the
+// Publisher exactly once, thanks to the capped counter and the published_at claim.
+func TestHandleRecord_SinglePublisherInvokeAtBoundary(t *testing.T) {
+	m := newConcurrentMock(3)
+	cl := &countingLambda{}
+	h := &WorkerHandler{ddb: m, lambda: cl}
+
+	urls := []string{"D01.pdf", "D02.pdf", "D03.pdf"}
+	var wg sync.WaitGroup
+	errs := make([]error, len(urls))
+	for i, u := range urls {
+		wg.Add(1)
+		go func(idx int, url string) {
+			defer wg.Done()
+			msg := SQSPayload{CouncilID: "C1", PDFURL: "https://example.com/" + url, TotalPDFs: 3}
+			errs[idx] = h.handleRecord(context.Background(), msg, &GeminiResult{Title: "T", Summary: "S"})
+		}(i, u)
+	}
+	wg.Wait()
+
+	for _, e := range errs {
+		require.NoError(t, e)
+	}
+
+	m.mu.Lock()
+	assert.Equal(t, 3, m.processed, "every distinct pdf must be counted once")
+	assert.True(t, m.published, "completion must be claimed once")
+	m.mu.Unlock()
+
+	cl.mu.Lock()
+	assert.Equal(t, 1, cl.count, "publisher must be invoked exactly once")
+	cl.mu.Unlock()
 }
 
 var _ = time.Now

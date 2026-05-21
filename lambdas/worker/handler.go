@@ -191,28 +191,56 @@ func (h *WorkerHandler) handleRecord(ctx context.Context, msg SQSPayload, result
 	}
 
 	if shouldCount {
-		// 2. Increment counter
+		// 2. Increment counter, capped at total_pdfs. The condition stops a
+		//    late retry from pushing processed past total and re-triggering
+		//    completion.
 		out, err := h.ddb.UpdateItem(ctx, &dynamodb.UpdateItemInput{
 			TableName: aws.String(os.Getenv("COUNCILS_TABLE")),
 			Key: map[string]types.AttributeValue{
 				"council_id": &types.AttributeValueMemberS{Value: msg.CouncilID},
 			},
-			UpdateExpression: aws.String("SET processed_pdfs = processed_pdfs + :one"),
+			UpdateExpression:    aws.String("ADD processed_pdfs :one"),
+			ConditionExpression: aws.String("processed_pdfs < total_pdfs"),
 			ExpressionAttributeValues: map[string]types.AttributeValue{
 				":one": &types.AttributeValueMemberN{Value: "1"},
 			},
 			ReturnValues: types.ReturnValueAllNew,
 		})
 		if err != nil {
+			var ccfe *ddbtypes.ConditionalCheckFailedException
+			if errors.As(err, &ccfe) {
+				log.Printf("council %s already capped, skipping counter increment", msg.CouncilID)
+				return nil
+			}
 			return fmt.Errorf("update council counter: %w", err)
 		}
 
-		// 3. Complete?
+		// 3. Complete? Claim the publish slot so a single worker fans out to the
+		//    Publisher even when several cross the boundary together.
 		processed := attrInt(out.Attributes, "processed_pdfs")
 		total := attrInt(out.Attributes, "total_pdfs")
 		if processed >= total && total > 0 {
-			log.Printf("council %s complete (%d/%d), invoking publisher", msg.CouncilID, processed, total)
-			h.invokePublisher(ctx, msg.CouncilID)
+			_, perr := h.ddb.UpdateItem(ctx, &dynamodb.UpdateItemInput{
+				TableName: aws.String(os.Getenv("COUNCILS_TABLE")),
+				Key: map[string]types.AttributeValue{
+					"council_id": &types.AttributeValueMemberS{Value: msg.CouncilID},
+				},
+				UpdateExpression:    aws.String("SET published_at = :ts"),
+				ConditionExpression: aws.String("attribute_not_exists(published_at)"),
+				ExpressionAttributeValues: map[string]types.AttributeValue{
+					":ts": &types.AttributeValueMemberS{Value: time.Now().UTC().Format(time.RFC3339)},
+				},
+			})
+			if perr != nil {
+				var ccfe *ddbtypes.ConditionalCheckFailedException
+				if !errors.As(perr, &ccfe) {
+					return fmt.Errorf("claim publish slot for %s: %w", msg.CouncilID, perr)
+				}
+				log.Printf("council %s already published by another worker, skipping publisher", msg.CouncilID)
+			} else {
+				log.Printf("council %s complete (%d/%d), invoking publisher", msg.CouncilID, processed, total)
+				h.invokePublisher(ctx, msg.CouncilID)
+			}
 		}
 	}
 

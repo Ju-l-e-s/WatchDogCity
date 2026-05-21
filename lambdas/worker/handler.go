@@ -73,27 +73,10 @@ func (h *WorkerHandler) HandleRequest(ctx context.Context, event events.SQSEvent
 			continue
 		}
 
-		id := deliberationID(msg.PDFURL)
-
-		// 0. Idempotence Check
-		existing, err := h.ddb.GetItem(ctx, &dynamodb.GetItemInput{
-			TableName: aws.String(os.Getenv("DELIBERATIONS_TABLE")),
-			Key: map[string]types.AttributeValue{
-				"id": &types.AttributeValueMemberS{Value: id},
-			},
-		})
-		if err != nil {
-			log.Printf("error checking idempotence for %s: %v", id, err)
-			failures = append(failures, events.SQSBatchItemFailure{ItemIdentifier: record.MessageId})
-			continue
-		}
-		if existing.Item != nil {
-			if _, ok := existing.Item["analysis_data"]; ok {
-				log.Printf("deliberation %s already analyzed, skipping gracefully", id)
-				continue
-			}
-		}
-
+		// Idempotence is enforced by the conditional PutItem in handleRecord.
+		// A pre-check GetItem here would only widen the race: two workers could
+		// both read "absent", both spend ~minutes downloading and calling Gemini,
+		// and the PutItem loser would have to recover afterwards anyway.
 		dlCtx, dlCancel := context.WithTimeout(ctx, 60*time.Second)
 		pdfBytes, err := downloadPDF(dlCtx, msg.PDFURL)
 		dlCancel()
@@ -158,7 +141,7 @@ func (h *WorkerHandler) handleRecord(ctx context.Context, msg SQSPayload, result
 		return fmt.Errorf("marshal item: %w", err)
 	}
 
-	isNewInsert := true
+	shouldCount := true
 	_, err = h.ddb.PutItem(ctx, &dynamodb.PutItemInput{
 		TableName:           aws.String(os.Getenv("DELIBERATIONS_TABLE")),
 		Item:                item,
@@ -166,36 +149,48 @@ func (h *WorkerHandler) handleRecord(ctx context.Context, msg SQSPayload, result
 	})
 	if err != nil {
 		var ccfe *ddbtypes.ConditionalCheckFailedException
-		if errors.As(err, &ccfe) {
-			isNewInsert = false
-		} else {
+		if !errors.As(err, &ccfe) {
 			return fmt.Errorf("put deliberation: %w", err)
 		}
-		// Item exists — update budget_impact and budget_breakdown unconditionally
-		breakdownVal, merr := attributevalue.Marshal(result.BudgetBreakdown)
-		if merr != nil {
-			log.Printf("warn: could not marshal budget_breakdown for %s: %v", id, merr)
-			breakdownVal = &types.AttributeValueMemberL{}
+		// Lost the PutItem race, or a previous attempt already claimed this id.
+		// Re-read to tell a fully-analyzed duplicate apart from a partial write
+		// left behind by a worker that crashed before storing analysis_data.
+		existing, gerr := h.ddb.GetItem(ctx, &dynamodb.GetItemInput{
+			TableName: aws.String(os.Getenv("DELIBERATIONS_TABLE")),
+			Key: map[string]types.AttributeValue{
+				"id": &types.AttributeValueMemberS{Value: id},
+			},
+		})
+		if gerr != nil {
+			return fmt.Errorf("get deliberation %s after conflict: %w", id, gerr)
 		}
+		if hasAnalysisData(existing.Item) {
+			log.Printf("deliberation %s already analyzed, skipping", id)
+			return nil
+		}
+		// Partial state: fill the analysis fields, guarding against a third
+		// worker that may complete the same item concurrently.
+		setExpr, names, values := buildSetExpression(item, "id")
 		_, uerr := h.ddb.UpdateItem(ctx, &dynamodb.UpdateItemInput{
 			TableName: aws.String(os.Getenv("DELIBERATIONS_TABLE")),
 			Key: map[string]types.AttributeValue{
 				"id": &types.AttributeValueMemberS{Value: id},
 			},
-			UpdateExpression: aws.String("SET budget_impact = :bi, budget_type = :bt, budget_breakdown = :bb"),
-			ExpressionAttributeValues: map[string]types.AttributeValue{
-				":bi": &types.AttributeValueMemberN{Value: strconv.FormatInt(result.BudgetImpact, 10)},
-				":bt": &types.AttributeValueMemberS{Value: result.BudgetType},
-				":bb": breakdownVal,
-			},
+			UpdateExpression:          aws.String(setExpr),
+			ConditionExpression:       aws.String("attribute_not_exists(analysis_data)"),
+			ExpressionAttributeNames:  names,
+			ExpressionAttributeValues: values,
 		})
 		if uerr != nil {
-			log.Printf("warn: could not update budget fields for %s: %v", id, uerr)
+			if errors.As(uerr, &ccfe) {
+				log.Printf("deliberation %s completed by another worker, skipping", id)
+				return nil
+			}
+			return fmt.Errorf("recover partial deliberation %s: %w", id, uerr)
 		}
-		log.Printf("deliberation %s already processed, budget fields updated", id)
 	}
 
-	if isNewInsert {
+	if shouldCount {
 		// 2. Increment counter
 		out, err := h.ddb.UpdateItem(ctx, &dynamodb.UpdateItemInput{
 			TableName: aws.String(os.Getenv("COUNCILS_TABLE")),
@@ -292,4 +287,50 @@ func attrInt(m map[string]types.AttributeValue, key string) int {
 		}
 	}
 	return 0
+}
+
+// hasAnalysisData reports whether a deliberation item carries a populated
+// analysis_data attribute, i.e. it was fully analyzed and is a real duplicate
+// rather than a bare claim left behind by a crashed worker.
+func hasAnalysisData(item map[string]types.AttributeValue) bool {
+	v, ok := item["analysis_data"]
+	if !ok {
+		return false
+	}
+	switch t := v.(type) {
+	case *types.AttributeValueMemberNULL:
+		return !t.Value
+	case *types.AttributeValueMemberM:
+		return len(t.Value) > 0
+	case *types.AttributeValueMemberS:
+		return t.Value != ""
+	default:
+		return true
+	}
+}
+
+// buildSetExpression renders a DynamoDB SET update writing every attribute in
+// item except the skipped keys. Name placeholders keep attribute names clear of
+// reserved-word collisions.
+func buildSetExpression(item map[string]types.AttributeValue, skip ...string) (string, map[string]string, map[string]types.AttributeValue) {
+	skipped := make(map[string]bool, len(skip))
+	for _, k := range skip {
+		skipped[k] = true
+	}
+	names := map[string]string{}
+	values := map[string]types.AttributeValue{}
+	var sets []string
+	i := 0
+	for k, v := range item {
+		if skipped[k] {
+			continue
+		}
+		nk := fmt.Sprintf("#k%d", i)
+		vk := fmt.Sprintf(":v%d", i)
+		names[nk] = k
+		values[vk] = v
+		sets = append(sets, nk+" = "+vk)
+		i++
+	}
+	return "SET " + strings.Join(sets, ", "), names, values
 }

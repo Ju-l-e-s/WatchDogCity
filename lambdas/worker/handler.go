@@ -342,7 +342,7 @@ func downloadPDF(ctx context.Context, url string) ([]byte, error) {
 }
 
 func deliberationID(url string) string {
-	u := strings.TrimRight(url, "/")
+	u := strings.TrimSuffix(url, "/")
 	parts := strings.Split(u, "/")
 	last := parts[len(parts)-1]
 	if last == "" {

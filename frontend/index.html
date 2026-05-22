@@ -163,7 +163,7 @@
         </button>
       </div>
 
-      <div class="overflow-y-auto p-10 md:p-12">
+      <div id="about-modal-body" class="flex-1 min-h-0 overflow-y-auto p-10 md:p-12">
         <div class="w-16 h-16 bg-brand-50 rounded-2xl flex items-center justify-center text-brand-700 mb-8">
           <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
@@ -198,10 +198,60 @@
               </div>
             </div>
           </section>
+
+          <section class="mt-10 pt-10 border-t border-slate-100">
+            <h4 class="text-slate-900 font-bold text-lg mb-4">Un projet informatique en tête ?</h4>
+            <p class="text-slate-600 mb-6">Au-delà de cette démarche citoyenne, je mets mes compétences en développement informatique au service de vos projets. Que vous soyez un particulier, une association ou une petite entreprise, je suis disponible pour vous accompagner.</p>
+            
+            <div class="space-y-6 mb-8">
+              <div class="flex gap-4">
+                <div class="w-10 h-10 bg-brand-50 rounded-xl flex items-center justify-center text-brand-700 shrink-0">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                </div>
+                <div>
+                  <p class="font-bold text-slate-900 text-sm mb-1">Simplifier et automatiser</p>
+                  <p class="text-xs text-slate-500 leading-relaxed">Création d'outils sur-mesure pour vos tâches répétitives et l'organisation de vos données.</p>
+                </div>
+              </div>
+              <div class="flex gap-4">
+                <div class="w-10 h-10 bg-brand-50 rounded-xl flex items-center justify-center text-brand-700 shrink-0">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.364-6.364l-.707-.707M6.343 17.657l-.707.707m12.728 0l-.707-.707"></path></svg>
+                </div>
+                <div>
+                  <p class="font-bold text-slate-900 text-sm mb-1">Donner vie à vos idées</p>
+                  <p class="text-xs text-slate-500 leading-relaxed">Accompagnement complet pour vos applications et sites web, de la conception à la réalisation.</p>
+                </div>
+              </div>
+              <div class="flex gap-4">
+                <div class="w-10 h-10 bg-brand-50 rounded-xl flex items-center justify-center text-brand-700 shrink-0">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path></svg>
+                </div>
+                <div>
+                  <p class="font-bold text-slate-900 text-sm mb-1">Conseil et accompagnement</p>
+                  <p class="text-xs text-slate-500 leading-relaxed">Avis technique et sécurisation de vos outils numériques au quotidien.</p>
+                </div>
+              </div>
+            </div>
+
+            <p class="text-sm text-slate-500 italic mb-8 border-l-2 border-brand-200 pl-4">
+              "Mon approche est simple : construire des solutions robustes, utiles et surtout, faciles à utiliser."
+            </p>
+
+            <button onclick="toggleAboutModal(false); setTimeout(() => toggleContactModal(true), 300)" class="w-full bg-brand-700 text-white font-bold py-4 rounded-2xl hover:bg-brand-600 transition-all shadow-lg shadow-brand-700/10">
+              DISCUTER DE MON PROJET
+            </button>
+          </section>
         </div>
         <button onclick="toggleAboutModal(false)" class="mt-10 mb-4 w-full bg-slate-900 text-white font-bold py-4 rounded-2xl hover:bg-slate-800 transition-all">
           J'AI COMPRIS
         </button>
+      </div>
+      <!-- Scroll Indicator -->
+      <div id="about-scroll-indicator" class="absolute bottom-6 left-1/2 -translate-x-1/2 pointer-events-none animate-bounce flex flex-col items-center gap-1 z-20 transition-opacity duration-300">
+        <span class="text-[9px] font-black text-slate-600 uppercase tracking-[0.2em] bg-white/90 backdrop-blur px-3 py-1 rounded-full shadow-sm border border-slate-100">Scrollez pour découvrir</span>
+        <svg class="w-5 h-5 text-brand-700 drop-shadow-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+        </svg>
       </div>
     </div>
   </div>
@@ -382,7 +432,7 @@
       </div>
     </div>
     <div class="flex flex-col md:flex-row justify-between items-center gap-4 text-slate-600 text-[13px] font-light">
-      <p>© 2026 Observatoire Bègles — Données publiques gratuites</p>
+      <p>© 2026 Observatoire Bègles — Conçu par Jules Laconfourque. <button onclick="toggleContactModal(true)" class="font-medium hover:text-brand-700 transition-colors underline decoration-slate-300 underline-offset-4">Contactez-moi pour vos projets.</button></p>
       <p>Source officielle : <a href="https://www.mairie-begles.fr/" class="text-slate-600 font-medium hover:text-brand-700 transition-colors" target="_blank" rel="noopener">mairie-begles.fr</a></p>
     </div>
   </footer>
@@ -566,7 +616,7 @@
     </div>
   </div>
 
-  <script src="app.js?v=20260425_V3" defer></script>
+  <script src="app.js?v=20260522_V1" defer></script>
   
 </body>
 

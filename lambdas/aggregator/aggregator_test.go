@@ -136,12 +136,11 @@ func TestComputeStats_Empty(t *testing.T) {
 	assert.Empty(t, stats.summaries)
 }
 
-// TestBuildPublisherPayload_ContainsCouncilID guards against the silent
-// regression where aggregator invoked the publisher without Payload, leaving
-// the downstream notifier with an empty council_id and dropping the
-// newsletter for every council triggered via the DynamoDB Stream path.
-func TestBuildPublisherPayload_ContainsCouncilID(t *testing.T) {
-	payload, err := buildPublisherPayload("council-2026-05")
+// TestBuildValidatorPayload_ContainsCouncilID guards against the silent
+// regression where aggregator invoked the validator without Payload, leaving
+// the downstream pipeline with an empty council_id.
+func TestBuildValidatorPayload_ContainsCouncilID(t *testing.T) {
+	payload, err := buildValidatorPayload("council-2026-05")
 	require.NoError(t, err)
 	require.NotEmpty(t, payload)
 

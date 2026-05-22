@@ -218,7 +218,7 @@ func runSynthesis(ctx context.Context, ddb *dynamodb.Client, lambdaClient *lambd
 		return nil
 	}
 
-	payload, err := json.Marshal(map[string]string{"council_id": councilID})
+	payload, err := buildValidatorPayload(councilID)
 	if err != nil {
 		return fmt.Errorf("marshal validator payload: %w", err)
 	}
@@ -276,6 +276,11 @@ func dominantTheme(topicBudgets map[string]int64) string {
 		}
 	}
 	return mainTheme
+}
+
+// buildValidatorPayload returns the JSON payload for invoking the Validator Lambda.
+func buildValidatorPayload(councilID string) ([]byte, error) {
+	return json.Marshal(map[string]string{"council_id": councilID})
 }
 
 // voteClimat returns "tensions" when opposition exceeds 10% of votes cast, else "consensus".

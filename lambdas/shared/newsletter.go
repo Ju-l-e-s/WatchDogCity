@@ -102,6 +102,8 @@ type coldNewsletterStats struct {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+func ptrFloat32(f float32) *float32 { return &f }
+
 // budgetFloatRe strips decimal parts from Gemini's numeric fields.
 var budgetFloatRe = regexp.MustCompile(`("(?:budget_total|total_councils|total_delibs)"\s*:\s*)(\d+)\.\d+`)
 
@@ -286,13 +288,15 @@ func buildColdNewsletterPrompt(
 		"Si un champ ne fournit aucune base factuelle pour 'context' ou 'impact', renvoie une chaîne vide. " +
 		"Aucun jugement de valeur, aucune motivation politique, aucun fait historique ou géographique.\n\n")
 
-	sb.WriteString("Tu es rédacteur en chef de L'Observatoire de Bègles, une newsletter de transparence citoyenne.\n")
+	sb.WriteString("Tu es un vulgarisateur neutre et un traducteur factuel pour L'Observatoire de Bègles. " +
+		"Tu n'es PAS journaliste : tu ne produis aucune ligne éditoriale, aucune interprétation politique, " +
+		"aucun adjectif d'appréciation. Tu transformes des faits structurés en phrases simples et neutres.\n")
 	sb.WriteString("Génère un objet JSON avec EXACTEMENT ce schéma (ne génère aucun texte en dehors) :\n\n")
 	sb.WriteString(`{
-  "email_subject": "accrocheur, < 60 caractères, reflète l'enjeu politique majeur",
+  "email_subject": "laisse vide, imposé par le système",
   "council_title": "copie verbatim du council_title fourni ci-dessous",
   "council_date": "copie verbatim du council_date fourni ci-dessous",
-  "main_issue": "Analyse journalistique (2 à 3 phrases maximum). Pourquoi ce conseil est-il important ? Reste strictement neutre et objectif. Aucun jargon administratif. Déduis uniquement des faits structurés fournis.",
+  "main_issue": "1 à 2 phrases factuelles décrivant le ou les domaines au plus gros budget et la présence ou absence d'opposition. Aucune notion d'importance, d'enjeu politique ou de jugement de valeur. Déduis uniquement des faits structurés fournis.",
   "budget_total": "montant total voté (fourni ci-dessous, copie verbatim)",
   "has_global_budget": true,
   "vote_climat": "VOTES PARTAGÉS ou CONSENSUS (fourni ci-dessous, copie verbatim)",
@@ -301,7 +305,7 @@ func buildColdNewsletterPrompt(
   "total_delibs_in_council": 0,
   "tensions": [
     {
-      "title": "Titre explicite et percutant",
+      "title": "Reformulation neutre et factuelle du titre fourni ; pas d'accroche, pas d'adjectif évaluatif",
       "context": "Neutre en 2 à 3 phrases maximum. Déduis UNIQUEMENT du titre, du montant, du type et des votes. Si insuffisant, laisse vide.",
       "impact": "Neutre en 2 à 3 phrases maximum. Conséquence concrète pour le citoyen. Si insuffisant, laisse vide.",
       "budget": "X € (LAISSER VIDE '' SI IMPACT NUL)",
@@ -340,7 +344,7 @@ func buildColdNewsletterPrompt(
 	sb.WriteString("- INTERDICTION FORMELLE : N'ajoute JAMAIS de liens HTML ou de texte 'En savoir plus' dans les champs context ou impact.\n")
 	sb.WriteString("- CATÉGORISATION STRICTE : Police et Vidéoprotection → Sécurité. Clubs sportifs → Sport.\n")
 	sb.WriteString("- AFFICHAGE CONDITIONNEL : Ne mentionne pas de budget ('0 €') si l'impact est nul. Laisse le champ budget vide.\n")
-	sb.WriteString("- STYLE : Journalistique, actif, précis.\n\n")
+	sb.WriteString("- STYLE : descriptif, factuel, neutre. Phrases courtes. Aucun adjectif évaluatif (excellent, ambitieux, coûteux, important, crucial…).\n\n")
 
 	fmt.Fprintf(&sb, "DONNÉES D'ENTRÉE :\n")
 	fmt.Fprintf(&sb, "- council_title : %s\n", councilTitle)
@@ -448,6 +452,7 @@ func GenerateNewsletterParams(
 				Parts: []*genai.Part{{Text: prompt}},
 			}},
 			&genai.GenerateContentConfig{
+				Temperature:      ptrFloat32(0),
 				ResponseMIMEType: "application/json",
 				ResponseSchema:   newsletterSchema,
 				MaxOutputTokens:  8192,

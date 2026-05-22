@@ -263,26 +263,28 @@ func (h *WorkerHandler) handleRecord(ctx context.Context, msg SQSPayload, result
 		processed := attrInt(cur.Item, "processed_pdfs")
 		total := attrInt(cur.Item, "total_pdfs")
 		if processed >= total && total > 0 {
+			// Gate: only one worker fans out to the Validator.
+			// qc_status starts absent; SET succeeds exactly once.
 			_, perr := h.ddb.UpdateItem(ctx, &dynamodb.UpdateItemInput{
 				TableName: aws.String(os.Getenv("COUNCILS_TABLE")),
 				Key: map[string]types.AttributeValue{
 					"council_id": &types.AttributeValueMemberS{Value: msg.CouncilID},
 				},
-				UpdateExpression:    aws.String("SET published_at = :ts"),
-				ConditionExpression: aws.String("attribute_not_exists(published_at)"),
+				UpdateExpression:    aws.String("SET qc_status = :pending"),
+				ConditionExpression: aws.String("attribute_not_exists(qc_status)"),
 				ExpressionAttributeValues: map[string]types.AttributeValue{
-					":ts": &types.AttributeValueMemberS{Value: time.Now().UTC().Format(time.RFC3339)},
+					":pending": &types.AttributeValueMemberS{Value: "PENDING"},
 				},
 			})
 			if perr != nil {
 				var ccfe *ddbtypes.ConditionalCheckFailedException
 				if !errors.As(perr, &ccfe) {
-					return fmt.Errorf("claim publish slot for %s: %w", msg.CouncilID, perr)
+					return fmt.Errorf("set qc_status=PENDING for %s: %w", msg.CouncilID, perr)
 				}
-				log.Printf("council %s already published by another worker, skipping publisher", msg.CouncilID)
+				log.Printf("council %s qc_status already set, skipping validator", msg.CouncilID)
 			} else {
-				log.Printf("council %s complete (%d/%d), invoking publisher", msg.CouncilID, processed, total)
-				h.invokePublisher(ctx, msg.CouncilID)
+				log.Printf("council %s complete (%d/%d), invoking validator", msg.CouncilID, processed, total)
+				h.invokeValidator(ctx, msg.CouncilID)
 			}
 		}
 	}
@@ -293,15 +295,15 @@ func (h *WorkerHandler) handleRecord(ctx context.Context, msg SQSPayload, result
 	return nil
 }
 
-func (h *WorkerHandler) invokePublisher(ctx context.Context, councilID string) {
+func (h *WorkerHandler) invokeValidator(ctx context.Context, councilID string) {
 	payload, _ := json.Marshal(map[string]string{"council_id": councilID})
 	_, err := h.lambda.Invoke(ctx, &awslambda.InvokeInput{
-		FunctionName:   aws.String(os.Getenv("PUBLISHER_FUNCTION_NAME")),
+		FunctionName:   aws.String(os.Getenv("VALIDATOR_FUNCTION_NAME")),
 		InvocationType: lambdatypes.InvocationTypeEvent,
 		Payload:        payload,
 	})
 	if err != nil {
-		log.Printf("error invoking publisher: %v", err)
+		log.Printf("error invoking validator: %v", err)
 	}
 }
 

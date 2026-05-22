@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -194,24 +195,39 @@ func runSynthesis(ctx context.Context, ddb *dynamodb.Client, lambdaClient *lambd
 		return err
 	}
 
-	// 5. Déclenchement du Publisher pour mettre à jour le JSON front-end.
-	// Le payload est requis : sans council_id, le publisher cascade au notifier
-	// avec une chaîne vide → fetchCouncil("") 404 → newsletter perdue.
-	payload, err := buildPublisherPayload(councilID)
+	// 5. Route through QC gateway: set qc_status=PENDING (idempotent gate) and
+	//    invoke Validator. Validator runs the deterministic gate; on APPROVED it
+	//    invokes Publisher (website JSON) and Notifier (newsletter).
+	_, qerr := ddb.UpdateItem(ctx, &dynamodb.UpdateItemInput{
+		TableName: aws.String(os.Getenv("COUNCILS_TABLE")),
+		Key: map[string]types.AttributeValue{
+			"council_id": &types.AttributeValueMemberS{Value: councilID},
+		},
+		UpdateExpression:    aws.String("SET qc_status = :pending"),
+		ConditionExpression: aws.String("attribute_not_exists(qc_status)"),
+		ExpressionAttributeValues: map[string]types.AttributeValue{
+			":pending": &types.AttributeValueMemberS{Value: "PENDING"},
+		},
+	})
+	if qerr != nil {
+		var ccfe *types.ConditionalCheckFailedException
+		if !errors.As(qerr, &ccfe) {
+			return fmt.Errorf("set qc_status=PENDING for %s: %w", councilID, qerr)
+		}
+		log.Printf("council %s qc_status already set, skipping validator", councilID)
+		return nil
+	}
+
+	payload, err := json.Marshal(map[string]string{"council_id": councilID})
 	if err != nil {
-		return fmt.Errorf("marshal publisher payload: %w", err)
+		return fmt.Errorf("marshal validator payload: %w", err)
 	}
 	_, err = lambdaClient.Invoke(ctx, &lambdaService.InvokeInput{
-		FunctionName:   aws.String(os.Getenv("PUBLISHER_FUNCTION_NAME")),
+		FunctionName:   aws.String(os.Getenv("VALIDATOR_FUNCTION_NAME")),
 		InvocationType: lambdaTypes.InvocationTypeEvent,
 		Payload:        payload,
 	})
-
 	return err
-}
-
-func buildPublisherPayload(councilID string) ([]byte, error) {
-	return json.Marshal(map[string]string{"council_id": councilID})
 }
 
 // ── Pure calculation functions (extracted for testability) ───────────────────

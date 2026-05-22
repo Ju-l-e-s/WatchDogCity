@@ -252,8 +252,8 @@ func (m *concurrentMockDDB) UpdateItem(_ context.Context, p *dynamodb.UpdateItem
 	defer m.mu.Unlock()
 	if _, ok := p.Key["council_id"]; ok {
 		expr := aws.ToString(p.UpdateExpression)
-		// Publish-slot claim, guarded by attribute_not_exists(published_at).
-		if strings.Contains(expr, "published_at") {
+		// QC-gate claim, guarded by attribute_not_exists(qc_status).
+		if strings.Contains(expr, "qc_status") {
 			if m.published {
 				return nil, &types.ConditionalCheckFailedException{}
 			}
@@ -331,7 +331,7 @@ func (l *countingLambda) Invoke(_ context.Context, p *awslambda.InvokeInput, _ .
 }
 
 // Several workers crossing the completion boundary together must invoke the
-// Publisher exactly once, thanks to the capped counter and the published_at claim.
+// Validator exactly once, thanks to the capped counter and the qc_status gate.
 func TestHandleRecord_SinglePublisherInvokeAtBoundary(t *testing.T) {
 	m := newConcurrentMock(3)
 	cl := &countingLambda{}

@@ -24,6 +24,7 @@ func init() {
 		lambdaClient:       awslambda.NewFromConfig(cfg),
 		councilsTable:      mustEnv("COUNCILS_TABLE"),
 		deliberationsTable: mustEnv("DELIBERATIONS_TABLE"),
+		publisherFnName:    mustEnv("PUBLISHER_FUNCTION_NAME"),
 		notifierFnName:     mustEnv("NOTIFIER_FUNCTION_NAME"),
 		geminiDeps: shared.GeminiDeps{
 			APIKey: mustEnv("GEMINI_API_KEY"),

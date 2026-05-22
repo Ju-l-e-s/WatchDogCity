@@ -1,6 +1,6 @@
 # Bègles Watchdog - Maintenance Makefile
 
-.PHONY: build build-frontend verify-frontend preflight deploy test logs-orchestrator logs-worker logs-publisher logs-notifier clean update-data
+.PHONY: build build-frontend verify-frontend preflight deploy test logs-orchestrator logs-worker logs-publisher logs-notifier logs-validator logs-aggregator clean update-data
 
 # --- Déploiement ---
 build:
@@ -29,6 +29,9 @@ build:
 	# Notifier
 	cd lambdas/notifier && go mod tidy && GOOS=linux GOARCH=arm64 go build -o bootstrap .
 	cd lambdas/notifier && zip -j ../../dist/notifier.zip bootstrap && rm bootstrap
+	# Validator
+	cd lambdas/validator && go mod tidy && GOOS=linux GOARCH=arm64 go build -o bootstrap .
+	cd lambdas/validator && zip -j ../../dist/validator.zip bootstrap && rm bootstrap
 
 build-frontend:
 	cd frontend && npm run build
@@ -73,6 +76,12 @@ logs-publisher:
 
 logs-notifier:
 	aws logs tail /aws/lambda/WatchdogStack-Notifier --follow
+
+logs-validator:
+	aws logs tail /aws/lambda/WatchdogStack-Validator --follow
+
+logs-aggregator:
+	aws logs tail /aws/lambda/WatchdogStack-Aggregator --follow
 
 update-data:
 	aws lambda invoke --function-name $$(aws lambda list-functions --query "Functions[?contains(FunctionName, 'Orchestrator')].FunctionName" --output text | head -n 1) response.json

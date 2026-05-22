@@ -49,6 +49,7 @@ type ValidatorHandler struct {
 	lambdaClient       lambdaAPI
 	councilsTable      string
 	deliberationsTable string
+	publisherFnName    string
 	notifierFnName     string
 	geminiDeps         shared.GeminiDeps
 	cfg                shared.QcConfig
@@ -281,12 +282,29 @@ func (h *ValidatorHandler) handleApproved(
 		log.Printf("council %s: approved state already written by a concurrent invocation", council.CouncilID)
 	}
 
+	// Refresh the public website (data.json now includes this APPROVED council).
+	h.invokePublisher(ctx, council.CouncilID)
+	// Send newsletter with pre-generated sensory-deprived params.
 	h.invokeNotifier(ctx, council.CouncilID, params)
-	log.Printf("council %s APPROVED — invoking notifier", council.CouncilID)
+	log.Printf("council %s APPROVED — invoking publisher and notifier", council.CouncilID)
 	if len(verdict.Violations) > 0 {
 		log.Printf("  (%d WARN violations logged, not blocking)", len(verdict.Violations))
 	}
 	return nil
+}
+
+// invokePublisher fires the Publisher Lambda asynchronously so it regenerates
+// data.json now that this council is APPROVED and visible.
+func (h *ValidatorHandler) invokePublisher(ctx context.Context, councilID string) {
+	payload, _ := json.Marshal(map[string]string{"council_id": councilID})
+	_, err := h.lambdaClient.Invoke(ctx, &awslambda.InvokeInput{
+		FunctionName:   aws.String(h.publisherFnName),
+		InvocationType: lambdatypes.InvocationTypeEvent,
+		Payload:        payload,
+	})
+	if err != nil {
+		log.Printf("error invoking publisher for council %s: %v", councilID, err)
+	}
 }
 
 // invokeNotifier fires the Notifier Lambda asynchronously with pre-generated

@@ -207,7 +207,7 @@ class WatchdogStack(Stack):
             environment={
                 **common_env,
                 "GEMINI_MODEL": aggregator_model,
-                "PUBLISHER_FUNCTION_NAME": publisher.function_name,
+                # VALIDATOR_FUNCTION_NAME wired below after validator is defined
             },
         )
         aggregator.add_event_source(lambda_events.DynamoEventSource(
@@ -218,11 +218,38 @@ class WatchdogStack(Stack):
         ))
         councils_table.grant(aggregator, "dynamodb:GetItem", "dynamodb:UpdateItem")
         deliberations_table.grant_read_data(aggregator)
-        publisher.grant_invoke(aggregator)
 
-        # Worker needs to invoke Publisher (keeping for backward compatibility or removing if not needed)
-        publisher.grant_invoke(worker)
-        worker.add_environment("PUBLISHER_FUNCTION_NAME", publisher.function_name)
+        # ── Lambda: Validator (QC gateway) ───────────────────────────────────
+        validator_gemini_model = "gemini-2.5-pro"
+        validator = lambda_.Function(
+            self, "Validator",
+            runtime=lambda_.Runtime.PROVIDED_AL2023,
+            architecture=lambda_.Architecture.ARM_64,
+            handler="bootstrap",
+            code=lambda_.Code.from_asset("../dist/validator.zip"),
+            timeout=Duration.minutes(10),
+            log_retention=logs.RetentionDays.TWO_WEEKS,
+            environment={
+                "COUNCILS_TABLE": councils_table.table_name,
+                "DELIBERATIONS_TABLE": deliberations_table.table_name,
+                "GEMINI_API_KEY": gemini_api_key,
+                "GEMINI_MODEL": validator_gemini_model,
+                "PUBLISHER_FUNCTION_NAME": publisher.function_name,
+                "NOTIFIER_FUNCTION_NAME": "placeholder",  # overridden below after notifier is defined
+            },
+        )
+        councils_table.grant(validator, "dynamodb:GetItem", "dynamodb:Query", "dynamodb:Scan", "dynamodb:UpdateItem")
+        deliberations_table.grant(validator, "dynamodb:Query")
+        publisher.grant_invoke(validator)
+        # notifier.grant_invoke(validator) added after notifier is defined
+
+        # Worker routes completions through QC gateway
+        validator.grant_invoke(worker)
+        worker.add_environment("VALIDATOR_FUNCTION_NAME", validator.function_name)
+
+        # Aggregator routes completions through QC gateway
+        validator.grant_invoke(aggregator)
+        aggregator.add_environment("VALIDATOR_FUNCTION_NAME", validator.function_name)
 
         # ── Newsletter & Contact config ───────────────────────────────────
         site_url = os.environ.get("SITE_URL", "https://www.lobservatoiredebegles.fr")
@@ -295,6 +322,29 @@ class WatchdogStack(Stack):
         deliberations_table.grant_read_data(notifier)
         notifier.grant_invoke(publisher)
         publisher.add_environment("NOTIFIER_FUNCTION_NAME", notifier.function_name)
+
+        # Wire validator → notifier now that notifier is defined.
+        notifier.grant_invoke(validator)
+        validator.add_environment("NOTIFIER_FUNCTION_NAME", notifier.function_name)
+
+        # ── QcQuarantined alarm ───────────────────────────────────────────────
+        qc_alarm_topic = sns.Topic(self, "QcQuarantinedAlarmTopic")
+        if ops_email:
+            qc_alarm_topic.add_subscription(sns_subs.EmailSubscription(ops_email))
+        cloudwatch.Alarm(
+            self, "QcQuarantinedAlarm",
+            metric=cloudwatch.Metric(
+                namespace="Watchdog",
+                metric_name="QcQuarantined",
+                statistic="Sum",
+                period=Duration.minutes(5),
+            ),
+            threshold=0,
+            evaluation_periods=1,
+            comparison_operator=cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
+            treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING,
+            alarm_description="At least one council was quarantined by the QC gateway.",
+        ).add_alarm_action(cw_actions.SnsAction(qc_alarm_topic))
 
         api = apigw.RestApi(
             self, "WatchdogApi",

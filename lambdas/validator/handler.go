@@ -16,6 +16,7 @@ import (
 	ddbtypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	awslambda "github.com/aws/aws-sdk-go-v2/service/lambda"
 	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
+	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/watchdog/shared"
 )
 
@@ -36,6 +37,11 @@ type ddbAPI interface {
 	Query(ctx context.Context, in *dynamodb.QueryInput, opts ...func(*dynamodb.Options)) (*dynamodb.QueryOutput, error)
 	Scan(ctx context.Context, in *dynamodb.ScanInput, opts ...func(*dynamodb.Options)) (*dynamodb.ScanOutput, error)
 	UpdateItem(ctx context.Context, in *dynamodb.UpdateItemInput, opts ...func(*dynamodb.Options)) (*dynamodb.UpdateItemOutput, error)
+	DeleteItem(ctx context.Context, in *dynamodb.DeleteItemInput, opts ...func(*dynamodb.Options)) (*dynamodb.DeleteItemOutput, error)
+}
+
+type sqsAPI interface {
+	SendMessage(ctx context.Context, in *sqs.SendMessageInput, opts ...func(*sqs.Options)) (*sqs.SendMessageOutput, error)
 }
 
 type lambdaAPI interface {
@@ -47,10 +53,12 @@ type lambdaAPI interface {
 type ValidatorHandler struct {
 	ddb                ddbAPI
 	lambdaClient       lambdaAPI
+	sqsClient          sqsAPI
 	councilsTable      string
 	deliberationsTable string
 	publisherFnName    string
 	notifierFnName     string
+	sqsQueueURL        string // PDF processing queue; empty = self-heal disabled
 	geminiDeps         shared.GeminiDeps
 	cfg                shared.QcConfig
 }
@@ -80,20 +88,21 @@ type budgetBreakdownRec struct {
 }
 
 type deliberationRec struct {
-	ID              string             `dynamodbav:"id"`
-	Title           string             `dynamodbav:"title"`
-	TopicTag        string             `dynamodbav:"topic_tag"`
-	Summary         string             `dynamodbav:"summary"`
-	AnalysisData    analysisDataRec    `dynamodbav:"analysis_data"`
-	BudgetImpact    int64              `dynamodbav:"budget_impact"`
-	BudgetType      string             `dynamodbav:"budget_type"`
+	ID              string               `dynamodbav:"id"`
+	Title           string               `dynamodbav:"title"`
+	TopicTag        string               `dynamodbav:"topic_tag"`
+	PDFURL          string               `dynamodbav:"pdf_url"`
+	Summary         string               `dynamodbav:"summary"`
+	AnalysisData    analysisDataRec      `dynamodbav:"analysis_data"`
+	BudgetImpact    int64                `dynamodbav:"budget_impact"`
+	BudgetType      string               `dynamodbav:"budget_type"`
 	BudgetBreakdown []budgetBreakdownRec `dynamodbav:"budget_breakdown"`
-	ClimateImpact   string             `dynamodbav:"climate_impact"`
-	VotePour        *int               `dynamodbav:"vote_pour"`
-	VoteContre      *int               `dynamodbav:"vote_contre"`
-	VoteAbst        *int               `dynamodbav:"vote_abstention"`
-	Disagreements   *string            `dynamodbav:"disagreements"`
-	IsSubstantial   bool               `dynamodbav:"is_substantial"`
+	ClimateImpact   string               `dynamodbav:"climate_impact"`
+	VotePour        *int                 `dynamodbav:"vote_pour"`
+	VoteContre      *int                 `dynamodbav:"vote_contre"`
+	VoteAbst        *int                 `dynamodbav:"vote_abstention"`
+	Disagreements   *string              `dynamodbav:"disagreements"`
+	IsSubstantial   bool                 `dynamodbav:"is_substantial"`
 }
 
 // ── Handler ───────────────────────────────────────────────────────────────────
@@ -143,7 +152,12 @@ func (h *ValidatorHandler) HandleRequest(ctx context.Context, event ValidatorEve
 	verdict := shared.Decide(violations)
 
 	if verdict.Status == "QUARANTINED" {
-		return h.handleQuarantine(ctx, councilID, verdict)
+		if err := h.handleQuarantine(ctx, councilID, verdict); err != nil {
+			return err
+		}
+		// Self-heal: re-enqueue PDFs for re-analysis if under retry cap.
+		h.maybeHeal(ctx, council, delibs)
+		return nil
 	}
 	return h.handleApproved(ctx, council, deliberationViews, verdict)
 }
@@ -322,6 +336,86 @@ func (h *ValidatorHandler) invokeNotifier(ctx context.Context, councilID string,
 	if err != nil {
 		log.Printf("error invoking notifier for council %s: %v", councilID, err)
 	}
+}
+
+// ── Self-heal ─────────────────────────────────────────────────────────────────
+
+// maxHealAttempts is the inclusive upper bound on qc_attempts before self-heal
+// is disabled. Councils that reach this threshold stay QUARANTINED permanently
+// and require manual review.
+const maxHealAttempts = 3
+
+// maybeHeal re-enqueues deliberation PDFs for fresh Gemini analysis when a
+// council has been QUARANTINED but has not yet exhausted its retry budget.
+//
+// Steps (best-effort — individual errors are logged, not returned):
+//  1. Delete all existing deliberation records so workers can re-insert them
+//     and the transactional counted-marker is reset.
+//  2. Reset the council row: REMOVE qc_status, SET processed_pdfs = 0.
+//  3. Send one SQS message per PDF so the worker Lambda re-processes them.
+//
+// If sqsClient or sqsQueueURL is unset (e.g. in tests or staging), heal is
+// silently skipped — the council remains QUARANTINED.
+func (h *ValidatorHandler) maybeHeal(ctx context.Context, council *councilRec, delibs []deliberationRec) {
+	if h.sqsClient == nil || h.sqsQueueURL == "" {
+		return
+	}
+	if council.QcAttempts >= maxHealAttempts {
+		log.Printf("council %s exhausted %d heal attempts — staying QUARANTINED", council.CouncilID, council.QcAttempts)
+		return
+	}
+
+	log.Printf("council %s QUARANTINED after %d attempt(s) — scheduling re-analysis", council.CouncilID, council.QcAttempts)
+
+	// 1. Delete deliberation records so workers write fresh analysis.
+	for _, d := range delibs {
+		if _, err := h.ddb.DeleteItem(ctx, &dynamodb.DeleteItemInput{
+			TableName: aws.String(h.deliberationsTable),
+			Key: map[string]types.AttributeValue{
+				"id": &types.AttributeValueMemberS{Value: d.ID},
+			},
+		}); err != nil {
+			log.Printf("warn: heal delete deliberation %s: %v", d.ID, err)
+		}
+	}
+
+	// 2. Reset council: clear qc_status so worker can re-claim; reset counter.
+	if _, err := h.ddb.UpdateItem(ctx, &dynamodb.UpdateItemInput{
+		TableName: aws.String(h.councilsTable),
+		Key: map[string]types.AttributeValue{
+			"council_id": &types.AttributeValueMemberS{Value: council.CouncilID},
+		},
+		UpdateExpression: aws.String("REMOVE qc_status SET processed_pdfs = :zero"),
+		ExpressionAttributeValues: map[string]types.AttributeValue{
+			":zero": &types.AttributeValueMemberN{Value: "0"},
+		},
+	}); err != nil {
+		log.Printf("error resetting council %s for heal: %v", council.CouncilID, err)
+		return // do not re-enqueue if state reset failed
+	}
+
+	// 3. Re-enqueue each PDF.
+	enqueued := 0
+	for _, d := range delibs {
+		if d.PDFURL == "" {
+			continue
+		}
+		body, _ := json.Marshal(map[string]interface{}{
+			"council_id": council.CouncilID,
+			"pdf_title":  d.Title,
+			"pdf_url":    d.PDFURL,
+			"total_pdfs": council.TotalPdfs,
+		})
+		if _, err := h.sqsClient.SendMessage(ctx, &sqs.SendMessageInput{
+			QueueUrl:    aws.String(h.sqsQueueURL),
+			MessageBody: aws.String(string(body)),
+		}); err != nil {
+			log.Printf("warn: heal re-enqueue PDF %s: %v", d.PDFURL, err)
+		} else {
+			enqueued++
+		}
+	}
+	log.Printf("council %s heal: re-enqueued %d/%d PDFs", council.CouncilID, enqueued, len(delibs))
 }
 
 // ── DynamoDB helpers ──────────────────────────────────────────────────────────

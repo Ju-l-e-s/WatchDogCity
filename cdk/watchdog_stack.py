@@ -239,9 +239,12 @@ class WatchdogStack(Stack):
             },
         )
         councils_table.grant(validator, "dynamodb:GetItem", "dynamodb:Query", "dynamodb:Scan", "dynamodb:UpdateItem")
-        deliberations_table.grant(validator, "dynamodb:Query")
+        deliberations_table.grant(validator, "dynamodb:Query", "dynamodb:DeleteItem")
         publisher.grant_invoke(validator)
         # notifier.grant_invoke(validator) added after notifier is defined
+        # Self-heal: validator re-enqueues PDFs to the worker queue on QUARANTINE.
+        pdf_queue.grant_send_messages(validator)
+        validator.add_environment("PDF_QUEUE_URL", pdf_queue.queue_url)
 
         # Worker routes completions through QC gateway
         validator.grant_invoke(worker)

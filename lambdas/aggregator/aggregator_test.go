@@ -119,21 +119,58 @@ func TestUnmarshal_FlatVoteAttributes(t *testing.T) {
 	assert.Equal(t, "tensions", voteClimat(stats.totalPour, stats.totalContre))
 }
 
-func TestComputeStats_CollectsSummaries(t *testing.T) {
-	delibs := []Deliberation{
-		{Summary: "Premier résumé."},
-		{Summary: ""},
-		{Summary: "Deuxième résumé."},
-	}
-	stats := computeStats(delibs)
-	assert.Equal(t, []string{"- Premier résumé.", "- Deuxième résumé."}, stats.summaries)
-}
-
 func TestComputeStats_Empty(t *testing.T) {
 	stats := computeStats(nil)
 	assert.Equal(t, int64(0), stats.totalBudget)
 	assert.Equal(t, 0, stats.totalPour)
-	assert.Empty(t, stats.summaries)
+}
+
+// --- buildDeterministicSummary ---
+
+func TestBuildDeterministicSummary_TwoTopics(t *testing.T) {
+	stats := councilStats{
+		topicBudgets: map[string]int64{"Sport": 100_000, "Urbanisme": 200_000},
+		totalContre:  0,
+	}
+	s := buildDeterministicSummary(stats)
+	assert.Contains(t, s, "Urbanisme")
+	assert.Contains(t, s, "Sport")
+	assert.Contains(t, s, "200000")
+}
+
+func TestBuildDeterministicSummary_OneTopic(t *testing.T) {
+	stats := councilStats{
+		topicBudgets: map[string]int64{"Culture": 50_000},
+		totalContre:  0,
+	}
+	s := buildDeterministicSummary(stats)
+	assert.Contains(t, s, "Culture")
+	assert.Contains(t, s, "50000")
+	assert.NotContains(t, s, "voix contre")
+}
+
+func TestBuildDeterministicSummary_WithOpposition(t *testing.T) {
+	stats := councilStats{
+		topicBudgets: map[string]int64{"Budget": 500_000},
+		totalContre:  3,
+	}
+	s := buildDeterministicSummary(stats)
+	assert.Contains(t, s, "3 voix contre")
+}
+
+func TestBuildDeterministicSummary_NoBudget(t *testing.T) {
+	stats := councilStats{topicBudgets: map[string]int64{}}
+	s := buildDeterministicSummary(stats)
+	assert.Contains(t, s, "sans impact budgétaire")
+}
+
+func TestBuildDeterministicSummary_PluralOpposition(t *testing.T) {
+	stats := councilStats{
+		topicBudgets: map[string]int64{},
+		totalContre:  2,
+	}
+	s := buildDeterministicSummary(stats)
+	assert.Contains(t, s, "enregistrées")
 }
 
 // TestBuildValidatorPayload_ContainsCouncilID guards against the silent

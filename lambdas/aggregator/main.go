@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/aws/aws-lambda-go/events"
@@ -19,11 +18,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	lambdaService "github.com/aws/aws-sdk-go-v2/service/lambda"
 	lambdaTypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
-	"github.com/watchdog/shared"
-	"google.golang.org/genai"
 )
-
-func ptrInt32(i int32) *int32 { return &i }
 
 var (
 	ddb          *dynamodb.Client
@@ -57,7 +52,6 @@ type Deliberation struct {
 	CouncilID    string `dynamodbav:"council_id"`
 	BudgetImpact int64  `dynamodbav:"budget_impact"`
 	TopicTag     string `dynamodbav:"topic_tag"`
-	Summary      string `dynamodbav:"summary"`
 	VotePour     *int   `dynamodbav:"vote_pour"`
 	VoteContre   *int   `dynamodbav:"vote_contre"`
 	VoteAbst     *int   `dynamodbav:"vote_abstention"`
@@ -149,25 +143,9 @@ func runSynthesis(ctx context.Context, ddb *dynamodb.Client, lambdaClient *lambd
 	mainTheme := dominantTheme(stats.topicBudgets)
 	climat := voteClimat(stats.totalPour, stats.totalContre)
 
-	// 3. Synthèse IA (Enjeu Clé) — short-circuited when Gemini is down for long.
-	councilsTable := os.Getenv("COUNCILS_TABLE")
-	const synthesisFallback = "Synthèse des enjeux majeurs de la séance du conseil municipal."
-	var voteSummary string
-	if open, cerr := shared.GeminiCircuitOpen(ctx, ddb, councilsTable); cerr == nil && open {
-		log.Printf("gemini circuit OPEN — skipping synthesis for %s, using fallback", councilID)
-		voteSummary = synthesisFallback
-	} else {
-		voteSummary, err = askGeminiForSynthesis(ctx, stats.summaries)
-		if err != nil {
-			log.Printf("IA Synthesis failed, using fallback: %v", err)
-			voteSummary = synthesisFallback
-			if rerr := shared.RecordGeminiError(ctx, ddb, councilsTable); rerr != nil {
-				log.Printf("warn: record gemini error: %v", rerr)
-			}
-		} else if rerr := shared.RecordGeminiSuccess(ctx, ddb, councilsTable); rerr != nil {
-			log.Printf("warn: record gemini success: %v", rerr)
-		}
-	}
+	// 3. Synthesis: fully deterministic template from pre-computed stats.
+	// No LLM involved — output is reproducible and cannot hallucinate political intent.
+	voteSummary := buildDeterministicSummary(stats)
 
 	// 4. Mise à jour du Conseil dans DynamoDB
 	analysis := CouncilAnalysis{
@@ -238,7 +216,6 @@ type councilStats struct {
 	totalPour    int
 	totalContre  int
 	totalAbst    int
-	summaries    []string
 }
 
 func computeStats(delibs []Deliberation) councilStats {
@@ -256,9 +233,6 @@ func computeStats(delibs []Deliberation) councilStats {
 		}
 		if d.VoteAbst != nil {
 			s.totalAbst += *d.VoteAbst
-		}
-		if d.Summary != "" {
-			s.summaries = append(s.summaries, fmt.Sprintf("- %s", d.Summary))
 		}
 	}
 	return s
@@ -291,46 +265,57 @@ func voteClimat(totalPour, totalContre int) string {
 	return "consensus"
 }
 
-func askGeminiForSynthesis(ctx context.Context, summaries []string) (string, error) {
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-	apiKey := os.Getenv("GEMINI_API_KEY")
-	modelName := os.Getenv("GEMINI_MODEL")
-	if modelName == "" {
-		modelName = "gemini-2.5-pro"
+// tagBudget pairs a topic tag with its total budget for ranking.
+type tagBudget struct {
+	tag    string
+	budget int64
+}
+
+// topBudgetTopics returns the top n topics ordered by budget (budget > 0 only).
+// Uses a simple selection pass to avoid importing sort.
+func topBudgetTopics(topicBudgets map[string]int64, n int) []tagBudget {
+	var result []tagBudget
+	selected := make(map[string]bool)
+	for i := 0; i < n; i++ {
+		var best tagBudget
+		for tag, b := range topicBudgets {
+			if !selected[tag] && b > best.budget {
+				best = tagBudget{tag, b}
+			}
+		}
+		if best.budget > 0 {
+			result = append(result, best)
+			selected[best.tag] = true
+		}
+	}
+	return result
+}
+
+// buildDeterministicSummary constructs a factual, template-based council summary
+// from pre-computed statistics. No LLM involved; output is fully deterministic.
+func buildDeterministicSummary(stats councilStats) string {
+	top := topBudgetTopics(stats.topicBudgets, 2)
+
+	var summary string
+	switch len(top) {
+	case 0:
+		summary = "Séance sans impact budgétaire significatif."
+	case 1:
+		summary = fmt.Sprintf("La séance a concentré le budget sur le domaine %s (%d €).", top[0].tag, top[0].budget)
+	default:
+		summary = fmt.Sprintf("La séance a concentré le budget sur %s (%d €) et %s (%d €).",
+			top[0].tag, top[0].budget, top[1].tag, top[1].budget)
 	}
 
-	client, err := genai.NewClient(ctx, &genai.ClientConfig{
-		APIKey:      apiKey,
-		HTTPOptions: genai.HTTPOptions{APIVersion: "v1"},
-	})
-	if err != nil {
-		return "", err
+	if stats.totalContre > 0 {
+		suffix := ""
+		if stats.totalContre > 1 {
+			suffix = "s"
+		}
+		summary += fmt.Sprintf(" %d voix contre enregistrée%s.", stats.totalContre, suffix)
 	}
 
-	prompt := fmt.Sprintf(`Voici les résumés des délibérations d'un conseil municipal :
-%s
-
-Rédige une synthèse de 1 à 2 phrases complètes (entre 25 et 45 mots) identifiant l'enjeu politique ou social majeur de cette séance.
-Ne commence pas par "Enjeu Clé :". Ne sois pas trop court. Sois précis sur l'impact citoyen.`, strings.Join(summaries, "\n"))
-
-	resp, err := shared.CallGeminiWithRetry(ctx, func(ctx context.Context) (*genai.GenerateContentResponse, error) {
-		return client.Models.GenerateContent(ctx, modelName, []*genai.Content{{
-			Role:  "user",
-			Parts: []*genai.Part{{Text: prompt}},
-		}}, &genai.GenerateContentConfig{
-			MaxOutputTokens: 8192,
-		})
-	}, 4)
-	if err != nil {
-		return "", err
-	}
-
-	if len(resp.Candidates) > 0 && len(resp.Candidates[0].Content.Parts) > 0 {
-		return strings.TrimSpace(resp.Candidates[0].Content.Parts[0].Text), nil
-	}
-
-	return "", fmt.Errorf("no response from gemini")
+	return summary
 }
 
 func main() {

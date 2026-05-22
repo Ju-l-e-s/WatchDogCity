@@ -336,9 +336,14 @@ func fetchAllData(ctx context.Context, ddb *dynamodb.Client) ([]CouncilRecord, m
 	for {
 		cOut, err := ddb.Scan(ctx, &dynamodb.ScanInput{
 			TableName:        aws.String(os.Getenv("COUNCILS_TABLE")),
-			FilterExpression: aws.String("NOT begins_with(council_id, :metaprefix)"),
+			// Hard filter: only QC-approved councils appear on the public website.
+			// Councils without qc_status (pre-gate) are excluded intentionally.
+			FilterExpression: aws.String(
+				"NOT begins_with(council_id, :metaprefix) AND qc_status = :approved",
+			),
 			ExpressionAttributeValues: map[string]types.AttributeValue{
 				":metaprefix": &types.AttributeValueMemberS{Value: "metadata#"},
+				":approved":   &types.AttributeValueMemberS{Value: "APPROVED"},
 			},
 			ExclusiveStartKey: lastKey,
 		})

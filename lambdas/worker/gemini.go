@@ -30,27 +30,38 @@ Extrais les informations du PDF fourni au format JSON strict imposé par le sch�
 RÈGLES IMPÉRATIVES DE TRAITEMENT :
 
 1. CATÉGORISATION FINANCIÈRE ("budget_type" et "budget_impact") :
-   - Extrais le montant principal en euros dans "budget_impact" (nombre entier, 0 si aucun).
+   - Extrais le montant principal en EUROS ENTIERS dans "budget_impact" (pas en centimes ; ne multiplie ni ne convertis aucun montant). Valeur 0 si aucun montant.
    - Tu DOIS qualifier ce flux dans "budget_type" en utilisant UNIQUEMENT l'une de ces 4 valeurs exactes :
      * "DÉPENSE" : La ville paie ou verse de l'argent (subvention, achat, travaux, frais).
      * "RECETTE" : La ville gagne ou collecte de l'argent (impôts, taxes, vente de biens, dotations).
      * "CAUTION" : La ville se porte garante ou cautionne un prêt (ex: Agence France Locale).
-     * "AUCUN" : Aucun montant significatif.
+     * "AUCUN" : si et seulement si budget_impact = 0. Tout montant non nul (même faible) DOIT porter le type DÉPENSE, RECETTE ou CAUTION. Réciproquement, budget_impact = 0 impose budget_type = "AUCUN".
 
-2. IMPACTS CITOYENS ("impacts") :
+2. TITRE ("title") :
+   - Titre factuel, neutre et descriptif de l'objet de la délibération. Aucun adjectif évaluatif, aucune accroche éditoriale.
+   - Ce titre est la SEULE phrase reprise telle quelle par la newsletter publique : il doit pouvoir être publié sans relecture.
+
+3. DÉCISION ("decision") :
+   - Champ OBLIGATOIRE et non vide : indique ce qui a été décidé ou voté, en une phrase factuelle.
+
+4. IMPACTS CITOYENS ("impacts") :
    - Décris les conséquences DIRECTES, matérielles ou financières pour les Béglaises et Béglais.
-   - REGLE STRICTE : Si la délibération est de nature purement administrative, interne (élections de représentants, création de commissions, frais de mission des élus) ou sans impact tangible sur le quotidien citoyen, la valeur de ce champ DOIT ÊTRE STRICTEMENT la chaîne "Néant". N'invente JAMAIS d'impacts indirects, philosophiques ou théoriques.
+   - "impacts" n'est JAMAIS null ni vide. Soit il décrit un impact citoyen concret, soit il vaut EXACTEMENT la chaîne "Néant". Aucune autre valeur (pas de "null", "N/A", "-", chaîne vide).
+   - RÈGLE STRICTE : Si la délibération est de nature purement administrative, interne (élections de représentants, création de commissions, frais de mission des élus) ou sans impact tangible sur le quotidien citoyen, la valeur DOIT ÊTRE STRICTEMENT "Néant". N'invente JAMAIS d'impacts indirects, philosophiques ou théoriques.
 
-3. NEUTRALITÉ ET PÉDAGOGIE :
+5. NEUTRALITÉ ET PÉDAGOGIE :
    - AUCUN JARGON : Bannis le vocabulaire administratif, technocratique ou juridique brut. Si un terme complexe est indispensable (ex: "ZAC", "DSP"), tu DOIS le définir immédiatement en termes simples.
    - OBJECTIVITÉ : Reste factuel. Ne porte aucun jugement de valeur (évite "excellent", "coûteux", "ambitieux").
    - ANCRAGE (GROUNDING) : N'ajoute AUCUNE information qui n'est pas présente dans le document PDF. Ne fais aucun compliment, n'ajoute aucun fait historique, géographique ou classement (ex: "plus grand club") non mentionné explicitement dans le texte.
    - CLIMAT : "climate_impact" est "positif" uniquement pour des mesures environnementales directes (énergie renouvelable, espaces verts), "negatif" pour des énergies fossiles, sinon "neutre".
 
 Règles supplémentaires :
-- Le champ "budget_breakdown" est un tableau de ventilation détaillée. Laisse vide [] sauf si c'est un VOTE DU BUDGET ou des subventions à de multiples associations (dans ce cas, extraire {"topic_tag": "...", "label": "...", "amount": entier}).
+- Le champ "budget_breakdown" est un tableau de ventilation détaillée. Laisse vide [] sauf si c'est un VOTE DU BUDGET ou des subventions à de multiples associations.
+  Si renseigné : la SOMME EXACTE des "amount" DOIT être rigoureusement égale à "budget_impact" (tolérance 0). Additionne mentalement tous les montants et corrige jusqu'à l'égalité parfaite avant de produire le JSON. Si tu ne peux pas ventiler la totalité, laisse "budget_breakdown" = [] plutôt que de produire une ventilation partielle.
+  Pour "topic_tag" dans budget_breakdown, utilise UNIQUEMENT une de ces valeurs exactes : Administration, Sport, Budget, Sécurité, Environnement, Mobilité, Social, Culture, Urbanisme, Éducation.
 - "is_substantial" vaut "true" pour un budget, une DSP ou un projet structurant.
 - Si pas de vote, "has_vote" = false et compteurs à null.
+- Si "has_vote" = true, au moins un des compteurs (pour/contre/abstention) doit être un entier ≥ 0 ; ne les laisse pas tous à null. Les compteurs correspondent aux conseillers municipaux élus (environ 35) ; jamais au public, à la population ou à un quorum. Total plausible ≤ 40.
 - Ne génère aucun texte en dehors du JSON.`
 
 type BudgetBreakdownItem struct {
@@ -108,8 +119,8 @@ var deliberationSchema = &genai.Schema{
 			Type: genai.TypeObject,
 			Properties: map[string]*genai.Schema{
 				"contexte":        {Type: genai.TypeString, Nullable: ptrBool(true)},
-				"decision":        {Type: genai.TypeString, Nullable: ptrBool(true)},
-				"impacts":         {Type: genai.TypeString, Nullable: ptrBool(true)},
+				"decision":        {Type: genai.TypeString},
+				"impacts":         {Type: genai.TypeString},
 				"points_debattus": {Type: genai.TypeString, Nullable: ptrBool(true)},
 			},
 			PropertyOrdering: []string{"contexte", "decision", "impacts", "points_debattus"},
@@ -125,7 +136,7 @@ var deliberationSchema = &genai.Schema{
 			Items: &genai.Schema{
 				Type: genai.TypeObject,
 				Properties: map[string]*genai.Schema{
-					"topic_tag": {Type: genai.TypeString},
+					"topic_tag": {Type: genai.TypeString, Format: "enum", Enum: validTopicTags},
 					"label":     {Type: genai.TypeString},
 					"amount":    {Type: genai.TypeInteger, Format: "int64"},
 				},
@@ -311,10 +322,7 @@ func validateGeminiResult(r *GeminiResult) error {
 			diff = -diff
 		}
 		if r.BudgetImpact > 0 && diff > 1 {
-			// Don't hard-fail (breakdown can legitimately exclude minor lines),
-			// but the inconsistency is logged by callers via the returned error
-			// path. Demoting to warn keeps the pipeline alive on partial breakdowns.
-			fmt.Printf("WARN: budget_breakdown sum=%d differs from budget_impact=%d\n", sum, r.BudgetImpact)
+			return fmt.Errorf("budget_breakdown sum=%d differs from budget_impact=%d (diff=%d > tolerance 1); set budget_breakdown=[] if full allocation is not possible", sum, r.BudgetImpact, diff)
 		}
 	}
 	return nil

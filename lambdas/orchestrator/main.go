@@ -16,6 +16,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	awslambda "github.com/aws/aws-sdk-go-v2/service/lambda"
+	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	sqstypes "github.com/aws/aws-sdk-go-v2/service/sqs/types"
 	"github.com/watchdog/shared"
@@ -50,6 +52,11 @@ type sqsClientAPI interface {
 	SendMessageBatch(ctx context.Context, in *sqs.SendMessageBatchInput, opts ...func(*sqs.Options)) (*sqs.SendMessageBatchOutput, error)
 }
 
+// lambdaClientAPI is satisfied by *lambda.Client and test mocks.
+type lambdaClientAPI interface {
+	Invoke(ctx context.Context, in *awslambda.InvokeInput, opts ...func(*awslambda.Options)) (*awslambda.InvokeOutput, error)
+}
+
 // scraperAPI is satisfied by *Scraper and test mocks.
 type scraperAPI interface {
 	ScrapeCouncilList(ctx context.Context) ([]CouncilListing, error)
@@ -60,10 +67,12 @@ type scraperAPI interface {
 type orchestrator struct {
 	ddb                ddbClient
 	sqs                sqsClientAPI
+	lambda             lambdaClientAPI
 	scraper            scraperAPI
 	councilsTable      string
 	deliberationsTable string
 	queueURL           string
+	publisherFnName    string
 }
 
 // buildCouncilUpdateInput crafts the conditional UpdateItem that creates or
@@ -122,7 +131,17 @@ func (o *orchestrator) handle(ctx context.Context, event OrchestratorEvent) erro
 		log.Printf("warn: failed to scrape next council date: %v", err)
 	} else {
 		log.Printf("Found next council date: %s", nextDate)
-		o.updateNextCouncilMetadata(ctx, nextDate)
+		oldDate, err := o.getNextCouncilMetadata(ctx)
+		if err != nil {
+			log.Printf("warn: failed to get old next council date from DB: %v", err)
+		}
+		if nextDate != oldDate {
+			log.Printf("Next council date changed from %q to %q — updating DB and invoking publisher", oldDate, nextDate)
+			o.updateNextCouncilMetadata(ctx, nextDate)
+			o.invokePublisher(ctx)
+		} else {
+			log.Printf("Next council date unchanged (%q) — no-op", nextDate)
+		}
 	}
 
 	// 2. Gérer la liste des délibérations
@@ -268,6 +287,46 @@ func (o *orchestrator) handle(ctx context.Context, event OrchestratorEvent) erro
 	return nil
 }
 
+func (o *orchestrator) getNextCouncilMetadata(ctx context.Context) (string, error) {
+	out, err := o.ddb.GetItem(ctx, &dynamodb.GetItemInput{
+		TableName: aws.String(o.councilsTable),
+		Key: map[string]types.AttributeValue{
+			"council_id": &types.AttributeValueMemberS{Value: "metadata#next_council"},
+		},
+	})
+	if err != nil {
+		return "", err
+	}
+	if out.Item == nil {
+		return "", nil
+	}
+	var meta struct {
+		DateText string `dynamodbav:"date_text"`
+	}
+	if err := attributevalue.UnmarshalMap(out.Item, &meta); err != nil {
+		return "", err
+	}
+	return meta.DateText, nil
+}
+
+func (o *orchestrator) invokePublisher(ctx context.Context) {
+	if o.lambda == nil || o.publisherFnName == "" {
+		log.Printf("warn: lambda client or publisherFnName not set, skipping invocation")
+		return
+	}
+	payload, _ := json.Marshal(map[string]string{"council_id": "metadata#next_council"})
+	_, err := o.lambda.Invoke(ctx, &awslambda.InvokeInput{
+		FunctionName:   aws.String(o.publisherFnName),
+		InvocationType: lambdatypes.InvocationTypeEvent,
+		Payload:        payload,
+	})
+	if err != nil {
+		log.Printf("error invoking publisher for next council date update: %v", err)
+	} else {
+		log.Printf("successfully invoked publisher to regenerate data.json")
+	}
+}
+
 func (o *orchestrator) updateNextCouncilMetadata(ctx context.Context, nextDate string) {
 	item, _ := attributevalue.MarshalMap(map[string]interface{}{
 		"council_id": "metadata#next_council",
@@ -307,10 +366,12 @@ func init() {
 	orch = &orchestrator{
 		ddb:                dynamodb.NewFromConfig(cfg),
 		sqs:                sqs.NewFromConfig(cfg),
+		lambda:             awslambda.NewFromConfig(cfg),
 		scraper:            NewScraper(deliberationsListURL),
 		councilsTable:      os.Getenv("COUNCILS_TABLE"),
 		deliberationsTable: os.Getenv("DELIBERATIONS_TABLE"),
 		queueURL:           os.Getenv("PDF_QUEUE_URL"),
+		publisherFnName:    os.Getenv("PUBLISHER_FUNCTION_NAME"),
 	}
 }
 

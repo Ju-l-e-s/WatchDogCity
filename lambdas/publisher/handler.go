@@ -362,6 +362,15 @@ func fetchAllData(ctx context.Context, ddb *dynamodb.Client) ([]CouncilRecord, m
 		lastKey = cOut.LastEvaluatedKey
 	}
 
+	// Only include Conseil municipal in the public website.
+	var filtered []CouncilRecord
+	for _, c := range councils {
+		if c.Category == "" || c.Category == "Conseil municipal" {
+			filtered = append(filtered, c)
+		}
+	}
+	councils = filtered
+
 	// Scan deliberations with pagination
 	var delibs []DeliberationRecord
 	lastKey = nil

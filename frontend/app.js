@@ -60,7 +60,7 @@ async function init() {
             if(n) n.classList.remove("hidden");
         }
 
-        allCouncils = (t.councils || []).sort((e, t) => t.date.localeCompare(e.date));
+        allCouncils = (t.councils || []).filter(c => !c.category || c.category === "Conseil municipal").sort((e, t) => t.date.localeCompare(e.date));
 
         console.log("📊 Nombre de conseils:", allCouncils.length);
 

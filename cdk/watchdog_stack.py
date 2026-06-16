@@ -193,6 +193,9 @@ class WatchdogStack(Stack):
             actions=["ses:SendEmail", "cloudfront:CreateInvalidation"],
             resources=["*"],
         ))
+        publisher.grant_invoke(orchestrator)
+        orchestrator.add_environment("PUBLISHER_FUNCTION_NAME", publisher.function_name)
+
 
         # ── Lambda: Aggregator ───────────────────────────────────────────
         aggregator = lambda_.Function(

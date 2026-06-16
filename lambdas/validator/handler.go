@@ -68,6 +68,7 @@ type ValidatorHandler struct {
 type councilRec struct {
 	CouncilID     string `dynamodbav:"council_id"`
 	Title         string `dynamodbav:"title"`
+	Category      string `dynamodbav:"category"`
 	Date          string `dynamodbav:"date"`
 	TotalPdfs     int    `dynamodbav:"total_pdfs"`
 	ProcessedPdfs int    `dynamodbav:"processed_pdfs"`
@@ -298,9 +299,13 @@ func (h *ValidatorHandler) handleApproved(
 
 	// Refresh the public website (data.json now includes this APPROVED council).
 	h.invokePublisher(ctx, council.CouncilID)
-	// Send newsletter with pre-generated sensory-deprived params.
-	h.invokeNotifier(ctx, council.CouncilID, params)
-	log.Printf("council %s APPROVED — invoking publisher and notifier", council.CouncilID)
+	// Send newsletter only for Conseil municipal.
+	if council.Category == "" || council.Category == "Conseil municipal" {
+		h.invokeNotifier(ctx, council.CouncilID, params)
+		log.Printf("council %s APPROVED — invoking publisher and notifier", council.CouncilID)
+	} else {
+		log.Printf("council %s APPROVED (category=%q) — invoking publisher only, skipping newsletter", council.CouncilID, council.Category)
+	}
 	if len(verdict.Violations) > 0 {
 		log.Printf("  (%d WARN violations logged, not blocking)", len(verdict.Violations))
 	}

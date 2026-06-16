@@ -108,16 +108,22 @@ func TestFetchDocumentCancelledContext(t *testing.T) {
 
 func TestNormalizeCategory(t *testing.T) {
 	cases := []struct {
-		raw      string
+		cat      string
+		title    string
 		expected string
 	}{
-		{"", "Conseil municipal"},
-		{"Conseil municipal", "Conseil municipal"},
-		{"Centre communal d'action sociale", "CCAS"},
-		{"Centre social et culturel de l'Estey", "Estey"},
-		{"Les établissements", "Conseil municipal"},
+		// Category tag detected
+		{"", "Délibérations du conseil municipal", "Conseil municipal"},
+		{"Conseil municipal", "Délibérations du conseil municipal", "Conseil municipal"},
+		{"Centre communal d'action sociale", "Délibérations du CCAS", "CCAS"},
+		{"Centre social et culturel de l'Estey", "Délibérations de l'Estey", "Estey"},
+		{"Les établissements", "Délibérations", "Conseil municipal"},
+		// Title-based fallback (empty category tag)
+		{"", "Délibérations du conseil d'administration du CCAS du 26 janvier 2026", "CCAS"},
+		{"", "Délibérations du Conseil d'administration du Centre social et culturel l'Estey du 24 novembre 2025", "Estey"},
+		{"", "Délibérations du conseil municipal du 28 mars 2026", "Conseil municipal"},
 	}
 	for _, tc := range cases {
-		assert.Equal(t, tc.expected, normalizeCategory(tc.raw), "input: %q", tc.raw)
+		assert.Equal(t, tc.expected, normalizeCategory(tc.cat, tc.title), "cat=%q title=%q", tc.cat, tc.title)
 	}
 }

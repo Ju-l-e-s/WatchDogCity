@@ -76,7 +76,7 @@ func (sc *Scraper) ScrapeCouncilList(ctx context.Context) ([]CouncilListing, err
 		listings = append(listings, CouncilListing{
 			CouncilID: url,
 			Title:     title,
-			Category:  normalizeCategory(category),
+			Category:  normalizeCategory(category, title),
 			Date:      sessionDate,
 			URL:       url,
 			Summary:   summary,
@@ -160,12 +160,14 @@ func parseDateFromTitle(title string) string {
 	return fmt.Sprintf("%s-%s-%02s", m[3], monthNum, m[1])
 }
 
-func normalizeCategory(cat string) string {
-	cat = strings.ToLower(cat)
-	if strings.Contains(cat, "ccas") || strings.Contains(cat, "centre communal") {
+func normalizeCategory(cat, title string) string {
+	catLow := strings.ToLower(cat)
+	titleLow := strings.ToLower(title)
+	if strings.Contains(catLow, "ccas") || strings.Contains(catLow, "centre communal") ||
+		strings.Contains(titleLow, "ccas") || strings.Contains(titleLow, "centre communal") {
 		return "CCAS"
 	}
-	if strings.Contains(cat, "estey") {
+	if strings.Contains(catLow, "estey") || strings.Contains(titleLow, "estey") {
 		return "Estey"
 	}
 	return "Conseil municipal"

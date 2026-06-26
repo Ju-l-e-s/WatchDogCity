@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -115,8 +116,61 @@ func (sc *Scraper) ScrapeNextCouncilDate(ctx context.Context, url string) (strin
 		return "", err
 	}
 
-	// Cible le premier <li> dans le widget des prochains conseils
-	nextDate := strings.TrimSpace(doc.Find(".infowidget .rte ul li strong").First().Text())
+	now := time.Now()
+	todayStr := now.Format("2006-01-02")
+	todayTime, _ := time.Parse("2006-01-02", todayStr)
+
+	var nextDate string
+	dateRe := regexp.MustCompile(`(?i)(?:lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche)?\s*(\d{1,2})\s+([a-zéû]+)(?:\s+(\d{4}))?`)
+
+	doc.Find(".infowidget .rte ul li strong").EachWithBreak(func(_ int, s *goquery.Selection) bool {
+		text := strings.TrimSpace(s.Text())
+		if text == "" {
+			return true
+		}
+
+		m := dateRe.FindStringSubmatch(text)
+		if m == nil {
+			if nextDate == "" {
+				nextDate = text
+			}
+			return true
+		}
+
+		day, _ := strconv.Atoi(m[1])
+		monthName := strings.ToLower(m[2])
+		monthNumStr, ok := frMonthMap[monthName]
+		if !ok {
+			if nextDate == "" {
+				nextDate = text
+			}
+			return true
+		}
+		month, _ := strconv.Atoi(monthNumStr)
+
+		year := now.Year()
+		if m[3] != "" {
+			year, _ = strconv.Atoi(m[3])
+		}
+
+		parsedDate := time.Date(year, time.Month(month), day, 0, 0, 0, 0, time.UTC)
+		
+		if parsedDate.Before(todayTime) && m[3] == "" {
+			parsedDate = time.Date(year+1, time.Month(month), day, 0, 0, 0, 0, time.UTC)
+		}
+
+		if !parsedDate.Before(todayTime) {
+			nextDate = text
+			return false // break loop
+		}
+
+		return true
+	})
+
+	if nextDate == "" {
+		nextDate = strings.TrimSpace(doc.Find(".infowidget .rte ul li strong").First().Text())
+	}
+
 	return nextDate, nil
 }
 

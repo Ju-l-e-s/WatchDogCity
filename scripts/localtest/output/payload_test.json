@@ -1,0 +1,82 @@
+{
+  "council_id": "https://www.mairie-begles.fr/d%C3%A9lib%C3%A9rations/les-deliberations-du-conseil-municipal-du-1%e1%b5%89%ca%b3-juillet-2025-v7/",
+  "test_list_id": 3,
+  "newsletter_params": {
+    "email_subject": "L'Essentiel du Conseil",
+    "council_title": "Les d\u00e9lib\u00e9rations du Conseil municipal du 1\u1d49\u02b3 juillet 2025",
+    "council_date": "22 juin 2026",
+    "main_issue": "Le conseil a d\u00e9battu de plusieurs projets, notamment le lancement d'une nouvelle Zone d'Am\u00e9nagement Concert\u00e9 (ZAC) 'B\u00e8gles Garonne'. Plusieurs d\u00e9lib\u00e9rations, dont celle sur la ZAC et le rapport sur l'accessibilit\u00e9, ont fait l'objet de votes partag\u00e9s.",
+    "budget_total": "0",
+    "has_global_budget": false,
+    "vote_climat": "CONSENSUS",
+    "climat_color": "",
+    "vote_stats": "3 d\u00e9lib. non unanimes / jusqu'\u00e0 7 voix contre",
+    "total_delibs_in_council": 15,
+    "tensions": [
+      {
+        "title": "Annulation de dettes anciennes jug\u00e9es irr\u00e9couvrables",
+        "context": "Le conseil municipal a proc\u00e9d\u00e9 \u00e0 une r\u00e9gularisation comptable en annulant des dettes que la ville ne peut plus percevoir, pour un montant total de 29 891 \u20ac. Ces cr\u00e9ances, datant de 2016 \u00e0 2024, concernent des d\u00e9biteurs insolvables ou des situations de surendettement.",
+        "impact": "Cette op\u00e9ration est une formalit\u00e9 comptable qui n'a pas d'impact direct sur les services aux citoyens. Elle acte la perte de recettes anciennes qui ne pouvaient plus \u00eatre collect\u00e9es par la Ville.",
+        "budget": "29 891",
+        "has_budget": true,
+        "vote_details": "7 abstentions"
+      },
+      {
+        "title": "Avis de la commune sur le projet de Zone d'Am\u00e9nagement Concert\u00e9 (ZAC) B\u00e8gles Garonne",
+        "context": "Le conseil a donn\u00e9 un avis favorable sur le projet de cr\u00e9ation de la Zone d'Am\u00e9nagement Concert\u00e9 (ZAC) 'B\u00e8gles Garonne'. Ce projet pr\u00e9voit de transformer 81 hectares en un nouveau quartier mixte avec des logements, des bureaux et des commerces, en int\u00e9grant les enjeux environnementaux.",
+        "impact": "Ce projet va initier la transformation d'une vaste zone de la ville sur plusieurs ann\u00e9es, avec la construction pr\u00e9vue d'un maximum de 500 000 m\u00b2 de nouvelles surfaces. Cela augmentera l'offre de logements et d'activit\u00e9s \u00e9conomiques.",
+        "budget": "",
+        "has_budget": false,
+        "vote_details": "7 votes contre"
+      },
+      {
+        "title": "Pr\u00e9sentation du rapport annuel sur l'accessibilit\u00e9 pour les personnes handicap\u00e9es",
+        "context": "Le conseil a pris acte du rapport 2025 sur l'accessibilit\u00e9. Ce bilan annuel pr\u00e9sente les actions r\u00e9alis\u00e9es pour am\u00e9liorer l'acc\u00e8s des personnes en situation de handicap aux lieux publics et les projets \u00e0 venir.",
+        "impact": "Les citoyens sont inform\u00e9s des avanc\u00e9es et des futurs chantiers pour une ville plus accessible. Les projets incluent la finalisation des travaux du complexe Langevin d'ici 2026 et la r\u00e9vision du plan d'accessibilit\u00e9 de la voirie.",
+        "budget": "",
+        "has_budget": false,
+        "vote_details": "7 votes contre"
+      }
+    ],
+    "adopted": [
+      {
+        "tag": "Social",
+        "title": "Soutien \u00e0 l'h\u00f4pital Bordeaux Bagatelle en difficult\u00e9 financi\u00e8re",
+        "context": "Le conseil a vot\u00e9 une motion pour soutenir la Fondation Maison de Sant\u00e9 Bordeaux Bagatelle. Cet h\u00f4pital local fait face \u00e0 d'importantes difficult\u00e9s financi\u00e8res qui menacent 1600 emplois et l'acc\u00e8s aux soins dans le sud de l'agglom\u00e9ration.",
+        "impact": "Cette action vise \u00e0 pr\u00e9server une offre de soins de proximit\u00e9 essentielle (urgences, maternit\u00e9) sans d\u00e9passement d'honoraires pour les habitants et \u00e0 \u00e9viter la formation d'un 'd\u00e9sert hospitalier'.",
+        "budget": "",
+        "has_budget": false
+      },
+      {
+        "tag": "Environnement",
+        "title": "Raccordement des b\u00e2timents municipaux au r\u00e9seau de chaleur urbain",
+        "context": "La ville va raccorder ses principaux b\u00e2timents publics, comme la piscine et les \u00e9coles, au r\u00e9seau de chaleur de Bordeaux M\u00e9tropole. Ce projet, d'un co\u00fbt estim\u00e9 \u00e0 3,5 millions d'euros, vise \u00e0 diminuer la consommation de gaz et les \u00e9missions de gaz \u00e0 effet de serre.",
+        "impact": "Le chauffage des b\u00e2timents municipaux deviendra plus \u00e9cologique, avec un objectif de r\u00e9duction de 45% de la consommation de gaz. Des travaux d'am\u00e9nagement seront r\u00e9alis\u00e9s en deux phases \u00e0 partir de 2026.",
+        "budget": "3 500 000",
+        "has_budget": true
+      },
+      {
+        "tag": "Urbanisme",
+        "title": "Cr\u00e9ation d'une Maison du projet pour la r\u00e9novation du quartier du Dorat",
+        "context": "La ville s'associe avec des bailleurs sociaux pour cr\u00e9er une 'Maison du projet urbain et social' au Dorat. Ce lieu informera et animera le quartier pendant sa r\u00e9novation, pr\u00e9vue de 2025 \u00e0 2032.",
+        "impact": "Les r\u00e9sidents du quartier du Dorat auront un espace d\u00e9di\u00e9 pour s'informer sur le projet de r\u00e9novation, \u00e9changer avec les responsables et participer \u00e0 des activit\u00e9s.",
+        "budget": "",
+        "has_budget": false
+      }
+    ],
+    "briefs": [
+      {
+        "tag": "Culture",
+        "summary": "La ville a fix\u00e9 les nouveaux tarifs de la Cit\u00e9Cirque pour la saison 2025-2026, en pr\u00e9vision de la reprise de sa gestion directe en 2026, assurant une transition sans interruption pour le public."
+      },
+      {
+        "tag": "Administration",
+        "summary": "La ville va utiliser la plateforme de financement participatif 'J'adopte un projet' pour permettre aux citoyens et entreprises de faire des dons en ligne afin de soutenir des projets locaux."
+      }
+    ],
+    "next_meeting": "Mardi 29 septembre, à 18h30",
+    "website_url": "https://lobservatoiredebegles.fr",
+    "total_councils": 13,
+    "total_delibs": 83
+  }
+}

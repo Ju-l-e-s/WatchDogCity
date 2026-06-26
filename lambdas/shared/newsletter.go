@@ -30,6 +30,8 @@ type ColdDeliberation struct {
 	ClimateImpact   string // enum
 	IsSubstantial   bool
 	HasDisagreement bool // derived from Disagreements != nil && != ""; pass the bool, not the prose
+	Summary         string // Factual summary from worker
+	Impacts         string // Factual citizen impacts from worker
 }
 
 // GeminiDeps carries the credentials needed to call Gemini.
@@ -307,8 +309,8 @@ func buildColdNewsletterPrompt(
 	var sb strings.Builder
 
 	// Sensory-deprivation declaration (verbatim from spec).
-	sb.WriteString("Tu reçois UNIQUEMENT les faits structurés ci-dessous. Tu n'as AUCUN accès au document source. " +
-		"N'invente rien. Chaque phrase doit être déductible de ces champs (montant, type, votes, catégorie, titre). " +
+	sb.WriteString("Tu reçois les faits structurés ci-dessous (incluant un titre, un résumé factuel, et l'impact citoyen extrait de chaque délibération). Tu n'as AUCUN accès au document PDF source. " +
+		"N'invente rien. Chaque phrase doit être déductible de ces champs (montant, type, votes, catégorie, titre, résumé, impact).\n" +
 		"Si un champ ne fournit aucune base factuelle pour 'context' ou 'impact', renvoie une chaîne vide. " +
 		"Aucun jugement de valeur, aucune motivation politique, aucun fait historique ou géographique.\n\n")
 
@@ -330,8 +332,8 @@ func buildColdNewsletterPrompt(
   "tensions": [
     {
       "title": "Reformulation neutre et factuelle du titre fourni ; pas d'accroche, pas d'adjectif évaluatif",
-      "context": "Neutre en 2 à 3 phrases maximum. Déduis UNIQUEMENT du titre, du montant, du type et des votes. Si insuffisant, laisse vide.",
-      "impact": "Changements factuels physiques (factual_changes) en 2 à 3 phrases maximum. Utilise uniquement des verbes d'action concrets (ex: 'Remplacement de 4 700 ampoules', 'Ouverture de 10 postes'). Bannis toute notion subjective ou concept abstrait (ex: 'bien-être', 'sécurité', 'transition écologique', 'confort'). Si insuffisant, laisse vide.",
+      "context": "Neutre en 2 à 3 phrases maximum. Explique le besoin et le contexte en te basant sur le titre et le résumé (Résumé) fournis ci-dessous. Ne rajoute rien.",
+      "impact": "Explique l'impact pratique et concret pour les habitants en 2 à 3 phrases maximum, en te basant sur le champ 'Impact' fourni. Reste factuel. Si le champ 'Impact' d'origine vaut 'Néant' ou est vide, laisse ce champ vide.",
       "budget": "X € (LAISSER VIDE '' SI IMPACT NUL)",
       "has_budget": true,
       "vote_details": "Y votes contre"
@@ -341,8 +343,8 @@ func buildColdNewsletterPrompt(
     {
       "tag": "Administration, Sport, Budget, Sécurité, Environnement, Mobilité, Social, Culture, Urbanisme ou Éducation",
       "title": "Titre vulgarisé",
-      "context": "2 à 3 phrases maximum. Explication factuelle du besoin. Déduis UNIQUEMENT des faits structurés.",
-      "impact": "Changements factuels physiques (factual_changes) en 2 à 3 phrases maximum. Utilise uniquement des verbes d'action concrets (ex: 'Remplacement de 4 700 ampoules', 'Ouverture de 10 postes'). Bannis toute notion subjective ou concept abstrait (ex: 'bien-être', 'sécurité', 'transition écologique', 'confort'). Si insuffisant, laisse vide.",
+      "context": "2 à 3 phrases maximum. Explication factuelle du besoin en te basant sur le titre et le résumé (Résumé) fournis ci-dessous.",
+      "impact": "Explique l'impact pratique et concret pour les habitants en 2 à 3 phrases maximum, en te basant sur le champ 'Impact' fourni. Reste factuel. Si le champ 'Impact' d'origine vaut 'Néant' ou est vide, laisse ce champ vide.",
       "budget": "X € (LAISSER VIDE '' SI IMPACT NUL)",
       "has_budget": true
     }
@@ -368,7 +370,7 @@ func buildColdNewsletterPrompt(
 	sb.WriteString("- STYLE JOURNALISTIQUE PÉDAGOGIQUE : Traduis les termes administratifs complexes en langage clair. Par exemple, au lieu de parler de budget supplémentaire ou d'ajustements de crédits, explique : 'Le conseil ajuste les comptes en cours d'année pour réallouer l'argent là où les besoins sont les plus urgents.' Évite les répétitions vides ou tautologiques (ne pas écrire 'le budget est concentré sur le budget').\n")
 	sb.WriteString("- HUMANISATION DES CHIFFRES : Dans les champs textuels ('context', 'impact', 'summary'), arrondis systématiquement les grands chiffres pour faciliter la lecture (ex: écris 'environ 7 millions d'euros' au lieu de '7 034 925,77 €'). Les montants exacts ne doivent figurer que dans le champ numérique 'budget'.\n")
 	sb.WriteString("- RECADRAGE DES TENSIONS : Ne classe dans 'tensions' que les délibérations ayant fait l'objet d'une réelle contestation ou division politique (votes contre ou débat contradictoire). N'y inclus jamais des procédures administratives obligatoires (ex: le fait légal que le maire quitte la salle lors du vote de son propre bilan financier n'est pas une controverse, c'est une règle de procédure standard, indique alors 'Aucun désaccord, procédure standard.').\n")
-	sb.WriteString("- NEUTRALITÉ ET CHANGEMENTS PHYSIQUES FACTUELS (FACTUAL CHANGES) : Pour le champ 'impact', décris exclusivement des changements factuels et physiques concrets au moyen de verbes d'action concrets (ex: 'Remplacement de 4 700 ampoules', 'Ouverture de 10 postes'). Bannis absolument toutes les notions abstraites, subjectives ou politiques (comme 'le bien-être', 'la sécurité', 'le confort', 'la transition', 'le dynamisme'). Si aucun changement physique direct n'est déductible, laisse le champ vide.\n")
+	sb.WriteString("- NEUTRALITÉ ET IMPACTS : Pour le champ 'impact', décris les conséquences concrètes et opérationnelles en te basant sur le champ 'Impact' d'entrée. Bannis absolument toutes les notions subjectives ou politiques partisanes (comme 'le bien-être', 'la sécurité', 'le confort', 'le dynamisme'). Si aucun impact concret n'est mentionné ou s'il vaut 'Néant', laisse le champ vide.\n")
 	sb.WriteString("- PÉDAGOGIE ET NEUTRALITÉ : Agis en traducteur neutre. Bannis le jargon juridique et administratif. N'utilise aucune formulation partisane.\n")
 	sb.WriteString("- ANCRAGE STRICT : N'ajoute AUCUNE information qui n'est pas présente dans les données structurées d'entrée. Zéro fait géographique, historique ou éditorial externe.\n")
 	sb.WriteString("- INTERDICTION FORMELLE : N'ajoute JAMAIS de liens HTML ou de texte 'En savoir plus' dans les champs context ou impact.\n")
@@ -431,9 +433,9 @@ func buildColdNewsletterPrompt(
 		if d.Pour != nil {
 			pour = *d.Pour
 		}
-		fmt.Fprintf(&sb, "- %s | Tag: %s | Budget: %d€ | Type: %s | Vote: %d/%d/%d (pour/contre/abst) | disagreement: %v | substantial: %v\n",
-			TruncForLog(d.Title, 80), d.TopicTag, d.BudgetImpact, d.BudgetType,
-			pour, contre, abst, d.HasDisagreement, d.IsSubstantial)
+		fmt.Fprintf(&sb, "- Titre: %s\n  Tag: %s | Budget: %d€ | Type: %s | Vote: %d/%d/%d (pour/contre/abst)\n  Résumé: %s\n  Impact: %s\n\n",
+			d.Title, d.TopicTag, d.BudgetImpact, d.BudgetType,
+			pour, contre, abst, d.Summary, d.Impacts)
 	}
 	if len(tensions) == 0 {
 		sb.WriteString("(néant)\n")
@@ -442,8 +444,8 @@ func buildColdNewsletterPrompt(
 	sb.WriteString("\nDÉLIBÉRATIONS ADOPTÉES SIGNIFICATIVES (A FILTRER POUR adopted[] et briefs[]) :\n")
 	significant := append(major, local...)
 	for _, d := range significant {
-		fmt.Fprintf(&sb, "- %s | Tag: %s | Budget: %d€ | Type: %s | substantial: %v\n",
-			TruncForLog(d.Title, 80), d.TopicTag, d.BudgetImpact, d.BudgetType, d.IsSubstantial)
+		fmt.Fprintf(&sb, "- Titre: %s\n  Tag: %s | Budget: %d€ | Type: %s\n  Résumé: %s\n  Impact: %s\n\n",
+			d.Title, d.TopicTag, d.BudgetImpact, d.BudgetType, d.Summary, d.Impacts)
 	}
 	if len(significant) == 0 {
 		sb.WriteString("(néant)\n")

@@ -1,0 +1,82 @@
+{
+  "email_subject": "L'Essentiel du Conseil",
+  "council_title": "Les délibérations du Conseil municipal du 1ᵉʳ juillet 2025",
+  "council_date": "3 juillet 2025",
+  "main_issue": "Le conseil a débattu de plusieurs projets, notamment un projet d'aménagement urbain qui a rencontré une opposition de 7 voix. D'autres délibérations, relatives à l'accessibilité et à des questions comptables, ont également fait l'objet de votes partagés.",
+  "budget_total": "0",
+  "has_global_budget": false,
+  "vote_climat": "CONSENSUS",
+  "climat_color": "",
+  "vote_stats": "3 délib. non unanimes / jusqu'à 7 voix contre",
+  "total_delibs_in_council": 15,
+  "tensions": [
+    {
+      "title": "Régularisation de créances impayées",
+      "context": "Le conseil a procédé à l'annulation comptable de dettes jugées irrécouvrables. Cette procédure administrative permet de mettre à jour les comptes de la ville.",
+      "impact": "",
+      "budget": "",
+      "has_budget": false,
+      "vote_details": "7 abstentions"
+    },
+    {
+      "title": "Avis sur le projet de Zone d'Aménagement Concerté (ZAC) Bègles Garonne",
+      "context": "La commune a été sollicitée pour donner son avis sur un projet de création d'une Zone d'Aménagement Concerté (ZAC), un outil d'urbanisme pour l'aménagement d'un nouveau quartier.",
+      "impact": "",
+      "budget": "",
+      "has_budget": false,
+      "vote_details": "7 votes contre"
+    },
+    {
+      "title": "Présentation du rapport annuel sur l'accessibilité",
+      "context": "Le conseil a pris acte de la présentation du rapport annuel de la commission communale pour l'accessibilité. Ce document fait le bilan des actions menées pour les personnes en situation de handicap.",
+      "impact": "",
+      "budget": "",
+      "has_budget": false,
+      "vote_details": "7 votes contre"
+    }
+  ],
+  "adopted": [
+    {
+      "tag": "Social",
+      "title": "Soutien à une fondation",
+      "context": "Le conseil municipal a voté une motion pour affirmer le soutien de la ville à une fondation.",
+      "impact": "",
+      "budget": "",
+      "has_budget": false
+    },
+    {
+      "tag": "Urbanisme",
+      "title": "Partenariat pour le logement avec Gironde Habitat et ICF Habitat",
+      "context": "Une convention de partenariat a été approuvée entre la ville et les bailleurs sociaux Gironde Habitat et ICF Habitat afin de coordonner leurs actions en matière de logement sur la commune.",
+      "impact": "",
+      "budget": "",
+      "has_budget": false
+    },
+    {
+      "tag": "Environnement",
+      "title": "Déploiement du réseau de chaleur urbain",
+      "context": "Le conseil a approuvé une délibération concernant le déploiement d'un réseau de chaleur urbain. Ce système permet de chauffer plusieurs bâtiments à partir d'une source d'énergie centralisée.",
+      "impact": "",
+      "budget": "",
+      "has_budget": false
+    },
+    {
+      "tag": "Culture",
+      "title": "Fixation des tarifs pour la CitéCirque",
+      "context": "Les tarifs des services et activités proposés par la CitéCirque ont été définis par le conseil. La délibération autorise également l'encaissement des recettes correspondantes.",
+      "impact": "",
+      "budget": "",
+      "has_budget": false
+    }
+  ],
+  "briefs": [
+    {
+      "tag": "Administration",
+      "summary": "Le conseil a approuvé une convention de mandat avec l'association 'J'adopte un projet - ADEFIP' pour la gestion de certaines missions."
+    }
+  ],
+  "next_meeting": "Mardi 21 avril 2026, à 18h30",
+  "website_url": "https://lobservatoiredebegles.fr",
+  "total_councils": 13,
+  "total_delibs": 83
+}

@@ -51,9 +51,6 @@ type councilRec struct {
 	NewsletterPendingAt string `dynamodbav:"newsletter_pending_at,omitempty"`
 }
 
-// deliberationRec is the minimal cold projection used to build ColdDeliberation.
-// Prose fields (summary, analysis_data.*) are intentionally absent: the newsletter
-// LLM must not receive source prose.
 type deliberationRec struct {
 	ID            string  `dynamodbav:"id"`
 	CouncilID     string  `dynamodbav:"council_id"`
@@ -67,6 +64,10 @@ type deliberationRec struct {
 	Disagreements *string `dynamodbav:"disagreements"`
 	ClimateImpact string  `dynamodbav:"climate_impact"`
 	IsSubstantial bool    `dynamodbav:"is_substantial"`
+	Summary       string  `dynamodbav:"summary"`
+	AnalysisData  struct {
+		Impacts *string `dynamodbav:"impacts"`
+	} `dynamodbav:"analysis_data"`
 }
 
 // ── Interfaces (for testability) ──────────────────────────────────────────────
@@ -337,8 +338,7 @@ func (d *notifierDeps) fetchGlobalStats(ctx context.Context) (councils int, deli
 // ── Newsletter generation (thin wrapper — delegates to shared) ─────────────────
 
 // toColdDelibs projects deliberation records into the whitelist struct that
-// the newsletter LLM may see. No prose fields (summary, analysis_data) are
-// forwarded — sensory deprivation is enforced here.
+// the newsletter LLM may see.
 func toColdDelibs(delibs []deliberationRec) []shared.ColdDeliberation {
 	cold := make([]shared.ColdDeliberation, len(delibs))
 	for i, d := range delibs {
@@ -352,6 +352,11 @@ func toColdDelibs(delibs []deliberationRec) []shared.ColdDeliberation {
 		}
 		hasDisagreement := contre > 0 || abst > 0
 
+		impactsVal := ""
+		if d.AnalysisData.Impacts != nil {
+			impactsVal = *d.AnalysisData.Impacts
+		}
+
 		cold[i] = shared.ColdDeliberation{
 			Title:           d.Title,
 			TopicTag:        d.TopicTag,
@@ -364,6 +369,8 @@ func toColdDelibs(delibs []deliberationRec) []shared.ColdDeliberation {
 			ClimateImpact:   d.ClimateImpact,
 			IsSubstantial:   d.IsSubstantial || d.BudgetImpact >= 5000,
 			HasDisagreement: hasDisagreement,
+			Summary:         d.Summary,
+			Impacts:         impactsVal,
 		}
 	}
 	return cold

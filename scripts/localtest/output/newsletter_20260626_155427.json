@@ -1,0 +1,78 @@
+{
+  "email_subject": "L'Essentiel du Conseil",
+  "council_title": "Les délibérations du Conseil municipal du 1ᵉʳ juillet 2025",
+  "council_date": "3 juillet 2025",
+  "main_issue": "Le conseil a débattu de plusieurs projets, notamment le lancement d'une nouvelle Zone d'Aménagement Concerté (ZAC) 'Bègles Garonne'. Plusieurs délibérations, dont celle sur la ZAC et le rapport sur l'accessibilité, ont fait l'objet de votes partagés.",
+  "budget_total": "0",
+  "has_global_budget": false,
+  "vote_climat": "CONSENSUS",
+  "climat_color": "",
+  "vote_stats": "3 délib. non unanimes / jusqu'à 7 voix contre",
+  "total_delibs_in_council": 15,
+  "tensions": [
+    {
+      "title": "Annulation de dettes anciennes jugées irrécouvrables",
+      "context": "Le conseil municipal a procédé à une régularisation comptable en annulant des dettes que la ville ne peut plus percevoir, pour un montant total de 29 891 €. Ces créances, datant de 2016 à 2024, concernent des débiteurs insolvables ou des situations de surendettement.",
+      "impact": "Cette opération est une formalité comptable qui n'a pas d'impact direct sur les services aux citoyens. Elle acte la perte de recettes anciennes qui ne pouvaient plus être collectées par la Ville.",
+      "budget": "29 891",
+      "has_budget": true,
+      "vote_details": "7 abstentions"
+    },
+    {
+      "title": "Avis de la commune sur le projet de Zone d'Aménagement Concerté (ZAC) Bègles Garonne",
+      "context": "Le conseil a donné un avis favorable sur le projet de création de la Zone d'Aménagement Concerté (ZAC) 'Bègles Garonne'. Ce projet prévoit de transformer 81 hectares en un nouveau quartier mixte avec des logements, des bureaux et des commerces, en intégrant les enjeux environnementaux.",
+      "impact": "Ce projet va initier la transformation d'une vaste zone de la ville sur plusieurs années, avec la construction prévue d'un maximum de 500 000 m² de nouvelles surfaces. Cela augmentera l'offre de logements et d'activités économiques.",
+      "budget": "",
+      "has_budget": false,
+      "vote_details": "7 votes contre"
+    },
+    {
+      "title": "Présentation du rapport annuel sur l'accessibilité pour les personnes handicapées",
+      "context": "Le conseil a pris acte du rapport 2025 sur l'accessibilité. Ce bilan annuel présente les actions réalisées pour améliorer l'accès des personnes en situation de handicap aux lieux publics et les projets à venir.",
+      "impact": "Les citoyens sont informés des avancées et des futurs chantiers pour une ville plus accessible. Les projets incluent la finalisation des travaux du complexe Langevin d'ici 2026 et la révision du plan d'accessibilité de la voirie.",
+      "budget": "",
+      "has_budget": false,
+      "vote_details": "7 votes contre"
+    }
+  ],
+  "adopted": [
+    {
+      "tag": "Social",
+      "title": "Soutien à l'hôpital Bordeaux Bagatelle en difficulté financière",
+      "context": "Le conseil a voté une motion pour soutenir la Fondation Maison de Santé Bordeaux Bagatelle. Cet hôpital local fait face à d'importantes difficultés financières qui menacent 1600 emplois et l'accès aux soins dans le sud de l'agglomération.",
+      "impact": "Cette action vise à préserver une offre de soins de proximité essentielle (urgences, maternité) sans dépassement d'honoraires pour les habitants et à éviter la formation d'un 'désert hospitalier'.",
+      "budget": "",
+      "has_budget": false
+    },
+    {
+      "tag": "Environnement",
+      "title": "Raccordement des bâtiments municipaux au réseau de chaleur urbain",
+      "context": "La ville va raccorder ses principaux bâtiments publics, comme la piscine et les écoles, au réseau de chaleur de Bordeaux Métropole. Ce projet, d'un coût estimé à 3,5 millions d'euros, vise à diminuer la consommation de gaz et les émissions de gaz à effet de serre.",
+      "impact": "Le chauffage des bâtiments municipaux deviendra plus écologique, avec un objectif de réduction de 45% de la consommation de gaz. Des travaux d'aménagement seront réalisés en deux phases à partir de 2026.",
+      "budget": "3 500 000",
+      "has_budget": true
+    },
+    {
+      "tag": "Urbanisme",
+      "title": "Création d'une Maison du projet pour la rénovation du quartier du Dorat",
+      "context": "La ville s'associe avec des bailleurs sociaux pour créer une 'Maison du projet urbain et social' au Dorat. Ce lieu informera et animera le quartier pendant sa rénovation, prévue de 2025 à 2032.",
+      "impact": "Les résidents du quartier du Dorat auront un espace dédié pour s'informer sur le projet de rénovation, échanger avec les responsables et participer à des activités.",
+      "budget": "",
+      "has_budget": false
+    }
+  ],
+  "briefs": [
+    {
+      "tag": "Culture",
+      "summary": "La ville a fixé les nouveaux tarifs de la CitéCirque pour la saison 2025-2026, en prévision de la reprise de sa gestion directe en 2026, assurant une transition sans interruption pour le public."
+    },
+    {
+      "tag": "Administration",
+      "summary": "La ville va utiliser la plateforme de financement participatif 'J'adopte un projet' pour permettre aux citoyens et entreprises de faire des dons en ligne afin de soutenir des projets locaux."
+    }
+  ],
+  "next_meeting": "Mardi 21 avril 2026, à 18h30",
+  "website_url": "https://lobservatoiredebegles.fr",
+  "total_councils": 13,
+  "total_delibs": 83
+}

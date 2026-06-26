@@ -581,7 +581,7 @@ func toDeliberationViews(recs []deliberationRec) []shared.DeliberationView {
 }
 
 // toColdDelibs builds the whitelist ColdDeliberation slice for newsletter
-// generation. No prose fields — sensory deprivation enforced here.
+// generation.
 func toColdDelibs(delibs []shared.DeliberationView) []shared.ColdDeliberation {
 	cold := make([]shared.ColdDeliberation, len(delibs))
 	for i, d := range delibs {
@@ -595,6 +595,11 @@ func toColdDelibs(delibs []shared.DeliberationView) []shared.ColdDeliberation {
 		}
 		hasDisagreement := contre > 0 || abst > 0
 
+		impactsVal := ""
+		if d.AnalysisData.Impacts != nil {
+			impactsVal = *d.AnalysisData.Impacts
+		}
+
 		cold[i] = shared.ColdDeliberation{
 			Title:           d.Title,
 			TopicTag:        d.TopicTag,
@@ -607,6 +612,8 @@ func toColdDelibs(delibs []shared.DeliberationView) []shared.ColdDeliberation {
 			ClimateImpact:   d.ClimateImpact,
 			IsSubstantial:   d.IsSubstantial || d.BudgetImpact >= 5000,
 			HasDisagreement: hasDisagreement,
+			Summary:         d.Summary,
+			Impacts:         impactsVal,
 		}
 	}
 	return cold

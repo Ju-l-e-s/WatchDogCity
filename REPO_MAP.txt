@@ -1,0 +1,500 @@
+================================================================================
+WATCHDOGCITY - REPOSITORY MAP
+================================================================================
+
+Cette carte fournit l'arborescence des fichiers du projet WatchdogCity ainsi
+que les signatures des fonctions, interfaces et structures clés de chaque module Go.
+Ne contient pas la logique interne des fonctions.
+
+--------------------------------------------------------------------------------
+1. ARBORESCENCE DU DÉPÔT (Tree Structure)
+--------------------------------------------------------------------------------
+.
+├── ARCHITECTURE.md
+├── Makefile
+├── README.md
+├── REPO_MAP.txt
+├── WHITE_LABEL_ARCHITECTURE.md
+├── cdk
+│   ├── cities
+│   │   └── begles.json
+│   ├── city.schema.json
+│   ├── requirements.txt
+│   └── watchdog_stack.py
+├── docs
+│   ├── ARCHITECTURE_PROJET.md
+│   ├── INFRASTRUCTURE.md
+│   ├── chaos-fixes-prompts.md
+│   ├── prompt-alignment-qc-gateway.md
+│   ├── secure-bucket.sh
+│   └── superpowers
+│       ├── plans
+│       │   ├── 2026-04-04-begles-watchdog.md
+│       │   ├── 2026-04-04-newsletter-complete-design.md
+│       │   ├── 2026-04-04-refonte-citoyenne-watchdog.md
+│       │   ├── 2026-04-07-data-json-optimization.md
+│       │   ├── 2026-04-07-migrate-secrets-to-github.md
+│       │   ├── 2026-04-11-ux-ui-optimization.md
+│       │   ├── 2026-04-14-budget-dashboard.md
+│       │   └── 2026-05-22-promotion-services-jules.md
+│       └── specs
+│           ├── 2026-04-04-refonte-citoyenne-design.md
+│           ├── 2026-04-07-data-json-optimization-design.md
+│           ├── 2026-04-14-budget-dashboard-design.md
+│           └── 2026-05-22-promotion-services-jules-design.md
+├── frontend
+│   ├── app.js
+│   ├── data.json
+│   ├── fonts
+│   │   └── ... (inter, outfit)
+│   ├── index.html
+│   ├── input.css
+│   ├── logo-begles.png
+│   ├── logo-begles.webp
+│   ├── logo-blanc.svg
+│   ├── maire.png
+│   ├── maire.webp
+│   ├── merci.html
+│   ├── package-lock.json
+│   ├── package.json
+│   ├── style.css
+│   ├── tailwind.config.js
+│   └── verify-build.js
+├── go.mod
+├── go.sum
+├── lambdas
+│   ├── aggregator
+│   │   ├── aggregator_test.go
+│   │   ├── go.mod
+│   │   ├── go.sum
+│   │   └── main.go
+│   ├── brevo-subscriber
+│   │   └── handler.py
+│   ├── confirmer
+│   │   ├── go.mod
+│   │   ├── go.sum
+│   │   ├── handler.go
+│   │   ├── handler_test.go
+│   │   └── main.go
+│   ├── contact
+│   │   ├── go.mod
+│   │   ├── go.sum
+│   │   ├── handler.go
+│   │   ├── handler_test.go
+│   │   └── main.go
+│   ├── notifier
+│   │   ├── go.mod
+│   │   ├── go.sum
+│   │   ├── handler.go
+│   │   ├── handler_test.go
+│   │   └── main.go
+│   ├── orchestrator
+│   │   ├── go.mod
+│   │   ├── go.sum
+│   │   ├── main.go
+│   │   ├── main_test.go
+│   │   ├── scraper.go
+│   │   └── scraper_test.go
+│   ├── publisher
+│   │   ├── go.mod
+│   │   ├── go.sum
+│   │   ├── handler.go
+│   │   ├── handler_test.go
+│   │   └── main.go
+│   ├── shared
+│   │   ├── circuit.go
+│   │   ├── circuit_test.go
+│   │   ├── ddb.go
+│   │   ├── ddb_test.go
+│   │   ├── enum_match.go
+│   │   ├── enum_match_test.go
+│   │   ├── enums.go
+│   │   ├── gemini_retry.go
+│   │   ├── gemini_retry_test.go
+│   │   ├── go.mod
+│   │   ├── go.sum
+│   │   ├── log.go
+│   │   ├── newsletter.go
+│   │   ├── qc.go
+│   │   └── qc_test.go
+│   ├── subscriber
+│   │   ├── go.mod
+│   │   ├── go.sum
+│   │   ├── handler.go
+│   │   ├── handler_test.go
+│   │   └── main.go
+│   ├── validator
+│   │   ├── go.mod
+│   │   ├── go.sum
+│   │   ├── handler.go
+│   │   ├── handler_test.go
+│   │   └── main.go
+│   └── worker
+│       ├── corpus
+│       │   └── ...
+│       ├── gemini.go
+│       ├── gemini_test.go
+│       ├── handler.go
+│       ├── handler_test.go
+│       └── main.go
+├── restore_dynamo.py
+├── scripts
+│   ├── backfill_2026.go
+│   └── localtest
+│       ├── article.go
+│       ├── go.mod
+│       └── main.go
+├── technical_handover.md
+└── watchdog_qc_gateway_spec.md
+
+--------------------------------------------------------------------------------
+2. COMPOSANTS CLÉS & SIGNATURES DE FONCTIONS GO
+--------------------------------------------------------------------------------
+
+=========================================
+MODULE : lambdas/shared
+=========================================
+
+--- Fichier : lambdas/shared/enums.go ---
+var TopicTags []string
+var BudgetTypes []string
+var ClimateImpacts []string
+
+--- Fichier : lambdas/shared/ddb.go ---
+type DDBQueryAPI interface {
+	Query(ctx context.Context, in *dynamodb.QueryInput, opts ...func(*dynamodb.Options)) (*dynamodb.QueryOutput, error)
+}
+
+type DDBScanAPI interface {
+	Scan(ctx context.Context, in *dynamodb.ScanInput, opts ...func(*dynamodb.Options)) (*dynamodb.ScanOutput, error)
+}
+
+func PaginateQuery(ctx context.Context, api DDBQueryAPI, in *dynamodb.QueryInput) ([]map[string]types.AttributeValue, error)
+func PaginateScan(ctx context.Context, api DDBScanAPI, in *dynamodb.ScanInput) ([]map[string]types.AttributeValue, error)
+func PaginateScanCount(ctx context.Context, api DDBScanAPI, in *dynamodb.ScanInput) (int64, error)
+
+--- Fichier : lambdas/shared/circuit.go ---
+type CircuitAPI interface {
+	GetItem(ctx context.Context, in *dynamodb.GetItemInput, opts ...func(*dynamodb.Options)) (*dynamodb.GetItemOutput, error)
+	UpdateItem(ctx context.Context, in *dynamodb.UpdateItemInput, opts ...func(*dynamodb.Options)) (*dynamodb.UpdateItemOutput, error)
+}
+
+func GeminiCircuitOpen(ctx context.Context, api CircuitAPI, table string) (bool, error)
+func RecordGeminiError(ctx context.Context, api CircuitAPI, table string) error
+func RecordGeminiSuccess(ctx context.Context, api CircuitAPI, table string) error
+
+--- Fichier : lambdas/shared/gemini_retry.go ---
+type GeminiCall func(ctx context.Context) (*genai.GenerateContentResponse, error)
+func CallGeminiWithRetry(ctx context.Context, call GeminiCall, maxAttempts int) (*genai.GenerateContentResponse, error)
+
+--- Fichier : lambdas/shared/qc.go ---
+type Severity string
+const (
+	SeverityHigh Severity = "HIGH"
+	SeverityWarn Severity = "WARN"
+)
+
+type Violation struct {
+	Rule           string   `json:"rule"`
+	Severity       Severity `json:"severity"`
+	DeliberationID string   `json:"deliberation_id,omitempty"`
+	Field          string   `json:"field,omitempty"`
+	Detail         string   `json:"detail"`
+}
+
+type QcBudgetBreakdownItem struct {
+	TopicTag string `json:"topic_tag"`
+	Label    string `json:"label"`
+	Amount   int64  `json:"amount"`
+}
+
+type QcAnalysisData struct {
+	Contexte *string
+	Decision *string
+	Impacts  *string
+}
+
+type DeliberationView struct {
+	ID              string
+	Title           string
+	TopicTag        string
+	Summary         string
+	AnalysisData    QcAnalysisData
+	BudgetImpact    int64
+	BudgetType      string
+	BudgetBreakdown []QcBudgetBreakdownItem
+	ClimateImpact   string
+	HasVote         bool
+	VotePour        *int
+	VoteContre      *int
+	VoteAbstention  *int
+	Disagreements   *string
+	IsSubstantial   bool
+}
+
+type CouncilView struct {
+	CouncilID     string
+	TotalPdfs     int64
+	ProcessedPdfs int64
+	Date          string
+}
+
+type Baseline struct {
+	NeantRateMean float64
+	NeantRateStd  float64
+	BudgetMedian  int64
+	SampleSize    int
+}
+
+type QcConfig struct {
+	NeantRateCeiling      float64
+	NeantRateZMax         float64
+	MaxAbsoluteBudgetEUR  int64
+	MaxVoteTotal          int
+	BreakdownToleranceEUR int64
+	MinBaselineSample     int
+}
+
+type Verdict struct {
+	Status     string      `json:"status"` // "APPROVED" | "QUARANTINED"
+	Violations []Violation `json:"violations"`
+}
+
+func (v Verdict) HasHigh() bool
+func DefaultQcConfig() QcConfig
+func ValidateDeterministic(c CouncilView, delibs []DeliberationView) []Violation
+func ValidateStatistical(c CouncilView, delibs []DeliberationView, base Baseline, cfg QcConfig) []Violation
+func Decide(violations []Violation) Verdict
+func ComputeBaseline(neantRates []float64, budgets []int64) Baseline
+
+--- Fichier : lambdas/shared/newsletter.go ---
+type ColdDeliberation struct {
+	Title           string
+	TopicTag        string
+	BudgetImpact    int64
+	BudgetType      string
+	HasVote         bool
+	Pour            *int
+	Contre          *int
+	Abstention      *int
+	ClimateImpact   string
+	IsSubstantial   bool
+	HasDisagreement bool
+}
+
+type GeminiDeps struct {
+	APIKey string
+	Model  string
+}
+
+type NewsletterParams struct {
+	EmailSubject         string        `json:"email_subject"`
+	CouncilTitle         string        `json:"council_title"`
+	CouncilDate          string        `json:"council_date"`
+	MainIssue            string        `json:"main_issue"`
+	BudgetTotal          string        `json:"budget_total"`
+	HasGlobalBudget      bool          `json:"has_global_budget"`
+	VoteClimat           string        `json:"vote_climat"`
+	ClimatColor          string        `json:"climat_color"`
+	VoteStats            string        `json:"vote_stats"`
+	TotalDelibsInCouncil int           `json:"total_delibs_in_council"`
+	Tensions             []TensionItem `json:"tensions"`
+	Adopted              []AdoptedItem `json:"adopted"`
+	Briefs               []BriefItem   `json:"briefs"`
+	NextMeeting          string        `json:"next_meeting"`
+	WebsiteURL           string        `json:"website_url"`
+	TotalCouncils        int           `json:"total_councils"`
+	TotalDelibs          int           `json:"total_delibs"`
+}
+
+type TensionItem struct {
+	Title       string `json:"title"`
+	Context     string `json:"context"`
+	Impact      string `json:"impact"`
+	Budget      string `json:"budget"`
+	HasBudget   bool   `json:"has_budget"`
+	VoteDetails string `json:"vote_details"`
+}
+
+type AdoptedItem struct {
+	Tag       string `json:"tag"`
+	Title     string `json:"title"`
+	Context   string `json:"context"`
+	Impact    string `json:"impact"`
+	Budget    string `json:"budget"`
+	HasBudget bool   `json:"has_budget"`
+}
+
+type BriefItem struct {
+	Tag     string `json:"tag"`
+	Summary string `json:"summary"`
+}
+
+func GenerateNewsletterParams(ctx context.Context, deps GeminiDeps, councilTitle string, cold []ColdDeliberation, stats coldNewsletterStats, nextMeeting string, totalCouncils, totalDelibs int) (*NewsletterParams, error)
+func ParseNewsletterParams(raw string) (*NewsletterParams, error)
+
+=========================================
+MODULE : lambdas/orchestrator
+=========================================
+
+--- Fichier : lambdas/orchestrator/scraper.go ---
+type CouncilListing struct {
+	CouncilID string
+	Title     string
+	Date      string
+	URL       string
+}
+
+type PDFItem struct {
+	URL      string
+	Category string
+}
+
+type Scraper struct {
+	ListURL string
+}
+
+func NewScraper(listURL string) *Scraper
+func (sc *Scraper) ScrapeCouncilList(ctx context.Context) ([]CouncilListing, error)
+func (sc *Scraper) ScrapePDFLinks(ctx context.Context, councilURL string) ([]PDFItem, error)
+func (sc *Scraper) ScrapeNextCouncilDate(ctx context.Context, url string) (string, error)
+
+--- Fichier : lambdas/orchestrator/main.go ---
+type OrchestratorEvent struct {
+	CouncilID string `json:"council_id"`
+}
+
+type SQSMessage struct {
+	URL       string `json:"url"`
+	CouncilID string `json:"council_id"`
+}
+
+func main()
+
+=========================================
+MODULE : lambdas/worker
+=========================================
+
+--- Fichier : lambdas/worker/gemini.go ---
+type BudgetBreakdownItem struct {
+	TopicTag string  `json:"topic_tag"`
+	Label    string  `json:"label"`
+	Amount   int64   `json:"amount"`
+}
+
+type GeminiResult struct {
+	Title           string                `json:"title"`
+	TopicTag        string                `json:"topic_tag"`
+	Summary         string                `json:"summary"`
+	Contexte        string                `json:"contexte"`
+	Decision        string                `json:"decision"`
+	Impacts         string                `json:"impacts"`
+	BudgetImpact    int64                 `json:"budget_impact"`
+	BudgetType      string                `json:"budget_type"`
+	BudgetBreakdown []BudgetBreakdownItem `json:"budget_breakdown"`
+	ClimateImpact   string                `json:"climate_impact"`
+	KeyPoints       []string              `json:"key_points"`
+	HasVote         bool                  `json:"has_vote"`
+	VotePour        *int                  `json:"vote_pour"`
+	VoteContre      *int                  `json:"vote_contre"`
+	VoteAbstention  *int                  `json:"vote_abstention"`
+	Disagreements   *string               `json:"disagreements"`
+	IsSubstantial   bool                  `json:"is_substantial"`
+}
+
+func analyzeWithGemini(ctx context.Context, apiKey string, pdfBytes []byte) (*GeminiResult, error)
+
+--- Fichier : lambdas/worker/handler.go ---
+type SQSPayload struct {
+	URL       string `json:"url"`
+	CouncilID string `json:"council_id"`
+}
+
+type WorkerHandler struct {
+	DDB           DynamoDBAPI
+	LambdaClient  LambdaAPI
+	GeminiAPIKey  string
+	GeminiModel   string
+	ValidatorName string
+}
+
+func (h *WorkerHandler) HandleRequest(ctx context.Context, event events.SQSEvent) (events.SQSEventResponse, error)
+
+=========================================
+MODULE : lambdas/validator
+=========================================
+
+--- Fichier : lambdas/validator/handler.go ---
+type ValidatorEvent struct {
+	CouncilID string `json:"council_id"`
+}
+
+type ValidatorHandler struct {
+	DDB             ddbAPI
+	SQS             sqsAPI
+	LambdaClient    lambdaAPI
+	GeminiAPIKey    string
+	GeminiModel     string
+	PublisherName   string
+	NotifierName    string
+	PdfQueueURL     string
+	SelfHeal        bool
+	MaxAttempts     int
+	QcConfig        shared.QcConfig
+}
+
+func (h *ValidatorHandler) HandleRequest(ctx context.Context, event ValidatorEvent) error
+
+=========================================
+MODULE : lambdas/aggregator
+=========================================
+
+--- Fichier : lambdas/aggregator/main.go ---
+type Deliberation struct {
+	ID             string                  `dynamodbav:"id"`
+	CouncilID      string                  `dynamodbav:"council_id"`
+	TopicTag       string                  `dynamodbav:"topic_tag"`
+	BudgetImpact   int64                   `dynamodbav:"budget_impact"`
+	BudgetType     string                  `dynamodbav:"budget_type"`
+	ClimateImpact  string                  `dynamodbav:"climate_impact"`
+	HasVote        bool                    `dynamodbav:"has_vote"`
+	VotePour       *int                    `dynamodbav:"vote_pour"`
+	VoteContre     *int                    `dynamodbav:"vote_contre"`
+	VoteAbstention *int                    `dynamodbav:"vote_abstention"`
+}
+
+type councilStats struct {
+	dominantTheme        string
+	totalBudget          int64
+	totalPour            int
+	totalContre          int
+	totalAbstention      int
+	delibsWithOpposition int
+	budgetFmt            string
+	voteStats            string
+	voteClimat           string
+	climatColor          string
+}
+
+=========================================
+MODULE : lambdas/publisher
+=========================================
+
+--- Fichier : lambdas/publisher/handler.go ---
+type PublisherEvent struct {
+	CouncilID string `json:"council_id"`
+}
+
+func HandleRequest(ctx context.Context, event PublisherEvent) error
+
+=========================================
+MODULE : lambdas/notifier
+=========================================
+
+--- Fichier : lambdas/notifier/handler.go ---
+type NotifierEvent struct {
+	CouncilID        string                   `json:"council_id"`
+	NewsletterParams *shared.NewsletterParams `json:"newsletter_params,omitempty"`
+}
+
+func HandleRequest(ctx context.Context, event NotifierEvent) error

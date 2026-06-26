@@ -39,6 +39,7 @@ type NotifierEvent struct {
 	CouncilID        string                  `json:"council_id"`
 	TestListID       *int                    `json:"test_list_id"`
 	NewsletterParams *shared.NewsletterParams `json:"newsletter_params,omitempty"`
+	ScheduledAt      *string                 `json:"scheduled_at,omitempty"`
 }
 
 // ── DynamoDB records (minimal projection) ────────────────────────────────────
@@ -175,7 +176,7 @@ func (d *notifierDeps) handle(ctx context.Context, event NotifierEvent) error {
 		}
 	}
 
-	if err := d.sendCampaign(ctx, params, event.CouncilID, council.Date); err != nil {
+	if err := d.sendCampaign(ctx, params, event.CouncilID, council.Date, event.ScheduledAt); err != nil {
 		if event.TestListID == nil {
 			if relErr := d.releasePending(ctx, event.CouncilID); relErr != nil {
 				log.Printf("warn: failed to release pending claim for %s: %v", event.CouncilID, relErr)
@@ -412,7 +413,7 @@ func parseNewsletterParams(raw string) (*NewsletterParams, error) {
 
 // ── Brevo campaign ────────────────────────────────────────────────────────────
 
-func (d *notifierDeps) sendCampaign(ctx context.Context, params *NewsletterParams, councilID, councilDate string) error {
+func (d *notifierDeps) sendCampaign(ctx context.Context, params *NewsletterParams, councilID, councilDate string, scheduledAt *string) error {
 	// A deterministic name keyed on (councilID, councilDate) lets us recognise a
 	// campaign a previous — possibly transparently retried — invocation already
 	// created, so a client-side HTTP retry can never create a second campaign.
@@ -426,7 +427,7 @@ func (d *notifierDeps) sendCampaign(ctx context.Context, params *NewsletterParam
 
 	var campaignID int
 	switch {
-	case existingID != 0 && (status == "sent" || status == "queued" || status == "in_process"):
+	case existingID != 0 && (status == "sent" || status == "queued" || status == "in_process" || status == "scheduled"):
 		log.Printf("Brevo campaign %d (%q) already %s — skipping send", existingID, name, status)
 		return nil
 	case existingID != 0:
@@ -434,10 +435,15 @@ func (d *notifierDeps) sendCampaign(ctx context.Context, params *NewsletterParam
 		log.Printf("reusing existing Brevo campaign %d (%q, status %q)", existingID, name, status)
 		campaignID = existingID
 	default:
-		campaignID, err = d.createCampaign(ctx, params, name, idemKey)
+		campaignID, err = d.createCampaign(ctx, params, name, idemKey, scheduledAt)
 		if err != nil {
 			return fmt.Errorf("create campaign: %w", err)
 		}
+	}
+
+	if scheduledAt != nil {
+		log.Printf("Brevo campaign %d scheduled for %s — skipping immediate sendNow", campaignID, *scheduledAt)
+		return nil
 	}
 
 	if err := d.triggerSend(ctx, campaignID, idemKey); err != nil {
@@ -498,7 +504,7 @@ func (d *notifierDeps) lookupCampaign(ctx context.Context, name string) (int, st
 	return 0, "", nil
 }
 
-func (d *notifierDeps) createCampaign(ctx context.Context, params *NewsletterParams, name, idemKey string) (int, error) {
+func (d *notifierDeps) createCampaign(ctx context.Context, params *NewsletterParams, name, idemKey string, scheduledAt *string) (int, error) {
 	// Convert params struct → map[string]interface{} for the Brevo params field
 	paramsJSON, err := json.Marshal(params)
 	if err != nil {
@@ -509,7 +515,7 @@ func (d *notifierDeps) createCampaign(ctx context.Context, params *NewsletterPar
 		return 0, fmt.Errorf("unmarshal newsletter params to map: %w", err)
 	}
 
-	payload, err := json.Marshal(map[string]interface{}{
+	campaignData := map[string]interface{}{
 		"name":       name,
 		"subject":    params.EmailSubject,
 		"templateId": d.brevoTemplateID,
@@ -521,7 +527,12 @@ func (d *notifierDeps) createCampaign(ctx context.Context, params *NewsletterPar
 			"listIds": []int{d.brevoListID},
 		},
 		"params": paramsMap,
-	})
+	}
+	if scheduledAt != nil {
+		campaignData["scheduledAt"] = *scheduledAt
+	}
+
+	payload, err := json.Marshal(campaignData)
 	if err != nil {
 		return 0, err
 	}

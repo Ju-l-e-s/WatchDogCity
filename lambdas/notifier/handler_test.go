@@ -370,7 +370,7 @@ func TestSendCampaign_SkipsWhenAlreadySent(t *testing.T) {
 	}}
 	d := &notifierDeps{httpClient: h, brevoKey: "k"}
 
-	if err := d.sendCampaign(context.Background(), &NewsletterParams{}, councilID, councilDate); err != nil {
+	if err := d.sendCampaign(context.Background(), &NewsletterParams{}, councilID, councilDate, nil); err != nil {
 		t.Fatalf("sendCampaign: %v", err)
 	}
 	if n := h.count(isCreatePOST); n != 0 {
@@ -400,7 +400,7 @@ func TestSendCampaign_ReusesDraft(t *testing.T) {
 	}}
 	d := &notifierDeps{httpClient: h, brevoKey: "k"}
 
-	if err := d.sendCampaign(context.Background(), &NewsletterParams{}, councilID, councilDate); err != nil {
+	if err := d.sendCampaign(context.Background(), &NewsletterParams{}, councilID, councilDate, nil); err != nil {
 		t.Fatalf("sendCampaign: %v", err)
 	}
 	if n := h.count(isCreatePOST); n != 0 {

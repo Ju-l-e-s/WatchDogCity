@@ -320,9 +320,9 @@ func buildDeterministicSummary(stats councilStats) string {
 	case 0:
 		summary = "Séance sans impact budgétaire significatif."
 	case 1:
-		summary = fmt.Sprintf("La séance a concentré le budget sur le domaine %s (%d €).", top[0].tag, top[0].budget)
+		summary = fmt.Sprintf("La séance a concentré le budget sur la thématique %s (%d €).", top[0].tag, top[0].budget)
 	default:
-		summary = fmt.Sprintf("La séance a concentré le budget sur %s (%d €) et %s (%d €).",
+		summary = fmt.Sprintf("La séance a concentré le budget sur les thématiques %s (%d €) et %s (%d €).",
 			top[0].tag, top[0].budget, top[1].tag, top[1].budget)
 	}
 

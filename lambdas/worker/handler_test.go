@@ -102,25 +102,6 @@ func TestHandleRecord_IdempotentDuplicate(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestHandleRecord_LastPDFDetection(t *testing.T) {
-	mockL := &mockLambda{}
-	h := &WorkerHandler{
-		ddb: &mockDDB{
-			// Post-transaction GetItem reports the council as complete.
-			getItemOut: &dynamodb.GetItemOutput{
-				Item: map[string]types.AttributeValue{
-					"processed_pdfs": &types.AttributeValueMemberN{Value: "5"},
-					"total_pdfs":     &types.AttributeValueMemberN{Value: "5"},
-				},
-			},
-		},
-		lambda: mockL,
-	}
-	msg := SQSPayload{CouncilID: "conseil_municipal#2026-03-28", PDFURL: "https://example.com/D05.pdf", PDFTitle: "D05", TotalPDFs: 5}
-	err := h.handleRecord(context.Background(), msg, &GeminiResult{Title: "t", Summary: "s"})
-	require.NoError(t, err)
-	assert.NotNil(t, mockL.invokeInput)
-}
 
 func TestDeliberationID(t *testing.T) {
 	tests := []struct {
@@ -330,9 +311,8 @@ func (l *countingLambda) Invoke(_ context.Context, p *awslambda.InvokeInput, _ .
 	return &awslambda.InvokeOutput{}, nil
 }
 
-// Several workers crossing the completion boundary together must invoke the
-// Validator exactly once, thanks to the capped counter and the qc_status gate.
-func TestHandleRecord_SinglePublisherInvokeAtBoundary(t *testing.T) {
+// Several workers crossing the completion boundary together must increment the counter exactly once per PDF.
+func TestHandleRecord_ConcurrentCountingAtBoundary(t *testing.T) {
 	m := newConcurrentMock(3)
 	cl := &countingLambda{}
 	h := &WorkerHandler{ddb: m, lambda: cl}
@@ -356,11 +336,10 @@ func TestHandleRecord_SinglePublisherInvokeAtBoundary(t *testing.T) {
 
 	m.mu.Lock()
 	assert.Equal(t, 3, m.processed, "every distinct pdf must be counted once")
-	assert.True(t, m.published, "completion must be claimed once")
 	m.mu.Unlock()
 
 	cl.mu.Lock()
-	assert.Equal(t, 1, cl.count, "publisher must be invoked exactly once")
+	assert.Equal(t, 0, cl.count, "validator must not be invoked by the worker")
 	cl.mu.Unlock()
 }
 

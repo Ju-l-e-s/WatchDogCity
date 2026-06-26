@@ -23,7 +23,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	ddbtypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	awslambda "github.com/aws/aws-sdk-go-v2/service/lambda"
-	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 	"github.com/watchdog/shared"
 )
 
@@ -248,63 +247,12 @@ func (h *WorkerHandler) handleRecord(ctx context.Context, msg SQSPayload, result
 			return nil
 		}
 
-		// 3. Complete? The transaction returns no attributes, so re-read the
-		//    council, then claim the publish slot so a single worker fans out to
-		//    the Publisher even when several cross the boundary together.
-		cur, gerr := h.ddb.GetItem(ctx, &dynamodb.GetItemInput{
-			TableName: aws.String(os.Getenv("COUNCILS_TABLE")),
-			Key: map[string]types.AttributeValue{
-				"council_id": &types.AttributeValueMemberS{Value: msg.CouncilID},
-			},
-		})
-		if gerr != nil {
-			return fmt.Errorf("read council %s after counting: %w", msg.CouncilID, gerr)
-		}
-		processed := attrInt(cur.Item, "processed_pdfs")
-		total := attrInt(cur.Item, "total_pdfs")
-		if processed >= total && total > 0 {
-			// Gate: only one worker fans out to the Validator.
-			// qc_status starts absent; SET succeeds exactly once.
-			_, perr := h.ddb.UpdateItem(ctx, &dynamodb.UpdateItemInput{
-				TableName: aws.String(os.Getenv("COUNCILS_TABLE")),
-				Key: map[string]types.AttributeValue{
-					"council_id": &types.AttributeValueMemberS{Value: msg.CouncilID},
-				},
-				UpdateExpression:    aws.String("SET qc_status = :pending"),
-				ConditionExpression: aws.String("attribute_not_exists(qc_status)"),
-				ExpressionAttributeValues: map[string]types.AttributeValue{
-					":pending": &types.AttributeValueMemberS{Value: "PENDING"},
-				},
-			})
-			if perr != nil {
-				var ccfe *ddbtypes.ConditionalCheckFailedException
-				if !errors.As(perr, &ccfe) {
-					return fmt.Errorf("set qc_status=PENDING for %s: %w", msg.CouncilID, perr)
-				}
-				log.Printf("council %s qc_status already set, skipping validator", msg.CouncilID)
-			} else {
-				log.Printf("council %s complete (%d/%d), invoking validator", msg.CouncilID, processed, total)
-				h.invokeValidator(ctx, msg.CouncilID)
-			}
-		}
 	}
 
 	// Metrics
 	log.Printf("METRIC: GeminiUsage input=%d output=%d", result.InputTokens, result.OutputTokens)
 
 	return nil
-}
-
-func (h *WorkerHandler) invokeValidator(ctx context.Context, councilID string) {
-	payload, _ := json.Marshal(map[string]string{"council_id": councilID})
-	_, err := h.lambda.Invoke(ctx, &awslambda.InvokeInput{
-		FunctionName:   aws.String(os.Getenv("VALIDATOR_FUNCTION_NAME")),
-		InvocationType: lambdatypes.InvocationTypeEvent,
-		Payload:        payload,
-	})
-	if err != nil {
-		log.Printf("error invoking validator: %v", err)
-	}
 }
 
 func downloadPDF(ctx context.Context, url string) ([]byte, error) {

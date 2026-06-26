@@ -163,37 +163,21 @@ func runSynthesis(ctx context.Context, ddb *dynamodb.Client, lambdaClient *lambd
 		Key: map[string]types.AttributeValue{
 			"council_id": &types.AttributeValueMemberS{Value: councilID},
 		},
-		UpdateExpression: aws.String("SET analysis = :a, updated_at = :u"),
-		ExpressionAttributeValues: map[string]types.AttributeValue{
-			":a": &types.AttributeValueMemberM{Value: analysisMap},
-			":u": &types.AttributeValueMemberS{Value: time.Now().UTC().Format(time.RFC3339)},
-		},
-	})
-	if err != nil {
-		return err
-	}
-
-	// 5. Route through QC gateway: set qc_status=PENDING (idempotent gate) and
-	//    invoke Validator. Validator runs the deterministic gate; on APPROVED it
-	//    invokes Publisher (website JSON) and Notifier (newsletter).
-	_, qerr := ddb.UpdateItem(ctx, &dynamodb.UpdateItemInput{
-		TableName: aws.String(os.Getenv("COUNCILS_TABLE")),
-		Key: map[string]types.AttributeValue{
-			"council_id": &types.AttributeValueMemberS{Value: councilID},
-		},
-		UpdateExpression:    aws.String("SET qc_status = :pending"),
+		UpdateExpression:    aws.String("SET analysis = :a, updated_at = :u, qc_status = :pending"),
 		ConditionExpression: aws.String("attribute_not_exists(qc_status)"),
 		ExpressionAttributeValues: map[string]types.AttributeValue{
+			":a":       &types.AttributeValueMemberM{Value: analysisMap},
+			":u":       &types.AttributeValueMemberS{Value: time.Now().UTC().Format(time.RFC3339)},
 			":pending": &types.AttributeValueMemberS{Value: "PENDING"},
 		},
 	})
-	if qerr != nil {
+	if err != nil {
 		var ccfe *types.ConditionalCheckFailedException
-		if !errors.As(qerr, &ccfe) {
-			return fmt.Errorf("set qc_status=PENDING for %s: %w", councilID, qerr)
+		if errors.As(err, &ccfe) {
+			log.Printf("council %s qc_status already set (or completed), skipping validator", councilID)
+			return nil
 		}
-		log.Printf("council %s qc_status already set, skipping validator", councilID)
-		return nil
+		return fmt.Errorf("update analysis and set qc_status=PENDING for %s: %w", councilID, err)
 	}
 
 	payload, err := buildValidatorPayload(councilID)

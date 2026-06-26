@@ -342,6 +342,16 @@ func (d *notifierDeps) fetchGlobalStats(ctx context.Context) (councils int, deli
 func toColdDelibs(delibs []deliberationRec) []shared.ColdDeliberation {
 	cold := make([]shared.ColdDeliberation, len(delibs))
 	for i, d := range delibs {
+		contre := 0
+		if d.VoteContre != nil {
+			contre = *d.VoteContre
+		}
+		abst := 0
+		if d.VoteAbst != nil {
+			abst = *d.VoteAbst
+		}
+		hasDisagreement := contre > 0 || abst > 0
+
 		cold[i] = shared.ColdDeliberation{
 			Title:           d.Title,
 			TopicTag:        d.TopicTag,
@@ -352,8 +362,8 @@ func toColdDelibs(delibs []deliberationRec) []shared.ColdDeliberation {
 			Contre:          d.VoteContre,
 			Abstention:      d.VoteAbst,
 			ClimateImpact:   d.ClimateImpact,
-			IsSubstantial:   d.IsSubstantial,
-			HasDisagreement: d.Disagreements != nil && *d.Disagreements != "",
+			IsSubstantial:   d.IsSubstantial || d.BudgetImpact >= 5000,
+			HasDisagreement: hasDisagreement,
 		}
 	}
 	return cold

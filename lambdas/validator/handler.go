@@ -585,6 +585,16 @@ func toDeliberationViews(recs []deliberationRec) []shared.DeliberationView {
 func toColdDelibs(delibs []shared.DeliberationView) []shared.ColdDeliberation {
 	cold := make([]shared.ColdDeliberation, len(delibs))
 	for i, d := range delibs {
+		contre := 0
+		if d.VoteContre != nil {
+			contre = *d.VoteContre
+		}
+		abst := 0
+		if d.VoteAbstention != nil {
+			abst = *d.VoteAbstention
+		}
+		hasDisagreement := contre > 0 || abst > 0
+
 		cold[i] = shared.ColdDeliberation{
 			Title:           d.Title,
 			TopicTag:        d.TopicTag,
@@ -595,8 +605,8 @@ func toColdDelibs(delibs []shared.DeliberationView) []shared.ColdDeliberation {
 			Contre:          d.VoteContre,
 			Abstention:      d.VoteAbstention,
 			ClimateImpact:   d.ClimateImpact,
-			IsSubstantial:   d.IsSubstantial,
-			HasDisagreement: d.Disagreements != nil && *d.Disagreements != "",
+			IsSubstantial:   d.IsSubstantial || d.BudgetImpact >= 5000,
+			HasDisagreement: hasDisagreement,
 		}
 	}
 	return cold

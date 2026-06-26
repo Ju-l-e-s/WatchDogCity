@@ -44,9 +44,10 @@ RÈGLES IMPÉRATIVES DE TRAITEMENT :
    - Champ OBLIGATOIRE et non vide : indique ce qui a été décidé ou voté, en une phrase factuelle et simple.
 
 4. IMPACTS CITOYENS ("impacts") :
-   - Décris les conséquences DIRECTES, matérielles ou financières pour les Béglaises et Béglais.
-   - "impacts" n'est JAMAIS null ni vide. Soit il décrit un impact citoyen concret, soit il vaut EXACTEMENT la chaîne "Néant". Aucune autre valeur (pas de "null", "N/A", "-", chaîne vide).
-   - RÈGLE STRICTE : Si la délibération est de nature purement administrative, interne (élections de représentants, création de commissions, frais de mission des élus) ou sans impact tangible sur le quotidien citoyen, la valeur DOIT ÊTRE STRICTEMENT "Néant". N'invente JAMAIS d'impacts indirects, philosophiques ou théoriques.
+   - Décris uniquement les changements physiques ou factuels concrets (factual changes) au moyen de verbes d'action concrets (ex: "Remplacement de 4 700 ampoules", "Ouverture de 10 postes").
+   - Bannis absolument toutes les notions politiques, subjectives, marketing ou promotionnelles (ex: "sécurité accrue", "bien-être", "transition écologique", "confort des usagers").
+   - "impacts" n'est JAMAIS null ni vide. Soit il décrit un impact physique concret, soit il vaut EXACTEMENT la chaîne "Néant". Aucune autre valeur (pas de "null", "N/A", "-", chaîne vide).
+   - RÈGLE STRICTE : Si la délibération est de nature purement administrative, interne (élections de représentants, création de commissions, frais de mission des élus) ou sans impact matériel tangible direct sur le quotidien citoyen, la valeur DOIT ÊTRE STRICTEMENT "Néant". N'invente JAMAIS d'impacts indirects, théoriques ou idéologiques.
 
 5. VULGARISATION ET PÉDAGOGIE CITOYENNE :
    - INTERDICTION ABSOLUE DU JARGON COMPTABLE ET LÉGAL :
@@ -67,7 +68,7 @@ Règles supplémentaires :
 - Le champ "budget_breakdown" est un tableau de ventilation détaillée. Laisse vide [] sauf si c'est un VOTE DU BUDGET ou des subventions à de multiples associations.
   Si renseigné : la SOMME EXACTE des "amount" DOIT être rigoureusement égale à "budget_impact" (tolérance 0).
   Pour "topic_tag" dans budget_breakdown, utilise UNIQUEMENT une de ces valeurs exactes : Administration, Sport, Budget, Sécurité, Environnement, Mobilité, Social, Culture, Urbanisme, Éducation.
-- "is_substantial" vaut "true" pour un budget, une DSP ou un projet structurant.
+- "is_substantial" vaut "true" pour un budget, une DSP, un projet structurant, ou une décision réglementaire / motion à forte portée symbolique ou écologique globale (ex: motions d'opposition aux vols de nuit, chartes environnementales, etc.), même si son budget est de 0 €.
 - Si pas de vote, "has_vote" = false et compteurs à null.
 - Si "has_vote" = true, au moins un des compteurs (pour/contre/abstention) doit être un entier ≥ 0. Total plausible ≤ 40.
 - Ne génère aucun texte en dehors du JSON.`

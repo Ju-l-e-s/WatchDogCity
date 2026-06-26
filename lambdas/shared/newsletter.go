@@ -331,7 +331,7 @@ func buildColdNewsletterPrompt(
     {
       "title": "Reformulation neutre et factuelle du titre fourni ; pas d'accroche, pas d'adjectif évaluatif",
       "context": "Neutre en 2 à 3 phrases maximum. Déduis UNIQUEMENT du titre, du montant, du type et des votes. Si insuffisant, laisse vide.",
-      "impact": "Neutre en 2 à 3 phrases maximum. Conséquence concrète pour le citoyen. Si insuffisant, laisse vide.",
+      "impact": "Changements factuels physiques (factual_changes) en 2 à 3 phrases maximum. Utilise uniquement des verbes d'action concrets (ex: 'Remplacement de 4 700 ampoules', 'Ouverture de 10 postes'). Bannis toute notion subjective ou concept abstrait (ex: 'bien-être', 'sécurité', 'transition écologique', 'confort'). Si insuffisant, laisse vide.",
       "budget": "X € (LAISSER VIDE '' SI IMPACT NUL)",
       "has_budget": true,
       "vote_details": "Y votes contre"
@@ -342,7 +342,7 @@ func buildColdNewsletterPrompt(
       "tag": "Administration, Sport, Budget, Sécurité, Environnement, Mobilité, Social, Culture, Urbanisme ou Éducation",
       "title": "Titre vulgarisé",
       "context": "2 à 3 phrases maximum. Explication factuelle du besoin. Déduis UNIQUEMENT des faits structurés.",
-      "impact": "2 à 3 phrases maximum. Conséquence directe sur le quotidien. Si insuffisant, laisse vide.",
+      "impact": "Changements factuels physiques (factual_changes) en 2 à 3 phrases maximum. Utilise uniquement des verbes d'action concrets (ex: 'Remplacement de 4 700 ampoules', 'Ouverture de 10 postes'). Bannis toute notion subjective ou concept abstrait (ex: 'bien-être', 'sécurité', 'transition écologique', 'confort'). Si insuffisant, laisse vide.",
       "budget": "X € (LAISSER VIDE '' SI IMPACT NUL)",
       "has_budget": true
     }
@@ -368,6 +368,7 @@ func buildColdNewsletterPrompt(
 	sb.WriteString("- STYLE JOURNALISTIQUE PÉDAGOGIQUE : Traduis les termes administratifs complexes en langage clair. Par exemple, au lieu de parler de budget supplémentaire ou d'ajustements de crédits, explique : 'Le conseil ajuste les comptes en cours d'année pour réallouer l'argent là où les besoins sont les plus urgents.' Évite les répétitions vides ou tautologiques (ne pas écrire 'le budget est concentré sur le budget').\n")
 	sb.WriteString("- HUMANISATION DES CHIFFRES : Dans les champs textuels ('context', 'impact', 'summary'), arrondis systématiquement les grands chiffres pour faciliter la lecture (ex: écris 'environ 7 millions d'euros' au lieu de '7 034 925,77 €'). Les montants exacts ne doivent figurer que dans le champ numérique 'budget'.\n")
 	sb.WriteString("- RECADRAGE DES TENSIONS : Ne classe dans 'tensions' que les délibérations ayant fait l'objet d'une réelle contestation ou division politique (votes contre ou débat contradictoire). N'y inclus jamais des procédures administratives obligatoires (ex: le fait légal que le maire quitte la salle lors du vote de son propre bilan financier n'est pas une controverse, c'est une règle de procédure standard, indique alors 'Aucun désaccord, procédure standard.').\n")
+	sb.WriteString("- NEUTRALITÉ ET CHANGEMENTS PHYSIQUES FACTUELS (FACTUAL CHANGES) : Pour le champ 'impact', décris exclusivement des changements factuels et physiques concrets au moyen de verbes d'action concrets (ex: 'Remplacement de 4 700 ampoules', 'Ouverture de 10 postes'). Bannis absolument toutes les notions abstraites, subjectives ou politiques (comme 'le bien-être', 'la sécurité', 'le confort', 'la transition', 'le dynamisme'). Si aucun changement physique direct n'est déductible, laisse le champ vide.\n")
 	sb.WriteString("- PÉDAGOGIE ET NEUTRALITÉ : Agis en traducteur neutre. Bannis le jargon juridique et administratif. N'utilise aucune formulation partisane.\n")
 	sb.WriteString("- ANCRAGE STRICT : N'ajoute AUCUNE information qui n'est pas présente dans les données structurées d'entrée. Zéro fait géographique, historique ou éditorial externe.\n")
 	sb.WriteString("- INTERDICTION FORMELLE : N'ajoute JAMAIS de liens HTML ou de texte 'En savoir plus' dans les champs context ou impact.\n")
@@ -404,7 +405,7 @@ func buildColdNewsletterPrompt(
 			tensions = append(tensions, d)
 			continue
 		}
-		if d.BudgetImpact >= 5000 {
+		if d.IsSubstantial || d.BudgetImpact >= 5000 {
 			major = append(major, d)
 			continue
 		}

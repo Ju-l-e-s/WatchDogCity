@@ -155,6 +155,7 @@ class WatchdogStack(Stack):
             handler="bootstrap",
             code=lambda_.Code.from_asset("../dist/worker.zip"),
             timeout=Duration.minutes(5),
+            memory_size=512,
             log_retention=logs.RetentionDays.TWO_WEEKS,
             environment={
                 **common_env,

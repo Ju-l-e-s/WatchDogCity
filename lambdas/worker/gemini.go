@@ -17,14 +17,13 @@ import (
 // occasionally emits floats (e.g. 2028913.40) instead of integers.
 var budgetAmountFloatRe = regexp.MustCompile(`("(?:budget_impact|amount)"\s*:\s*)(\d+)\.\d+`)
 
-// Enum aliases — single source of truth lives in shared package.
 var (
 	validTopicTags      = shared.TopicTags
 	validBudgetTypes    = shared.BudgetTypes
 	validClimateImpacts = shared.ClimateImpacts
 )
 
-const deliberationPrompt = `Tu es un analyste juridique et financier chargé de décrypter les délibérations de la ville de Bègles.
+const deliberationPrompt = `Tu es un vulgarisateur neutre et un traducteur factuel pour L'Observatoire de Bègles, chargé de décrypter les délibérations de la ville.
 Extrais les informations du PDF fourni au format JSON strict imposé par le schéma de réponse.
 
 RÈGLES IMPÉRATIVES DE TRAITEMENT :
@@ -38,30 +37,39 @@ RÈGLES IMPÉRATIVES DE TRAITEMENT :
      * "AUCUN" : si et seulement si budget_impact = 0. Tout montant non nul (même faible) DOIT porter le type DÉPENSE, RECETTE ou CAUTION. Réciproquement, budget_impact = 0 impose budget_type = "AUCUN".
 
 2. TITRE ("title") :
-   - Titre factuel, neutre et descriptif de l'objet de la délibération. Aucun adjectif évaluatif, aucune accroche éditoriale.
+   - Titre vulgarisé, factuel, neutre et descriptif de l'objet de la délibération. Rédige un titre simple pour un non-initié, évite le jargon technocratique.
    - Ce titre est la SEULE phrase reprise telle quelle par la newsletter publique : il doit pouvoir être publié sans relecture.
 
 3. DÉCISION ("decision") :
-   - Champ OBLIGATOIRE et non vide : indique ce qui a été décidé ou voté, en une phrase factuelle.
+   - Champ OBLIGATOIRE et non vide : indique ce qui a été décidé ou voté, en une phrase factuelle et simple.
 
 4. IMPACTS CITOYENS ("impacts") :
    - Décris les conséquences DIRECTES, matérielles ou financières pour les Béglaises et Béglais.
    - "impacts" n'est JAMAIS null ni vide. Soit il décrit un impact citoyen concret, soit il vaut EXACTEMENT la chaîne "Néant". Aucune autre valeur (pas de "null", "N/A", "-", chaîne vide).
    - RÈGLE STRICTE : Si la délibération est de nature purement administrative, interne (élections de représentants, création de commissions, frais de mission des élus) ou sans impact tangible sur le quotidien citoyen, la valeur DOIT ÊTRE STRICTEMENT "Néant". N'invente JAMAIS d'impacts indirects, philosophiques ou théoriques.
 
-5. NEUTRALITÉ ET PÉDAGOGIE :
-   - AUCUN JARGON : Bannis le vocabulaire administratif, technocratique ou juridique brut. Si un terme complexe est indispensable (ex: "ZAC", "DSP"), tu DOIS le définir immédiatement en termes simples.
-   - OBJECTIVITÉ : Reste factuel. Ne porte aucun jugement de valeur (évite "excellent", "coûteux", "ambitieux").
-   - ANCRAGE (GROUNDING) : N'ajoute AUCUNE information qui n'est pas présente dans le document PDF. Ne fais aucun compliment, n'ajoute aucun fait historique, géographique ou classement (ex: "plus grand club") non mentionné explicitement dans le texte.
-   - CLIMAT : "climate_impact" est "positif" uniquement pour des mesures environnementales directes (énergie renouvelable, espaces verts), "negatif" pour des énergies fossiles, sinon "neutre".
+5. VULGARISATION ET PÉDAGOGIE CITOYENNE :
+   - INTERDICTION ABSOLUE DU JARGON COMPTABLE ET LÉGAL :
+     * Ne mentionne jamais de codes d'imputation budgétaire (ex: pas de "Chapitre 65", "nature 657363", "article 65748").
+     * Ne cite jamais d'articles de loi ou de codes juridiques bruts (ex: bannir "article L.2241-1 du CGCT", "décret n°..."). Écris plutôt : "Conformément à la loi..." ou "Selon la réglementation...".
+     * Vulgarise systématiquement tous les acronymes ou termes techniques entre parenthèses lors de leur première apparition (ex: écrire "CFU (le bilan financier de l'année passée)", "CCAS (l'organisme d'action sociale de la ville)", "AP/CP (la programmation pluriannuelle des investissements)", "TPE (la taxe sur la publicité extérieure)", "ZAC (zone d'aménagement concerté)", "DSP (délégation de service public)").
+   - STYLE JOURNALISTIQUE PÉDAGOGIQUE :
+     * Traduis les termes administratifs en langage clair (ex: au lieu d'écrire "décision budgétaire modificative" ou "budget supplémentaire", explique : "Le conseil ajuste les comptes en cours d'année pour réallouer l'argent là où les besoins sont les plus urgents.").
+     * Évite les répétitions et les formules vides de sens (ne pas écrire "le budget est concentré sur le budget").
+     * Dans les champs textuels ("summary", "impacts", etc.), arrondis systématiquement les grands chiffres pour faciliter la lecture (ex: écris "environ 7 millions d'euros" au lieu de "7 034 925,77 euros" ou "7034925"). Remarque : le montant exact en centimes ne doit figurer que dans le champ numérique "budget_impact" du JSON.
+     * Reste neutre et objectif. Aucun jugement de valeur (bannis "excellent", "ambitieux", "très coûteux").
+
+6. RECADRAGE DE LA SECTION DÉSACCORDS / CONTROVERSES ("disagreements") :
+   - Fais la différence entre une règle de procédure administrative obligatoire (ex: "Le maire a dû quitter la salle car il ne peut pas voter sur son propre bilan financier") et un véritable débat politique ou vote d'opposition.
+   - Ne décris sous "disagreements" que les véritables tensions politiques, les débats de fond, ou les votes d'opposition (ex: voix contre). Si le vote s'est déroulé de façon standard sans opposition, écris : "Aucun désaccord, procédure standard."
 
 Règles supplémentaires :
 - Le champ "budget_breakdown" est un tableau de ventilation détaillée. Laisse vide [] sauf si c'est un VOTE DU BUDGET ou des subventions à de multiples associations.
-  Si renseigné : la SOMME EXACTE des "amount" DOIT être rigoureusement égale à "budget_impact" (tolérance 0). Additionne mentalement tous les montants et corrige jusqu'à l'égalité parfaite avant de produire le JSON. Si tu ne peux pas ventiler la totalité, laisse "budget_breakdown" = [] plutôt que de produire une ventilation partielle.
+  Si renseigné : la SOMME EXACTE des "amount" DOIT être rigoureusement égale à "budget_impact" (tolérance 0).
   Pour "topic_tag" dans budget_breakdown, utilise UNIQUEMENT une de ces valeurs exactes : Administration, Sport, Budget, Sécurité, Environnement, Mobilité, Social, Culture, Urbanisme, Éducation.
 - "is_substantial" vaut "true" pour un budget, une DSP ou un projet structurant.
 - Si pas de vote, "has_vote" = false et compteurs à null.
-- Si "has_vote" = true, au moins un des compteurs (pour/contre/abstention) doit être un entier ≥ 0 ; ne les laisse pas tous à null. Les compteurs correspondent aux conseillers municipaux élus (environ 35) ; jamais au public, à la population ou à un quorum. Total plausible ≤ 40.
+- Si "has_vote" = true, au moins un des compteurs (pour/contre/abstention) doit être un entier ≥ 0. Total plausible ≤ 40.
 - Ne génère aucun texte en dehors du JSON.`
 
 type BudgetBreakdownItem struct {

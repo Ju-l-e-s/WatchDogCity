@@ -4,9 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/watchdog/shared"
 	"google.golang.org/genai"
@@ -200,6 +202,9 @@ func analyzeWithGemini(ctx context.Context, apiKey string, pdfBytes []byte) (*Ge
 	client, err := genai.NewClient(ctx, &genai.ClientConfig{
 		APIKey:      apiKey,
 		HTTPOptions: genai.HTTPOptions{APIVersion: "v1beta"},
+		HTTPClient: &http.Client{
+			Timeout: 120 * time.Second,
+		},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("create gemini client: %w", err)

@@ -278,7 +278,7 @@ function render() {
                         const rows = oppositionDelibs.map(d => {
                             const totalD = (d.vote.pour || 0) + (d.vote.contre || 0) + (d.vote.abstention || 0);
                             const absText = (d.vote.abstention || 0) > 0 ? ` · <span class="text-amber-500">${d.vote.abstention} abstention${d.vote.abstention > 1 ? "s" : ""}</span>` : "";
-                            const shortTitle = (d.title || "").length > 70 ? (d.title || "").substring(0, 70) + "…" : (d.title || "");
+                            const shortTitle = (d.title || "").length > 100 ? (d.title || "").substring(0, 100) + "…" : (d.title || "");
                             return `<div class="flex flex-col gap-0.5 py-2 border-t border-slate-100/80 first:border-t-0"><div class="flex items-center gap-2 flex-wrap"><span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">${d.topic_tag || "Délibération"}</span><span class="text-[11px] font-bold text-rose-600">${d.vote.contre} contre</span><span class="text-[11px] text-slate-400">sur ${totalD}</span>${absText}</div><p class="text-[11px] text-slate-500 leading-snug">${shortTitle}</p></div>`;
                         }).join("");
                         oppositionRows = `<div class="mt-3 pt-1">${rows}</div>`;

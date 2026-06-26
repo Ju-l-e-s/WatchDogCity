@@ -187,7 +187,7 @@ func TestHandleIsolatesPerCouncilErrors(t *testing.T) {
 	}
 
 	err := o.handle(context.Background(), OrchestratorEvent{})
-	require.NoError(t, err, "handle must return nil even when one council fails")
+	require.Error(t, err, "handle must return an error when a council fails")
 	assert.Equal(t, 2, db.updateCount, "UpdateItem must be called for c1 and c3, not c2")
 	assert.Equal(t, 2, sqsMock.batchCount, "one SQS batch per successfully processed council")
 }

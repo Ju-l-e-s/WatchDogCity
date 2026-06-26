@@ -99,6 +99,7 @@ type deliberationRec struct {
 	BudgetType      string               `dynamodbav:"budget_type"`
 	BudgetBreakdown []budgetBreakdownRec `dynamodbav:"budget_breakdown"`
 	ClimateImpact   string               `dynamodbav:"climate_impact"`
+	HasVote         bool                 `dynamodbav:"has_vote"`
 	VotePour        *int                 `dynamodbav:"vote_pour"`
 	VoteContre      *int                 `dynamodbav:"vote_contre"`
 	VoteAbst        *int                 `dynamodbav:"vote_abstention"`
@@ -564,7 +565,7 @@ func toDeliberationViews(recs []deliberationRec) []shared.DeliberationView {
 			BudgetType:      r.BudgetType,
 			BudgetBreakdown: breakdown,
 			ClimateImpact:   r.ClimateImpact,
-			HasVote:         r.VotePour != nil || r.VoteContre != nil || r.VoteAbst != nil,
+			HasVote:         r.HasVote,
 			VotePour:        r.VotePour,
 			VoteContre:      r.VoteContre,
 			VoteAbstention:  r.VoteAbst,

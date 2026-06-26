@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
 	"net/http"
 	"regexp"
 	"strings"
@@ -63,15 +64,16 @@ func (sc *Scraper) ScrapeCouncilList(ctx context.Context) ([]CouncilListing, err
 		}
 
 		pubDate, _ := s.Find("time").Attr("datetime")
-		if pubDate == "" {
-			return
-		}
 		// Prefer the actual session date extracted from the title over the
 		// publication date from the <time datetime> attribute (which can be
 		// a few days later than when the council actually met).
 		sessionDate := parseDateFromTitle(title)
 		if sessionDate == "" {
 			sessionDate = pubDate
+		}
+		if sessionDate == "" {
+			log.Printf("warn: council %q has no date (no <time datetime> and no date in title) — skipping", title)
+			return
 		}
 		listings = append(listings, CouncilListing{
 			CouncilID: url,

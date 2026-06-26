@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -283,6 +285,7 @@ func (o *orchestrator) handle(ctx context.Context, event OrchestratorEvent) erro
 		for _, e := range errs {
 			log.Printf("  - %v", e)
 		}
+		return fmt.Errorf("orchestrator: %d council(s) failed", len(errs))
 	}
 	return nil
 }
@@ -352,8 +355,14 @@ func attrInt(m map[string]types.AttributeValue, key string) (int, bool) {
 }
 
 func deliberationID(url string) string {
-	parts := strings.Split(url, "/")
-	return parts[len(parts)-1]
+	u := strings.TrimSuffix(url, "/")
+	parts := strings.Split(u, "/")
+	last := parts[len(parts)-1]
+	if last == "" {
+		sum := sha256.Sum256([]byte(url))
+		return hex.EncodeToString(sum[:8])
+	}
+	return last
 }
 
 var orch *orchestrator

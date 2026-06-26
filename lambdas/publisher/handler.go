@@ -137,12 +137,25 @@ func buildDataJSON(ctx context.Context, ddb *dynamodb.Client, councils []Council
 	}
 	for _, c := range councils {
 		analysis := c.Analysis
-		// Budget impact = sum of individual deliberations only (verified PDF amounts)
-		var deliberationsTotal int64
+		// Budget impact = max of budget-tagged deliberations, or sum of other items to avoid double-counting
+		var hasBudgetTopic bool
+		var maxBudgetTopic int64
+		var otherTopicsSum int64
 		for _, d := range delibs[c.CouncilID] {
-			deliberationsTotal += d.BudgetImpact
+			if d.TopicTag == "Budget" {
+				hasBudgetTopic = true
+				if d.BudgetImpact > maxBudgetTopic {
+					maxBudgetTopic = d.BudgetImpact
+				}
+			} else {
+				otherTopicsSum += d.BudgetImpact
+			}
 		}
-		analysis.BudgetImpact = deliberationsTotal
+		if hasBudgetTopic {
+			analysis.BudgetImpact = maxBudgetTopic
+		} else {
+			analysis.BudgetImpact = otherTopicsSum
+		}
 
 		co := CouncilOutput{
 			CouncilID: c.CouncilID,
@@ -271,7 +284,7 @@ func HandleRequest(ctx context.Context, event PublisherEvent) error {
 	}
 
 	// Trigger newsletter Notifier asynchronously — last instruction, after S3.
-	if fn := os.Getenv("NOTIFIER_FUNCTION_NAME"); fn != "" {
+	if fn := os.Getenv("NOTIFIER_FUNCTION_NAME"); fn != "" && fn != "disabled" && fn != "placeholder" {
 		notifierPayload, _ := json.Marshal(map[string]string{"council_id": event.CouncilID})
 		_, err := lambdaClient.Invoke(ctx, &lambdaSvc.InvokeInput{
 			FunctionName:   aws.String(fn),
@@ -287,6 +300,8 @@ func HandleRequest(ctx context.Context, event PublisherEvent) error {
 		} else {
 			log.Printf("notifier invoked async for council %s", event.CouncilID)
 		}
+	} else if fn == "disabled" || fn == "placeholder" {
+		log.Printf("notifier invocation skipped: notifier is disabled or placeholder (%s)", fn)
 	}
 
 	return nil

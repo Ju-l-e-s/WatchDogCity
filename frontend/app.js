@@ -82,22 +82,25 @@ function renderDashboard() {
     if (!container) return;
 
     let totalBudget = 0;
+    let thematicTotal = 0;
     const categories = {};
 
     allCouncils.forEach(c => {
+        totalBudget += c.analysis ? c.analysis.budget_impact : 0;
+        
         (c.deliberations || []).forEach(d => {
             if (d.budget_breakdown && d.budget_breakdown.length > 0) {
                 d.budget_breakdown.forEach(item => {
-                    if (item.amount > 0) {
-                        totalBudget += item.amount;
+                    if (item.amount > 0 && item.topic_tag !== 'Budget') {
                         const cat = item.topic_tag || 'Administration';
                         categories[cat] = (categories[cat] || 0) + item.amount;
+                        thematicTotal += item.amount;
                     }
                 });
-            } else if (d.budget_impact > 0) {
-                totalBudget += d.budget_impact;
+            } else if (d.budget_impact > 0 && d.topic_tag !== 'Budget') {
                 const cat = d.topic_tag || 'Administration';
                 categories[cat] = (categories[cat] || 0) + d.budget_impact;
+                thematicTotal += d.budget_impact;
             }
         });
     });
@@ -109,7 +112,7 @@ function renderDashboard() {
     
     let ribbonHtml = '<div class="ribbon-bar flex h-3 bg-slate-100 rounded-full overflow-hidden mb-4 shadow-inner" role="progressbar" aria-label="Répartition du budget">';
     sortedCats.forEach(([name, val]) => {
-        const pct = totalBudget > 0 ? (val / totalBudget * 100).toFixed(1) : 0;
+        const pct = thematicTotal > 0 ? (val / thematicTotal * 100).toFixed(1) : 0;
         const color = COLORS[name] || COLORS['Autres'];
         ribbonHtml += `<div class="ribbon-segment" style="width: ${pct}%; background: ${color}" title="${name}: ${pct}%"><span class="sr-only">${name} : ${pct}%</span></div>`;
     });
@@ -128,7 +131,7 @@ function renderDashboard() {
 
     let gridHtml = '<div class="categories-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">';
     sortedCats.forEach(([name, val]) => {
-        const pct = totalBudget > 0 ? (val / totalBudget * 100).toFixed(1) : 0;
+        const pct = thematicTotal > 0 ? (val / thematicTotal * 100).toFixed(1) : 0;
         const color = COLORS[name] || COLORS['Autres'];
         gridHtml += `
             <div class="category-row p-4 bg-white rounded-2xl border border-slate-100 hover:shadow-micro transition-all">
@@ -201,23 +204,30 @@ function render() {
         const councilTotal = council.analysis ? council.analysis.budget_impact : 0;
         if (councilTotal > 0) {
             const cats = {};
+            let councilThematicTotal = 0;
             (council.deliberations || []).forEach(d => {
-                if (d.budget_impact > 0) { const cat = d.topic_tag || 'Autres'; cats[cat] = (cats[cat] || 0) + d.budget_impact; }
+                if (d.budget_impact > 0 && d.topic_tag !== 'Budget') {
+                    const cat = d.topic_tag || 'Autres';
+                    cats[cat] = (cats[cat] || 0) + d.budget_impact;
+                    councilThematicTotal += d.budget_impact;
+                }
             });
-            const sortedCats = Object.entries(cats).sort((a, b) => b[1] - a[1]);
-            councilRibbonHtml = '<div class="flex rounded-full overflow-hidden mt-5 bg-slate-100" style="height: 10px;" role="progressbar" aria-label="Répartition du budget">';
-            sortedCats.forEach(([name, val]) => {
-                const pct = (val / councilTotal * 100).toFixed(1);
-                councilRibbonHtml += `<div style="width:${pct}%;background:${COLORS[name]||COLORS['Autres']}" title="${name}: ${pct}%"><span class="sr-only">${name} : ${pct}%</span></div>`;
-            });
-            councilRibbonHtml += '</div>';
-            councilLegendHtml = '<div class="flex flex-wrap mt-4 text-xs font-bold text-slate-500 leading-none" style="gap:20px;row-gap:12px;">';
-            sortedCats.forEach(([name, val]) => {
-                const pct = Math.round(val / councilTotal * 100);
-                const color = COLORS[name] || COLORS['Autres'];
-                councilLegendHtml += `<div class="flex items-center gap-2"><span class="mr-1" style="width:10px;height:10px;border-radius:2px;background:${color}"></span><span>${pct}% ${name}</span></div>`;
-            });
-            councilLegendHtml += '</div>';
+            if (councilThematicTotal > 0) {
+                const sortedCats = Object.entries(cats).sort((a, b) => b[1] - a[1]);
+                councilRibbonHtml = '<div class="flex rounded-full overflow-hidden mt-5 bg-slate-100" style="height: 10px;" role="progressbar" aria-label="Répartition du budget">';
+                sortedCats.forEach(([name, val]) => {
+                    const pct = (val / councilThematicTotal * 100).toFixed(1);
+                    councilRibbonHtml += `<div style="width:${pct}%;background:${COLORS[name]||COLORS['Autres']}" title="${name}: ${pct}%"><span class="sr-only">${name} : ${pct}%</span></div>`;
+                });
+                councilRibbonHtml += '</div>';
+                councilLegendHtml = '<div class="flex flex-wrap mt-4 text-xs font-bold text-slate-500 leading-none" style="gap:20px;row-gap:12px;">';
+                sortedCats.forEach(([name, val]) => {
+                    const pct = Math.round(val / councilThematicTotal * 100);
+                    const color = COLORS[name] || COLORS['Autres'];
+                    councilLegendHtml += `<div class="flex items-center gap-2"><span class="mr-1" style="width:10px;height:10px;border-radius:2px;background:${color}"></span><span>${pct}% ${name}</span></div>`;
+                });
+                councilLegendHtml += '</div>';
+            }
         }
 
         // Calculate vote climate from individual deliberations

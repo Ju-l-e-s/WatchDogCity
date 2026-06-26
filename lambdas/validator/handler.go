@@ -330,6 +330,10 @@ func (h *ValidatorHandler) invokePublisher(ctx context.Context, councilID string
 // invokeNotifier fires the Notifier Lambda asynchronously with pre-generated
 // newsletter params embedded in the event payload.
 func (h *ValidatorHandler) invokeNotifier(ctx context.Context, councilID string, params *shared.NewsletterParams) {
+	if h.notifierFnName == "" || h.notifierFnName == "disabled" || h.notifierFnName == "placeholder" {
+		log.Printf("notifier invocation skipped: notifier is disabled or placeholder (%s)", h.notifierFnName)
+		return
+	}
 	payload, _ := json.Marshal(map[string]interface{}{
 		"council_id":        councilID,
 		"newsletter_params": params,

@@ -144,17 +144,37 @@ func plural(n int) string {
 
 func computeColdNewsletterStats(cold []ColdDeliberation) coldNewsletterStats {
 	var s coldNewsletterStats
-	hasIndividualTension := false
 	nonUnanimousCount := 0
 	maxOpposition := 0
+	totalPour := 0
+	totalContre := 0
+
+	var hasBudgetTopic bool
+	var maxBudgetTopic int64
+	var otherTopicsSum int64
 
 	for _, d := range cold {
-		s.totalBudget += d.BudgetImpact
+		if d.TopicTag == "Budget" {
+			hasBudgetTopic = true
+			if d.BudgetImpact > maxBudgetTopic {
+				maxBudgetTopic = d.BudgetImpact
+			}
+		} else {
+			otherTopicsSum += d.BudgetImpact
+		}
+
+		pour := 0
+		if d.Pour != nil {
+			pour = *d.Pour
+		}
+		totalPour += pour
 
 		contre := 0
 		if d.Contre != nil {
 			contre = *d.Contre
 		}
+		totalContre += contre
+
 		abst := 0
 		if d.Abstention != nil {
 			abst = *d.Abstention
@@ -166,12 +186,16 @@ func computeColdNewsletterStats(cold []ColdDeliberation) coldNewsletterStats {
 		if contre > 0 || abst > 0 {
 			nonUnanimousCount++
 		}
-		if contre > 0 || d.HasDisagreement {
-			hasIndividualTension = true
-		}
 	}
 
-	if hasIndividualTension || nonUnanimousCount > 0 {
+	if hasBudgetTopic {
+		s.totalBudget = maxBudgetTopic
+	} else {
+		s.totalBudget = otherTopicsSum
+	}
+
+	totalVotesCast := totalPour + totalContre
+	if totalVotesCast > 0 && float64(totalContre)/float64(totalVotesCast) > 0.10 {
 		s.voteClimat = "VOTES PARTAGÉS"
 		s.climatColor = "#E11D48" // Rose 600
 	} else {
@@ -338,6 +362,7 @@ func buildColdNewsletterPrompt(
 	sb.WriteString("\n\nCONSIGNES ÉDITORIALES ET LOGIQUES :\n")
 	sb.WriteString("- PRIORITÉ ABSOLUE : Toute délibération avec des votes contre ou disagreement=true DOIT figurer dans 'tensions'.\n")
 	sb.WriteString("- ENJEU CLÉ : Si le VOTE DES TAUX d'imposition est présent, il doit être le sujet prioritaire.\n")
+	sb.WriteString("- HIÉRARCHISATION DES BUDGETS : Les délibérations adoptées avec les plus gros budgets (notamment les budgets supplémentaires, Comptes Financiers Uniques (CFU), Comptes Administratifs, etc.) DOIVENT figurer en priorité dans la section 'adopted' avec leurs détails, et non pas dans les simples résumés ('briefs').\n")
 	sb.WriteString("- VULGARISATION INDEMNITÉS : Pour les indemnités des élus, explique simplement : 'Le conseil définit légalement la rémunération des élus pour leur travail, selon un barème national basé sur la taille de la ville'.\n")
 	sb.WriteString("- PÉDAGOGIE ET NEUTRALITÉ : Agis en traducteur neutre. Bannis le jargon juridique et administratif. N'utilise aucune formulation partisane.\n")
 	sb.WriteString("- ANCRAGE STRICT : N'ajoute AUCUNE information qui n'est pas présente dans les données structurées d'entrée. Zéro fait géographique, historique ou éditorial externe.\n")
@@ -367,7 +392,11 @@ func buildColdNewsletterPrompt(
 		if d.Contre != nil {
 			contre = *d.Contre
 		}
-		if contre > 0 || d.HasDisagreement {
+		abst := 0
+		if d.Abstention != nil {
+			abst = *d.Abstention
+		}
+		if contre > 0 || (d.HasDisagreement && (contre > 0 || abst > 0)) {
 			tensions = append(tensions, d)
 			continue
 		}

@@ -220,8 +220,20 @@ type councilStats struct {
 
 func computeStats(delibs []Deliberation) councilStats {
 	s := councilStats{topicBudgets: make(map[string]int64)}
+	var hasBudgetTopic bool
+	var maxBudgetTopic int64
+	var otherTopicsSum int64
+
 	for _, d := range delibs {
-		s.totalBudget += d.BudgetImpact
+		if d.TopicTag == "Budget" {
+			hasBudgetTopic = true
+			if d.BudgetImpact > maxBudgetTopic {
+				maxBudgetTopic = d.BudgetImpact
+			}
+		} else {
+			otherTopicsSum += d.BudgetImpact
+		}
+
 		if d.TopicTag != "" {
 			s.topicBudgets[d.TopicTag] += d.BudgetImpact
 		}
@@ -234,6 +246,13 @@ func computeStats(delibs []Deliberation) councilStats {
 		if d.VoteAbst != nil {
 			s.totalAbst += *d.VoteAbst
 		}
+	}
+
+	if hasBudgetTopic {
+		s.totalBudget = maxBudgetTopic
+		s.topicBudgets["Budget"] = maxBudgetTopic
+	} else {
+		s.totalBudget = otherTopicsSum
 	}
 	return s
 }

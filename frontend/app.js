@@ -77,33 +77,87 @@ async function init() {
         }
     }
 }
+
+function getBudgetData() {
+    let primitifDelib = null;
+    let maxBreakdownItems = 0;
+    
+    // 1. Trouver le Budget Primitif (délibération avec le plus grand breakdown thématique et contenant VOTE et BUDGET dans son titre)
+    allCouncils.forEach(c => {
+        (c.deliberations || []).forEach(d => {
+            const titleUpper = (d.title || "").toUpperCase();
+            const breakdown = d.budget_breakdown;
+            if (breakdown && breakdown.length > maxBreakdownItems && titleUpper.includes("VOTE") && titleUpper.includes("BUDGET")) {
+                primitifDelib = d;
+                maxBreakdownItems = breakdown.length;
+            }
+        });
+    });
+
+    let totalBudget = 0;
+    const categories = {};
+    const otherFinancialDelibs = [];
+    const adjustments = [];
+
+    // 2. Traiter le Budget Primitif s'il existe
+    if (primitifDelib) {
+        (primitifDelib.budget_breakdown || []).forEach(item => {
+            if (!item.amount || item.amount <= 0) return;
+            totalBudget += item.amount;
+            const theme = item.topic_tag || 'Administration';
+            categories[theme] = (categories[theme] || 0) + item.amount;
+        });
+    }
+
+    const ADJUSTMENT_KEYWORDS = [
+        "SUPPLÉMENTAIRE", "AFFECTATION DES RÉSULTATS", "CFU", 
+        "FINANCIER UNIQUE", "MUTUALISATION", "NIVEAUX DE SERVICES", "AP/CP"
+    ];
+
+    // 3. Classer les autres délibérations financières
+    allCouncils.forEach(c => {
+        (c.deliberations || []).forEach(d => {
+            if (primitifDelib && d.id === primitifDelib.id) return;
+            
+            const titleUpper = (d.title || "").toUpperCase();
+            const impact = d.budget_impact || 0;
+            const hasBreakdown = d.budget_breakdown && d.budget_breakdown.length > 0;
+            
+            if (impact > 0 || hasBreakdown) {
+                const isAdj = ADJUSTMENT_KEYWORDS.some(kw => titleUpper.includes(kw));
+                if (isAdj) {
+                    adjustments.push({
+                        title: d.title,
+                        amount: impact || d.budget_breakdown.reduce((sum, item) => sum + (item.amount || 0), 0),
+                        date: c.date,
+                        pdf: d.pdf_url
+                    });
+                } else {
+                    otherFinancialDelibs.push({
+                        ...d,
+                        council_date: c.date
+                    });
+                }
+            }
+        });
+    });
+
+    return {
+        primitifDelib,
+        totalBudget,
+        categories,
+        otherFinancialDelibs,
+        adjustments
+    };
+}
+
 function renderDashboard() {
     const container = document.getElementById('global-dashboard');
     if (!container) return;
 
-    let totalBudget = 0;
-    let thematicTotal = 0;
-    const categories = {};
-
-    allCouncils.forEach(c => {
-        totalBudget += c.analysis ? c.analysis.budget_impact : 0;
-        
-        (c.deliberations || []).forEach(d => {
-            if (d.budget_breakdown && d.budget_breakdown.length > 0) {
-                d.budget_breakdown.forEach(item => {
-                    if (item.amount > 0 && item.topic_tag !== 'Budget') {
-                        const cat = item.topic_tag || 'Administration';
-                        categories[cat] = (categories[cat] || 0) + item.amount;
-                        thematicTotal += item.amount;
-                    }
-                });
-            } else if (d.budget_impact > 0 && d.topic_tag !== 'Budget') {
-                const cat = d.topic_tag || 'Administration';
-                categories[cat] = (categories[cat] || 0) + d.budget_impact;
-                thematicTotal += d.budget_impact;
-            }
-        });
-    });
+    const budgetData = getBudgetData();
+    const totalBudget = budgetData.totalBudget;
+    const categories = budgetData.categories;
 
     if (totalBudget === 0) { container.classList.add('hidden'); return; }
     container.classList.remove('hidden');
@@ -112,7 +166,7 @@ function renderDashboard() {
     
     let ribbonHtml = '<div class="ribbon-bar flex h-3 bg-slate-100 rounded-full overflow-hidden mb-4 shadow-inner" role="progressbar" aria-label="Répartition du budget">';
     sortedCats.forEach(([name, val]) => {
-        const pct = thematicTotal > 0 ? (val / thematicTotal * 100).toFixed(1) : 0;
+        const pct = totalBudget > 0 ? (val / totalBudget * 100).toFixed(1) : 0;
         const color = COLORS[name] || COLORS['Autres'];
         ribbonHtml += `<div class="ribbon-segment" style="width: ${pct}%; background: ${color}" title="${name}: ${pct}%"><span class="sr-only">${name} : ${pct}%</span></div>`;
     });
@@ -131,7 +185,7 @@ function renderDashboard() {
 
     let gridHtml = '<div class="categories-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">';
     sortedCats.forEach(([name, val]) => {
-        const pct = thematicTotal > 0 ? (val / thematicTotal * 100).toFixed(1) : 0;
+        const pct = totalBudget > 0 ? (val / totalBudget * 100).toFixed(1) : 0;
         const color = COLORS[name] || COLORS['Autres'];
         gridHtml += `
             <div class="category-row p-4 bg-white rounded-2xl border border-slate-100 hover:shadow-micro transition-all">
@@ -150,13 +204,14 @@ function renderDashboard() {
         <div class="dashboard-container animate-fade-in mb-16">
             <div class="mb-8">
                 <span class="dashboard-title flex items-center gap-2 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
-                    Analyse Budgétaire 2026
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2m0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                    Budget de Référence ${budgetData.primitifDelib ? '2026' : ''}
                 </span>
                 <div class="budget-total-val text-4xl md:text-5xl font-black text-slate-900 tracking-tight">${formatBudget(totalBudget)}</div>
+                ${budgetData.primitifDelib ? `<p class="text-xs text-slate-500 mt-2">Basé sur le Budget Primitif voté le ${formatDate(budgetData.primitifDelib.council_date || '2025-12-18')}</p>` : ''}
             </div>
             
-            <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Répartition thématique (Cumul Annuel)</h4>
+            <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Répartition thématique du Budget de Référence</h4>
             ${ribbonHtml}
             ${legendHtml}
             ${gridHtml}
@@ -466,82 +521,48 @@ function renderBudgetView() {
     const container = document.getElementById("budget-detail");
     if (!container) return;
 
-    let totalBudget = 0;
+    const budgetData = getBudgetData();
+
+    // 1. Générer le HTML du Budget Primitif thématique
     const thematicData = {};
-    let financialDelibsCount = 0;
-
-    allCouncils.forEach(council => {
-        (council.deliberations || []).forEach(d => {
-            // Source 2 prioritaire : ventilation thématique (budget primitif ou subventions avec tableau)
-            // Si un breakdown existe, il prend le pas sur budget_impact pour éviter le double-comptage
-            if (d.budget_breakdown && d.budget_breakdown.length > 0) {
-                d.budget_breakdown.forEach(item => {
-                    if (!item.amount || item.amount <= 0) return;
-                    totalBudget += item.amount;
-                    financialDelibsCount++;
-                    const theme = item.topic_tag || 'Administration';
-                    if (!thematicData[theme]) thematicData[theme] = { total: 0, delibs: [], breakdowns: [] };
-                    thematicData[theme].total += item.amount;
-                    thematicData[theme].breakdowns.push({
-                        label: item.label || item.topic_tag,
-                        amount: item.amount,
-                        council_date: council.date,
-                        source_title: d.title,
-                        source_pdf: d.pdf_url,
-                    });
-                });
-            } else if (d.budget_impact && d.budget_impact > 0) {
-                // Source 1 : montant individuel vérifié par l'IA (délibération ordinaire sans tableau)
-                totalBudget += d.budget_impact;
-                financialDelibsCount++;
-                const theme = d.topic_tag || 'Administration';
-                if (!thematicData[theme]) thematicData[theme] = { total: 0, delibs: [], breakdowns: [] };
-                thematicData[theme].total += d.budget_impact;
-                thematicData[theme].delibs.push({ ...d, council_date: council.date });
-            }
+    if (budgetData.primitifDelib) {
+        const d = budgetData.primitifDelib;
+        (d.budget_breakdown || []).forEach(item => {
+            if (!item.amount || item.amount <= 0) return;
+            const theme = item.topic_tag || 'Administration';
+            if (!thematicData[theme]) thematicData[theme] = { total: 0, delibs: [], breakdowns: [] };
+            thematicData[theme].total += item.amount;
+            thematicData[theme].breakdowns.push({
+                label: item.label || item.topic_tag,
+                amount: item.amount,
+                council_date: budgetData.primitifDelib.council_date || '2025-12-18',
+                source_title: d.title,
+                source_pdf: d.pdf_url,
+            });
         });
-    });
-
-    if (financialDelibsCount === 0) {
-        container.innerHTML = `<div class="text-center py-20 text-slate-500">Aucune donnée budgétaire disponible pour le moment.</div>`;
-        return;
     }
 
     const sortedThemes = Object.entries(thematicData).sort((a, b) => b[1].total - a[1].total);
-
-    generateBudgetHTML(container, totalBudget, sortedThemes);
-}
-
-function generateBudgetHTML(container, totalBudget, sortedThemes) {
-    let html = ``;
+    let primHtml = '';
 
     sortedThemes.forEach(([themeName, themeData]) => {
         const themeColor = COLORS[themeName] || COLORS['Autres'];
-        const percentage = ((themeData.total / totalBudget) * 100).toFixed(1);
+        const percentage = budgetData.totalBudget > 0 ? ((themeData.total / budgetData.totalBudget) * 100).toFixed(1) : 0;
         
-        html += `
-            <div class="mb-10">
-                <div class="flex items-center justify-between border-b border-slate-200 pb-3 mb-6">
-                    <div class="flex items-center gap-3">
-                        <div class="w-4 h-4 rounded" style="background-color: ${themeColor}"></div>
-                        <h3 class="text-2xl font-bold text-slate-900">${themeName}</h3>
-                        <span class="text-sm font-semibold text-slate-500 bg-slate-100 px-2 py-1 rounded">${percentage}%</span>
+        primHtml += `
+            <div class="mb-8">
+                <div class="flex items-center justify-between border-b border-slate-200 pb-2 mb-4">
+                    <div class="flex items-center gap-2.5">
+                        <div class="w-3.5 h-3.5 rounded" style="background-color: ${themeColor}"></div>
+                        <h4 class="text-xl font-bold text-slate-800">${themeName}</h4>
+                        <span class="text-xs font-semibold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">${percentage}%</span>
                     </div>
-                    <div class="text-xl font-bold" style="color: ${themeColor}">${formatBudget(themeData.total)}</div>
+                    <div class="text-lg font-bold" style="color: ${themeColor}">${formatBudget(themeData.total)}</div>
                 </div>
-                <div class="bg-white rounded-[2rem] shadow-card overflow-hidden">
+                <div class="bg-white rounded-2xl shadow-card overflow-hidden">
                     <div class="divide-y divide-slate-100/50">
         `;
 
-        themeData.delibs.sort((a, b) => b.council_date.localeCompare(a.council_date));
-        themeData.delibs.forEach(delib => {
-            const originalTag = delib.topic_tag;
-            delib.topic_tag = formatDate(delib.council_date);
-            html += renderDeliberationRow(delib);
-            delib.topic_tag = originalTag;
-        });
-
-        // Carte budget primitif — une seule carte avec tableau de lignes
         if (themeData.breakdowns && themeData.breakdowns.length > 0) {
             const breakdownsBySource = {};
             themeData.breakdowns.forEach(b => {
@@ -557,28 +578,103 @@ function generateBudgetHTML(container, totalBudget, sortedThemes) {
                         <span class="text-[13px] text-slate-600 leading-snug flex-1 pr-4">${escapeHTML(l.label)}</span>
                         <span class="text-[13px] font-semibold text-slate-800 shrink-0">${l.amount.toLocaleString('fr-FR')} €</span>
                     </div>`).join('');
-                html += `
-                    <div class="px-4 py-5 md:px-8 md:py-6">
-                        <div class="flex items-center gap-2.5 mb-3">
+                primHtml += `
+                    <div class="px-4 py-5 md:px-6 md:py-5">
+                        <div class="flex items-center gap-2 mb-2">
                             <span class="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0"></span>
-                            <span class="text-[11px] font-medium text-slate-600 uppercase tracking-widest">${formatDate(src.date)}</span>
-                            <span class="inline-flex items-center whitespace-nowrap shrink-0 px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-100 ml-2 shadow-sm">💰 ${srcTotal.toLocaleString('fr-FR')} €</span>
+                            <span class="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">${formatDate(src.date)}</span>
+                            <span class="inline-flex items-center whitespace-nowrap shrink-0 px-2 py-0.5 rounded text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-100 ml-2 shadow-sm">💰 ${srcTotal.toLocaleString('fr-FR')} €</span>
                         </div>
-                        <h4 class="text-base font-semibold text-slate-800 mb-4">${escapeHTML(src.title)}</h4>
+                        <h5 class="text-sm font-semibold text-slate-700 mb-3">${escapeHTML(src.title)}</h5>
                         <div class="bg-slate-50/60 rounded-xl px-4 py-1">${linesHtml}</div>
-                        ${src.pdf ? `<div class="mt-4"><a href="${src.pdf}" target="_blank" class="inline-flex items-center gap-2 text-xs font-bold text-brand-600 hover:text-brand-700 bg-brand-50 px-4 py-2 rounded-lg transition-all border border-brand-100 hover:shadow-sm"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>Consulter le PDF officiel</a></div>` : ''}
+                        ${src.pdf ? `<div class="mt-3"><a href="${src.pdf}" target="_blank" class="inline-flex items-center gap-1.5 text-[11px] font-bold text-brand-600 hover:text-brand-700 bg-brand-50 px-3 py-1.5 rounded-lg transition-all border border-brand-100 hover:shadow-sm"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>Consulter le PDF officiel</a></div>` : ''}
                     </div>`;
             });
         }
 
-        html += `
+        primHtml += `
                     </div>
                 </div>
             </div>
         `;
     });
 
-    container.innerHTML = html;
+    // 2. Générer le HTML des Projets Complémentaires
+    let projectsHtml = '';
+    if (budgetData.otherFinancialDelibs && budgetData.otherFinancialDelibs.length > 0) {
+        budgetData.otherFinancialDelibs.sort((a, b) => b.council_date.localeCompare(a.council_date));
+        budgetData.otherFinancialDelibs.forEach(d => {
+            projectsHtml += renderDeliberationRow(d);
+        });
+    } else {
+        projectsHtml = `<div class="text-center py-8 text-slate-500 text-sm">Aucun autre projet budgétaire enregistré.</div>`;
+    }
+
+    // 3. Générer le HTML des Ajustements
+    let adjustmentsHtml = '';
+    if (budgetData.adjustments && budgetData.adjustments.length > 0) {
+        budgetData.adjustments.sort((a, b) => b.date.localeCompare(a.date));
+        budgetData.adjustments.forEach(adj => {
+            adjustmentsHtml += `
+                <div class="p-4 bg-slate-50/50 rounded-2xl border border-slate-100 hover:shadow-micro transition-all">
+                    <div class="flex items-center gap-2 mb-1.5">
+                        <span class="text-[9px] font-bold text-slate-400 uppercase tracking-widest">${formatDate(adj.date)}</span>
+                        <span class="text-[10px] font-black text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded ml-auto">${formatBudget(adj.amount)}</span>
+                    </div>
+                    <p class="text-xs font-semibold text-slate-800 leading-snug mb-2">${escapeHTML(adj.title)}</p>
+                    ${adj.pdf ? `<a href="${adj.pdf}" target="_blank" class="text-[10px] font-bold text-brand-600 hover:underline inline-flex items-center gap-1"><svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>PDF officiel</a>` : ''}
+                </div>
+            `;
+        });
+    } else {
+        adjustmentsHtml = `<div class="text-center py-6 text-slate-400 text-xs">Aucun ajustement enregistré.</div>`;
+    }
+
+    // 4. Assembler le tout dans une grille responsive
+    container.innerHTML = `
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            <!-- Colonne gauche/principale : Budget Primitif et Projets Réels -->
+            <div class="lg:col-span-8 space-y-12">
+                <div>
+                    <h3 class="text-2xl font-bold text-slate-900 mb-6 flex items-center gap-2.5">
+                        📊 Détails du Budget de Référence (Budget Primitif)
+                    </h3>
+                    <div class="space-y-8">
+                        ${primHtml}
+                    </div>
+                </div>
+                
+                <div>
+                    <h3 class="text-2xl font-bold text-slate-900 mb-6 flex items-center gap-2.5">
+                        ✨ Décisions & Investissements Complémentaires
+                    </h3>
+                    <p class="text-sm text-slate-500 leading-relaxed mb-6">
+                        Ces délibérations concernent des projets précis et des aides financières votés individuellement au cours de l'année. Leurs montants ne sont pas additionnés au budget principal afin d'éviter les double-comptages.
+                    </p>
+                    <div class="bg-white rounded-[2rem] shadow-card overflow-hidden">
+                        <div class="divide-y divide-slate-100/50">
+                            ${projectsHtml}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Colonne droite : Historique et Ajustements de Trésorerie -->
+            <div class="lg:col-span-4 space-y-6">
+                <h3 class="text-xl font-bold text-slate-900 flex items-center gap-2">
+                    ⚙️ Ajustements & Trésorerie
+                </h3>
+                <div class="bg-white rounded-[2.5rem] shadow-card p-6 border border-slate-100/80 space-y-6">
+                    <p class="text-xs text-slate-500 leading-relaxed border-l-2 border-brand-200 pl-3">
+                        Ces votes concernent des écritures comptables d'ajustement ou d'affectation de surplus budgétaires de l'année précédente.
+                    </p>
+                    <div class="space-y-4">
+                        ${adjustmentsHtml}
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
 }
 
 init();

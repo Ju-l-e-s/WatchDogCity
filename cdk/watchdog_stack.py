@@ -231,6 +231,7 @@ class WatchdogStack(Stack):
             handler="bootstrap",
             code=lambda_.Code.from_asset("../dist/validator.zip"),
             timeout=Duration.minutes(10),
+            memory_size=512,
             log_retention=logs.RetentionDays.TWO_WEEKS,
             environment={
                 "COUNCILS_TABLE": councils_table.table_name,
@@ -341,11 +342,11 @@ class WatchdogStack(Stack):
         councils_table.grant(notifier, "dynamodb:GetItem", "dynamodb:UpdateItem", "dynamodb:Scan")
         deliberations_table.grant_read_data(notifier)
         notifier.grant_invoke(publisher)
-        publisher.add_environment("NOTIFIER_FUNCTION_NAME", "disabled")
+        publisher.add_environment("NOTIFIER_FUNCTION_NAME", notifier.function_name)
 
         # Wire validator → notifier now that notifier is defined.
         notifier.grant_invoke(validator)
-        validator.add_environment("NOTIFIER_FUNCTION_NAME", "disabled")
+        validator.add_environment("NOTIFIER_FUNCTION_NAME", notifier.function_name)
 
         # ── QcQuarantined alarm ───────────────────────────────────────────────
         qc_alarm_topic = sns.Topic(self, "QcQuarantinedAlarmTopic")

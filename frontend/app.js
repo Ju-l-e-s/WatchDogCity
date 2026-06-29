@@ -290,7 +290,7 @@ function renderTopicChips() {
     topics.forEach(topic => {
         const isActive = selectedTopic === topic;
         const color = COLORS[topic] || COLORS['Autres'];
-        html += `<button onclick="handleTopicClick('${topic.replace(/'/g, "\\\\'")}')" aria-pressed="${isActive}" class="chip shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 flex items-center gap-2 ${
+        html += `<button onclick="handleTopicClick('${topic.replace(/'/g, "\\'")}')" aria-pressed="${isActive}" class="chip shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 flex items-center gap-2 ${
             isActive
                 ? 'bg-slate-900 text-white shadow-micro'
                 : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300'
@@ -343,6 +343,11 @@ function render() {
     // Event: search_no_results
     if (filteredCouncils.length === 0) {
       phCapture('search_no_results', {query_length: searchQuery.length, active_topic: selectedTopic || 'none'});
+    }
+
+    const announcer = document.getElementById('search-announcer');
+    if (announcer) {
+        announcer.textContent = filteredCouncils.length + ' résultat' + (filteredCouncils.length !== 1 ? 's' : '') + ' trouvé' + (filteredCouncils.length !== 1 ? 's' : '');
     }
 
     const visibleCouncils = filteredCouncils.slice(0, visibleCouncilsCount);
@@ -627,10 +632,12 @@ function toggleView(viewName) {
         if(navBudgetBtn) {
             navBudgetBtn.classList.add("text-brand-700", "font-bold");
             navBudgetBtn.classList.remove("text-slate-500", "font-medium");
+            navBudgetBtn.setAttribute('aria-current', 'page');
         }
         if(navTimelineBtn) {
             navTimelineBtn.classList.remove("text-brand-700", "font-bold");
             navTimelineBtn.classList.add("text-slate-500", "font-medium");
+            navTimelineBtn.removeAttribute('aria-current');
         }
 
         renderBudgetView();
@@ -642,10 +649,12 @@ function toggleView(viewName) {
         if(navTimelineBtn) {
             navTimelineBtn.classList.add("text-brand-700", "font-bold");
             navTimelineBtn.classList.remove("text-slate-500", "font-medium");
+            navTimelineBtn.setAttribute('aria-current', 'page');
         }
         if(navBudgetBtn) {
             navBudgetBtn.classList.remove("text-brand-700", "font-bold");
             navBudgetBtn.classList.add("text-slate-500", "font-medium");
+            navBudgetBtn.removeAttribute('aria-current');
         }
     }
 }
@@ -812,9 +821,59 @@ function renderBudgetView() {
 }
 
 init();
+document.addEventListener('keydown',function(e){if(e.key!=='Escape')return;const modals=[{el:document.getElementById('about-modal'),toggle:toggleAboutModal},{el:document.getElementById('team-modal'),toggle:toggleTeamModal},{el:document.getElementById('contact-modal'),toggle:toggleContactModal}];for(const m of modals){if(m.el&&!m.el.classList.contains('hidden')){m.toggle(false);break;}}});
 const contactForm = document.getElementById("contact-form"), contactStatus = document.getElementById("contact-status");
 contactForm && contactForm.addEventListener("submit", async e => { e.preventDefault(); const t = { name: document.getElementById("contact-name").value, email_sender: document.getElementById("contact-email").value, message: document.getElementById("contact-message").value }; try { e.submitter && (e.submitter.disabled = !0); const n = await fetch("https://zq7qfmhra1.execute-api.eu-west-3.amazonaws.com/prod/contact", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(t) }), s = await n.json().catch(() => ({})); n.ok ? (phCapture('contact_form_submitted', {success: true}), contactStatus.textContent = "Message envoyé avec succès.", contactStatus.className = "text-sm font-medium text-center py-2 rounded-xl text-green-600 bg-green-50 block", contactForm.reset()) : (phCapture('contact_form_submitted', {success: false}), contactStatus.textContent = s.error || "Erreur lors de l'envoi.", contactStatus.className = "text-sm font-medium text-center py-2 rounded-xl text-red-600 bg-red-50 block") } catch (e) { contactStatus.textContent = "Erreur réseau. Impossible de contacter le serveur.", contactStatus.className = "text-sm font-medium text-center py-2 rounded-xl text-red-600 bg-red-50 block", "undefined" != typeof turnstile && "undefined" != typeof contactWidgetId && turnstile.reset(contactWidgetId) } finally { e.submitter && (e.submitter.disabled = !1) } });
 
 const newsletterForm = document.getElementById("newsletter-form"), newsletterStatus = document.getElementById("newsletter-status"), newsletterEmail = document.getElementById("newsletter-email"), newsletterCheckbox = document.getElementById("newsletter-checkbox"), newsletterSubmit = document.getElementById("newsletter-submit"), newsletterConfirm = document.getElementById("newsletter-confirm"), newsletterConfirmEmail = document.getElementById("newsletter-confirm-email");
 newsletterCheckbox && newsletterCheckbox.addEventListener("change", () => { newsletterSubmit.disabled = !newsletterCheckbox.checked; });
 newsletterForm && newsletterForm.addEventListener("submit", async e => { e.preventDefault(); const email = newsletterEmail.value; try { e.submitter && (e.submitter.disabled = !0); const n = await fetch("https://zq7qfmhra1.execute-api.eu-west-3.amazonaws.com/prod/subscribe", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email }) }), s = await n.json().catch(() => ({})); n.ok ? (phCapture('newsletter_form_submitted', {success: true}), newsletterForm.classList.add("hidden"), newsletterConfirmEmail.textContent = email, newsletterConfirm.classList.remove("hidden")) : (phCapture('newsletter_form_submitted', {success: false}), newsletterStatus.textContent = s.error || "Oups ! Une erreur est survenue lors de l'inscription. Merci de réessayer d'ici quelques instants.", newsletterStatus.className = "text-sm font-medium text-center py-3 px-4 rounded-xl text-rose-400 bg-rose-400/10 border border-rose-400/20 block") } catch (e) { newsletterStatus.textContent = "Nous n'avons pas réussi à vous inscrire. Merci de vérifier votre connexion ou de réessayer plus tard.", newsletterStatus.className = "text-sm font-medium text-center py-3 px-4 rounded-xl text-rose-400 bg-rose-400/10 border border-rose-400/20 block" } finally { e.submitter && (e.submitter.disabled = !1) } });
+
+// ── Scroll Depth Tracking ──
+let scrollDepthTimer;
+window.addEventListener('scroll', () => {
+  clearTimeout(scrollDepthTimer);
+  scrollDepthTimer = setTimeout(() => {
+    const scrollTop = window.scrollY || document.documentElement.scrollTop;
+    const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+    if (docHeight <= 0) return;
+    const pct = Math.round((scrollTop / docHeight) * 100);
+    [25, 50, 75, 100].forEach(depth => {
+      if (pct >= depth && !scrollDepthTracked[depth]) {
+        scrollDepthTracked[depth] = true;
+        phCapture('scroll_depth_reached', {depth: depth});
+      }
+    });
+  }, 200);
+}, {passive: true});
+
+// ── RGPD Cookie Consent Banner ──
+(function() {
+  const banner = document.getElementById('cookie-consent-banner');
+  if (!banner) return;
+
+  const choice = localStorage.getItem('watchdogcity-cookies-consent');
+  if (choice === null) {
+    banner.classList.remove('hidden');
+    requestAnimationFrame(() => {
+      banner.classList.remove('translate-y-full');
+    });
+  }
+
+  document.getElementById('cookie-accept-btn')?.addEventListener('click', () => {
+    localStorage.setItem('watchdogcity-cookies-consent', 'accepted');
+    localStorage.removeItem('watchdogcity-cookies-refused');
+    banner.classList.add('translate-y-full');
+    setTimeout(() => banner.classList.add('hidden'), 500);
+  });
+
+  document.getElementById('cookie-refuse-btn')?.addEventListener('click', () => {
+    localStorage.setItem('watchdogcity-cookies-consent', 'refused');
+    localStorage.setItem('watchdogcity-cookies-refused', '1');
+    if (window.ph && typeof window.ph.opt_out_capturing === 'function') {
+      window.ph.opt_out_capturing();
+    }
+    banner.classList.add('translate-y-full');
+    setTimeout(() => banner.classList.add('hidden'), 500);
+  });
+})();

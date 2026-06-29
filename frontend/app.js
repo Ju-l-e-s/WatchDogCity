@@ -33,13 +33,24 @@ const COLORS = {
     'Mobilité': '#06b6d4',      // Cyan 500
     'Autres': '#cbd5e1'
 };
+const loadStartTime = performance.now();
+const scrollDepthTracked = {25: false, 50: false, 75: false, 100: false};
+
+function phCapture(eventName, props = {}) {
+  try {
+    if (window.phReady && window.ph && !localStorage.getItem('watchdogcity-cookies-refused')) {
+      window.ph.capture(eventName, props);
+    }
+  } catch(e) { /* fail silently */ }
+}
 
 function escapeRegExp(e) { return e.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") }
 function escapeHTML(e) { if (!e) return ""; const t = document.createElement("div"); return t.textContent = e, t.innerHTML }
 let lastFocusedElement = null;
-function toggleAboutModal(e) { if (e) lastFocusedElement = document.activeElement; const t = document.getElementById("about-modal"), n = document.getElementById("about-modal-body"), s = document.getElementById("about-scroll-indicator"); t.classList.toggle("hidden", !e), document.body.classList.toggle("modal-open", e), e && n && s && (n.scrollTop = 0, s.style.opacity = "1", n.dataset.hasScrollListener || (n.addEventListener("scroll", () => { console.log("Scroll About:", n.scrollTop); if (n.scrollTop > 10) { s.style.opacity = "0"; s.style.pointerEvents = "none"; } else { s.style.opacity = "1"; s.style.pointerEvents = "auto"; } }, { passive: true }), n.dataset.hasScrollListener = "true")); if (!e && lastFocusedElement) { lastFocusedElement.focus(); lastFocusedElement = null; } }
-function toggleTeamModal(e) { if (e) lastFocusedElement = document.activeElement; const t = document.getElementById("team-modal"), n = document.getElementById("team-modal-body"), s = document.getElementById("team-scroll-indicator"); t.classList.toggle("hidden", !e), document.body.classList.toggle("modal-open", e), e && n && s && (n.scrollTop = 0, s.style.opacity = "1", n.dataset.hasScrollListener || (n.addEventListener("scroll", () => { n.scrollTop > 50 ? s.style.opacity = "0" : s.style.opacity = "1" }), n.dataset.hasScrollListener = "true")); if (!e && lastFocusedElement) { lastFocusedElement.focus(); lastFocusedElement = null; } }
-function toggleContactModal(e) { if (e) lastFocusedElement = document.activeElement; document.getElementById("contact-modal").classList.toggle("hidden", !e), document.body.classList.toggle("modal-open", e); if (!e && lastFocusedElement) { lastFocusedElement.focus(); lastFocusedElement = null; } }
+function trapFocus(e){const t='a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',n=e.querySelectorAll(t),s=n[0],a=n[n.length-1];s&&a&&e.addEventListener('keydown',function(e){if(e.key==='Tab'){if(e.shiftKey){if(document.activeElement===s){e.preventDefault();a.focus()}}else{if(document.activeElement===a){e.preventDefault();s.focus()}}}})}
+function toggleAboutModal(e) { if (e) { lastFocusedElement = document.activeElement; phCapture('modal_opened', {modal: 'about'}); } const t = document.getElementById("about-modal"), n = document.getElementById("about-modal-body"), s = document.getElementById("about-scroll-indicator"); t.classList.toggle("hidden", !e), document.body.classList.toggle("modal-open", e), e&&trapFocus(t), e && n && s && (n.scrollTop = 0, s.style.opacity = "1", n.dataset.hasScrollListener || (n.addEventListener("scroll", () => { console.log("Scroll About:", n.scrollTop); if (n.scrollTop > 10) { s.style.opacity = "0"; s.style.pointerEvents = "none"; } else { s.style.opacity = "1"; s.style.pointerEvents = "auto"; } }, { passive: true }), n.dataset.hasScrollListener = "true")); if (!e && lastFocusedElement) { lastFocusedElement.focus(); lastFocusedElement = null; } }
+function toggleTeamModal(e) { if (e) { lastFocusedElement = document.activeElement; phCapture('modal_opened', {modal: 'team'}); } const t = document.getElementById("team-modal"), n = document.getElementById("team-modal-body"), s = document.getElementById("team-scroll-indicator"); t.classList.toggle("hidden", !e), document.body.classList.toggle("modal-open", e), e&&trapFocus(t), e && n && s && (n.scrollTop = 0, s.style.opacity = "1", n.dataset.hasScrollListener || (n.addEventListener("scroll", () => { n.scrollTop > 50 ? s.style.opacity = "0" : s.style.opacity = "1" }), n.dataset.hasScrollListener = "true")); if (!e && lastFocusedElement) { lastFocusedElement.focus(); lastFocusedElement = null; } }
+function toggleContactModal(e) { if (e) { lastFocusedElement = document.activeElement; phCapture('modal_opened', {modal: 'contact'}); } const t=document.getElementById("contact-modal"); t.classList.toggle("hidden", !e), document.body.classList.toggle("modal-open", e), e&&trapFocus(t); if (!e && lastFocusedElement) { lastFocusedElement.focus(); lastFocusedElement = null; } }
 function toggleMobileMenu(e) { if (e) lastFocusedElement = document.activeElement; document.getElementById("mobile-menu").classList.toggle("hidden", !e), document.body.classList.toggle("modal-open", e), e ? setTimeout(() => { document.getElementById("mobile-search-input")?.focus() }, 100) : (document.getElementById("mobile-search-input")?.blur(), lastFocusedElement && (lastFocusedElement.focus(), lastFocusedElement = null)) }
 function smartCapitalize(e) { if (!e) return ""; return e.split(" ").map((e, t) => { if (e.length > 1 && e === e.toUpperCase() && !/^[0-9]+$/.test(e)) return e; const n = e.toLowerCase(); return 0 === t ? n.charAt(0).toUpperCase() + n.slice(1) : n }).join(" ") }
 function applyAcronyms(e, t) { const n = { ...GLOBAL_GLOSSARY, ...t || {} }; if (0 === Object.keys(n).length) return e; let s = e; return Object.keys(n).sort((e, t) => t.length - e.length).forEach(e => { const t = escapeHTML(n[e]), a = new RegExp(`\\b${e}\\b`, "g"); s = s.replace(a, `<abbr title="${t}" class="cursor-help border-b border-dotted border-brand-300 decoration-brand-300 decoration-2 underline-offset-4" tabindex="0">${e}</abbr>`) }), s }
@@ -64,11 +75,28 @@ async function init() {
 
         console.log("📊 Nombre de conseils:", allCouncils.length);
 
+        phCapture('data_loaded', {
+          council_count: allCouncils.length,
+          deliberation_count: allCouncils.reduce((a, c) => a + (c.deliberations?.length || 0), 0),
+          load_time_ms: Math.round(performance.now() - loadStartTime)
+        });
+        phCapture('page_viewed', {view: 'timeline'});
+
         updateStats();
         renderTopicChips();
         render();
+        if (window.location.hash && window.location.hash.startsWith('#delib-')) {
+            const id = window.location.hash.substring(7);
+            if (!document.querySelector(`[data-delib-id="${id}"]`)) {
+                visibleCouncilsCount = 999;
+                render();
+            }
+            setTimeout(() => scrollToAndOpenDelib(id), 100);
+        }
     } catch (e) {
         console.error("❌ Erreur Init:", e);
+        const httpStatus = e.message.startsWith('HTTP Error:') ? parseInt(e.message.split(':')[1].trim()) : 0;
+        phCapture('data_load_failed', {error: e.message, status: httpStatus});
     } finally {
         const loader = document.getElementById("global-loader");
         if (loader) {
@@ -222,7 +250,7 @@ function renderDashboard() {
 }
 
 function handleSearch(e) { const t = document.getElementById("nav-search-input"), n = document.getElementById("mobile-search-input"); t && t.value !== e && (t.value = e), n && n.value !== e && (n.value = e), clearTimeout(searchTimeout), searchTimeout = setTimeout(() => { searchQuery = e.toLowerCase().trim(), visibleCouncilsCount = (searchQuery || selectedTopic) ? 5 : 2, render() }, 300) }
-function loadMore() { visibleCouncilsCount += 2, render() }
+function loadMore() { visibleCouncilsCount += 2, render(); phCapture('load_more_clicked', {visible_count: visibleCouncilsCount}); }
 function updateStats() { const e = document.getElementById("stat-councils"), t = document.getElementById("stat-deliberations"); e && (e.textContent = allCouncils.length), t && (t.textContent = allCouncils.reduce((e, t) => e + (t.deliberations?.length || 0), 0)) }
 function formatDate(e) { if (!e) return "Date inconnue"; try { const t = new Date(e); return isNaN(t.getTime()) ? e : t.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" }) } catch (t) { return e } }
 
@@ -252,7 +280,7 @@ function renderTopicChips() {
 
     // "Tous" chip
     const isAllActive = selectedTopic === null;
-    html += `<button onclick="handleTopicClick(null)" class="chip shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
+    html += `<button onclick="handleTopicClick(null)" aria-pressed="${isAllActive}" class="chip shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
         isAllActive
             ? 'bg-slate-900 text-white shadow-micro'
             : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300'
@@ -262,7 +290,7 @@ function renderTopicChips() {
     topics.forEach(topic => {
         const isActive = selectedTopic === topic;
         const color = COLORS[topic] || COLORS['Autres'];
-        html += `<button onclick="handleTopicClick('${topic.replace(/'/g, "\\'")}')" class="chip shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 flex items-center gap-2 ${
+        html += `<button onclick="handleTopicClick('${topic.replace(/'/g, "\\\\'")}')" aria-pressed="${isActive}" class="chip shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 flex items-center gap-2 ${
             isActive
                 ? 'bg-slate-900 text-white shadow-micro'
                 : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300'
@@ -278,6 +306,7 @@ function renderTopicChips() {
 function handleTopicClick(tag) {
     selectedTopic = tag;
     visibleCouncilsCount = (searchQuery || selectedTopic) ? 5 : 2;
+    if (tag) phCapture('topic_filter_clicked', {topic: tag});
     renderTopicChips();
     render();
 }
@@ -297,6 +326,24 @@ function render() {
         });
         return matchingDelibs.length > 0 ? { ...council, deliberations: matchingDelibs } : null;
     }).filter(c => c !== null);
+
+    // Event: council_empty for councils with 0 deliberations
+    allCouncils.forEach(c => {
+      if (!c.deliberations || c.deliberations.length === 0) {
+        phCapture('council_empty', {council_id: c.id});
+      }
+    });
+
+    // Event: search_performed
+    if (searchQuery) {
+      const resultCount = filteredCouncils.reduce((a, c) => a + c.deliberations.length, 0);
+      phCapture('search_performed', {result_count: resultCount, query_length: searchQuery.length});
+    }
+
+    // Event: search_no_results
+    if (filteredCouncils.length === 0) {
+      phCapture('search_no_results', {query_length: searchQuery.length, active_topic: selectedTopic || 'none'});
+    }
 
     const visibleCouncils = filteredCouncils.slice(0, visibleCouncilsCount);
     container.innerHTML = "";
@@ -525,12 +572,13 @@ function renderDeliberationRow(e) {
     const d = n ? `<div class="bg-white rounded-2xl p-6 shadow-micro border border-slate-100/80">\n            <div class="flex items-center justify-between mb-5">\n                <h5 class="text-[11px] font-semibold text-slate-900 uppercase tracking-widest">Vote</h5>\n                ${r ? '<span class="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-full ml-2">Unanimité</span>' : ""}\n            </div>\n            ${r ? `<div class="flex items-center gap-3"><div class="h-1.5 flex-1 bg-emerald-500 rounded-full"></div><span class="text-sm font-semibold text-emerald-700">${e.vote.pour} pour</span></div>` : `<div class="space-y-3">${renderVoteBar("Pour", e.vote.pour, s, "bg-emerald-500")}${renderVoteBar("Contre", e.vote.contre, s, "bg-rose-400")}${renderVoteBar("Abstention", e.vote.abstention, s, "bg-slate-300")}</div>`}\n           </div>` : '<div class="bg-slate-50 rounded-2xl p-6 border border-slate-100/50">\n            <p class="text-[11px] font-medium text-slate-600 uppercase tracking-widest text-center">Pas de vote enregistré</p>\n           </div>';
     
     return `<div class="group/item" data-delib-id="${e.id}">
-        <button onclick="toggleDelib('${t}')" id="btn-${t}" aria-expanded="false" aria-controls="content-${t}" class="delib-trigger w-full text-left px-4 py-4 md:px-8 md:py-6 flex items-center justify-between gap-4 min-h-[64px]">\n            <div class="flex-1 min-w-0">\n                <div class="flex items-center gap-2.5 mb-2">\n                    <span class="w-1.5 h-1.5 rounded-full ${a > 50 || r ? "bg-emerald-400" : n ? "bg-amber-400" : "bg-slate-300"} shrink-0"></span>\n                    <span class="text-[11px] font-medium text-slate-600 uppercase tracking-widest">${i}</span>\n                    ${budgetBadge}\n                    ${r ? '<span class="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">Unanime</span>' : ""}\n                </div>\n                <h4 class="text-base md:text-base font-semibold text-slate-800 group-hover/item:text-brand-600 transition-colors leading-snug">${o}</h4>\n            </div>\n            <div class="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-300 group-hover/item:text-brand-600 group-hover/item:bg-brand-50 transition-all shrink-0">\n                <svg id="icon-${t}" class="w-4 h-4 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>\n            </div>\n        </button>\n        <div id="content-${t}" class="delib-panel" role="region" aria-labelledby="btn-${t}">\n            <div class="delib-panel-inner">\n                <div class="border-t border-slate-100/60 bg-slate-50/30">\n                    <div class="px-4 pt-5 pb-5 md:px-10 md:py-8">\n                        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">\n                            <div class="lg:col-span-7">\n                                <p class="text-slate-500 leading-relaxed text-base mb-8">${l}</p>\n                                ${c}\n                                <div class="mt-8 pt-8 border-t border-slate-100/60 flex flex-wrap gap-4">\n                                    <a href="${e.pdf_url}" target="_blank" class="inline-flex items-center gap-2 text-xs font-bold text-brand-600 hover:text-brand-700 bg-brand-50 px-4 py-2 rounded-lg transition-all border border-brand-100 hover:shadow-sm">\n                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>\n                                        Consulter le PDF officiel\n                                    </a>\n                                </div>\n                            </div>\n                            <div class="lg:col-span-5">\n                                ${d}\n                            </div>\n                        </div>\n                    </div>\n                </div>\n            </div>\n        </div>\n    </div>`;
+        <button onclick="toggleDelib('${t}')" id="btn-${t}" aria-expanded="false" aria-controls="content-${t}" class="delib-trigger w-full text-left px-4 py-4 md:px-8 md:py-6 flex items-center justify-between gap-4 min-h-[64px]">\n            <div class="flex-1 min-w-0">\n                <div class="flex items-center gap-2.5 mb-2">\n                    <span class="w-1.5 h-1.5 rounded-full ${a > 50 || r ? "bg-emerald-400" : n ? "bg-amber-400" : "bg-slate-300"} shrink-0"></span>\n                    <span class="text-[11px] font-medium text-slate-600 uppercase tracking-widest">${i}</span>\n                    ${budgetBadge}\n                    ${r ? '<span class="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">Unanime</span>' : ""}\n                </div>\n                <h4 class="text-base md:text-base font-semibold text-slate-800 group-hover/item:text-brand-600 transition-colors leading-snug">${o}<button class="opacity-0 group-hover/item:opacity-100 transition-opacity duration-200 ml-2 text-slate-400 hover:text-brand-600 align-middle inline-flex items-center" title="Copier le lien de partage" aria-label="Partager cette délibération" onclick="event.stopPropagation(); copyShareLink('${e.id}')"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg></button></h4>\n            </div>\n            <div class="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-300 group-hover/item:text-brand-600 group-hover/item:bg-brand-50 transition-all shrink-0">\n                <svg id="icon-${t}" class="w-4 h-4 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>\n            </div>\n        </button>\n        <div id="content-${t}" class="delib-panel" role="region" aria-labelledby="btn-${t}">\n            <div class="delib-panel-inner">\n                <div class="border-t border-slate-100/60 bg-slate-50/30">\n                    <div class="px-4 pt-5 pb-5 md:px-10 md:py-8">\n                        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">\n                            <div class="lg:col-span-7">\n                                <p class="text-slate-500 leading-relaxed text-base mb-8">${l}</p>\n                                ${c}\n                                <div class="mt-8 pt-8 border-t border-slate-100/60 flex flex-wrap gap-4">\n                                    <a href="${e.pdf_url}" target="_blank" class="inline-flex items-center gap-2 text-xs font-bold text-brand-600 hover:text-brand-700 bg-brand-50 px-4 py-2 rounded-lg transition-all border border-brand-100 hover:shadow-sm">\n                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>\n                                        Consulter le PDF officiel\n                                    </a>\n                                </div>\n                            </div>\n                            <div class="lg:col-span-5">\n                                ${d}\n                            </div>\n                        </div>\n                    </div>\n                </div>\n            </div>\n        </div>\n    </div>`;
 }
 
 function renderVoteBar(e, t, n, s) { if (null == t) return `<div class="flex justify-between text-[11px] font-light text-slate-300 tracking-wide"><span>${e}</span><span>—</span></div>`; return `<div><div class="flex justify-between text-[11px] font-medium mb-1"><span class="text-slate-600">${e}</span><span class="text-slate-600 font-semibold">${t}</span></div><div class="h-1.5 bg-slate-100 rounded-full overflow-hidden"><div class="${s} h-full rounded-full transition-all duration-500" style="width:${n > 0 ? t / n * 100 : 0}%"></div></div></div>` }
-function toggleDelib(e) { const t = document.getElementById(`content-${e}`), n = document.getElementById(`icon-${e}`), s = document.getElementById(`btn-${e}`); if (!t || !n || !s) return; const a = t.classList.contains("is-open"); t.classList.toggle("is-open"), n.classList.toggle("rotate-180"), s.setAttribute("aria-expanded", a ? "false" : "true") }
+function toggleDelib(e) { const t = document.getElementById(`content-${e}`), n = document.getElementById(`icon-${e}`), s = document.getElementById(`btn-${e}`); if (!t || !n || !s) return; const a = t.classList.contains("is-open"); t.classList.toggle("is-open"), n.classList.toggle("rotate-180"), s.setAttribute("aria-expanded", a ? "false" : "true"); if (!a) { const r = s.closest('[data-delib-id]'); if (r) { const d = r.getAttribute('data-delib-id'); let g = 'unknown'; s.querySelectorAll('span').forEach(x => { if (x.className.includes('tracking-widest') && x.className.includes('uppercase')) g = x.textContent.trim() }); phCapture('deliberation_expanded', {deliberation_id: d, topic_tag: g}) } } }
 function scrollToAndOpenDelib(delibId) {
+    history.replaceState(null, '', '#delib-' + delibId);
     const container = document.querySelector(`[data-delib-id="${delibId}"]`);
     if (!container) return;
     container.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -541,7 +589,30 @@ function scrollToAndOpenDelib(delibId) {
     }
 }
 
+function copyShareLink(delibId) {
+    const url = window.location.origin + window.location.pathname + '#delib-' + delibId;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url)
+            .then(() => showToast("Lien copié !"))
+            .catch(() => prompt("Copier le lien de partage :", url));
+    } else {
+        prompt("Copier le lien de partage :", url);
+    }
+}
+
+function showToast(message) {
+    const toast = document.createElement('div');
+    toast.className = 'fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-900 text-white px-5 py-3 rounded-2xl shadow-xl z-[200] transition-opacity duration-300';
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 300);
+    }, 2000);
+}
+
 function toggleView(viewName) {
+    phCapture('view_toggled', {view: viewName});
     const timelineView = document.getElementById("timeline");
     const budgetView = document.getElementById("budget-view");
     const chipsBar = document.getElementById("topic-chips-bar");
@@ -742,8 +813,8 @@ function renderBudgetView() {
 
 init();
 const contactForm = document.getElementById("contact-form"), contactStatus = document.getElementById("contact-status");
-contactForm && contactForm.addEventListener("submit", async e => { e.preventDefault(); const t = { name: document.getElementById("contact-name").value, email_sender: document.getElementById("contact-email").value, message: document.getElementById("contact-message").value }; try { e.submitter && (e.submitter.disabled = !0); const n = await fetch("https://zq7qfmhra1.execute-api.eu-west-3.amazonaws.com/prod/contact", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(t) }), s = await n.json().catch(() => ({})); n.ok ? (contactStatus.textContent = "Message envoyé avec succès.", contactStatus.className = "text-sm font-medium text-center py-2 rounded-xl text-green-600 bg-green-50 block", contactForm.reset()) : (contactStatus.textContent = s.error || "Erreur lors de l'envoi.", contactStatus.className = "text-sm font-medium text-center py-2 rounded-xl text-red-600 bg-red-50 block") } catch (e) { contactStatus.textContent = "Erreur réseau. Impossible de contacter le serveur.", contactStatus.className = "text-sm font-medium text-center py-2 rounded-xl text-red-600 bg-red-50 block", "undefined" != typeof turnstile && "undefined" != typeof contactWidgetId && turnstile.reset(contactWidgetId) } finally { e.submitter && (e.submitter.disabled = !1) } });
+contactForm && contactForm.addEventListener("submit", async e => { e.preventDefault(); const t = { name: document.getElementById("contact-name").value, email_sender: document.getElementById("contact-email").value, message: document.getElementById("contact-message").value }; try { e.submitter && (e.submitter.disabled = !0); const n = await fetch("https://zq7qfmhra1.execute-api.eu-west-3.amazonaws.com/prod/contact", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(t) }), s = await n.json().catch(() => ({})); n.ok ? (phCapture('contact_form_submitted', {success: true}), contactStatus.textContent = "Message envoyé avec succès.", contactStatus.className = "text-sm font-medium text-center py-2 rounded-xl text-green-600 bg-green-50 block", contactForm.reset()) : (phCapture('contact_form_submitted', {success: false}), contactStatus.textContent = s.error || "Erreur lors de l'envoi.", contactStatus.className = "text-sm font-medium text-center py-2 rounded-xl text-red-600 bg-red-50 block") } catch (e) { contactStatus.textContent = "Erreur réseau. Impossible de contacter le serveur.", contactStatus.className = "text-sm font-medium text-center py-2 rounded-xl text-red-600 bg-red-50 block", "undefined" != typeof turnstile && "undefined" != typeof contactWidgetId && turnstile.reset(contactWidgetId) } finally { e.submitter && (e.submitter.disabled = !1) } });
 
 const newsletterForm = document.getElementById("newsletter-form"), newsletterStatus = document.getElementById("newsletter-status"), newsletterEmail = document.getElementById("newsletter-email"), newsletterCheckbox = document.getElementById("newsletter-checkbox"), newsletterSubmit = document.getElementById("newsletter-submit"), newsletterConfirm = document.getElementById("newsletter-confirm"), newsletterConfirmEmail = document.getElementById("newsletter-confirm-email");
 newsletterCheckbox && newsletterCheckbox.addEventListener("change", () => { newsletterSubmit.disabled = !newsletterCheckbox.checked; });
-newsletterForm && newsletterForm.addEventListener("submit", async e => { e.preventDefault(); const email = newsletterEmail.value; try { e.submitter && (e.submitter.disabled = !0); const n = await fetch("https://zq7qfmhra1.execute-api.eu-west-3.amazonaws.com/prod/subscribe", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email }) }), s = await n.json().catch(() => ({})); n.ok ? (newsletterForm.classList.add("hidden"), newsletterConfirmEmail.textContent = email, newsletterConfirm.classList.remove("hidden")) : (newsletterStatus.textContent = s.error || "Oups ! Une erreur est survenue lors de l'inscription. Merci de réessayer d'ici quelques instants.", newsletterStatus.className = "text-sm font-medium text-center py-3 px-4 rounded-xl text-rose-400 bg-rose-400/10 border border-rose-400/20 block") } catch (e) { newsletterStatus.textContent = "Nous n'avons pas réussi à vous inscrire. Merci de vérifier votre connexion ou de réessayer plus tard.", newsletterStatus.className = "text-sm font-medium text-center py-3 px-4 rounded-xl text-rose-400 bg-rose-400/10 border border-rose-400/20 block" } finally { e.submitter && (e.submitter.disabled = !1) } });
+newsletterForm && newsletterForm.addEventListener("submit", async e => { e.preventDefault(); const email = newsletterEmail.value; try { e.submitter && (e.submitter.disabled = !0); const n = await fetch("https://zq7qfmhra1.execute-api.eu-west-3.amazonaws.com/prod/subscribe", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email }) }), s = await n.json().catch(() => ({})); n.ok ? (phCapture('newsletter_form_submitted', {success: true}), newsletterForm.classList.add("hidden"), newsletterConfirmEmail.textContent = email, newsletterConfirm.classList.remove("hidden")) : (phCapture('newsletter_form_submitted', {success: false}), newsletterStatus.textContent = s.error || "Oups ! Une erreur est survenue lors de l'inscription. Merci de réessayer d'ici quelques instants.", newsletterStatus.className = "text-sm font-medium text-center py-3 px-4 rounded-xl text-rose-400 bg-rose-400/10 border border-rose-400/20 block") } catch (e) { newsletterStatus.textContent = "Nous n'avons pas réussi à vous inscrire. Merci de vérifier votre connexion ou de réessayer plus tard.", newsletterStatus.className = "text-sm font-medium text-center py-3 px-4 rounded-xl text-rose-400 bg-rose-400/10 border border-rose-400/20 block" } finally { e.submitter && (e.submitter.disabled = !1) } });

@@ -314,9 +314,13 @@ function render() {
         let councilRibbonHtml = '', councilLegendHtml = '';
         const councilTotal = council.analysis ? council.analysis.budget_impact : 0;
         if (councilTotal > 0) {
+            // Use the ORIGINAL (unfiltered) council deliberations for the budget ribbon,
+            // so percentages reflect the full council, not just the filtered subset.
+            const originalCouncil = allCouncils.find(c => c.id === council.id);
+            const budgetDelibs = originalCouncil ? (originalCouncil.deliberations || []) : (council.deliberations || []);
             const cats = {};
             let councilThematicTotal = 0;
-            (council.deliberations || []).forEach(d => {
+            budgetDelibs.forEach(d => {
                 if (d.budget_impact > 0 && d.topic_tag !== 'Budget') {
                     const cat = d.topic_tag || 'Autres';
                     cats[cat] = (cats[cat] || 0) + d.budget_impact;

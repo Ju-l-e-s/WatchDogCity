@@ -1,5 +1,5 @@
 console.log("🚀 L'Observatoire Citoyen : Initialisation...");
-let searchTimeout, allCouncils = [], visibleCouncilsCount = 2, searchQuery = "", selectedTopic = null;
+let searchTimeout, allCouncils = [], visibleCouncilsCount = 2, searchQuery = "", selectedTopics = [];
 const GLOBAL_GLOSSARY = {
     CCAS: "Centre Communal d'Action Sociale",
     ZAC: "Zone d'Aménagement Concerté",
@@ -83,7 +83,7 @@ async function init() {
         phCapture('page_viewed', {view: 'timeline'});
 
         updateStats();
-        renderTopicChips();
+        renderTopicDropdown();
         render();
         if (window.location.hash && window.location.hash.startsWith('#delib-')) {
             const id = window.location.hash.substring(7);
@@ -249,7 +249,7 @@ function renderDashboard() {
     console.log("✅ Dashboard rendu avec succès.");
 }
 
-function handleSearch(e) { const t = document.getElementById("nav-search-input"), n = document.getElementById("mobile-search-input"); t && t.value !== e && (t.value = e), n && n.value !== e && (n.value = e), clearTimeout(searchTimeout), searchTimeout = setTimeout(() => { searchQuery = e.toLowerCase().trim(), visibleCouncilsCount = (searchQuery || selectedTopic) ? 5 : 2, render() }, 300) }
+function handleSearch(e) { const t = document.getElementById("nav-search-input"), n = document.getElementById("mobile-search-input"); t && t.value !== e && (t.value = e), n && n.value !== e && (n.value = e), clearTimeout(searchTimeout), searchTimeout = setTimeout(() => { searchQuery = e.toLowerCase().trim(), visibleCouncilsCount = (searchQuery || selectedTopics.length > 0) ? 5 : 2, render() }, 300) }
 function loadMore() { visibleCouncilsCount += 2, render(); phCapture('load_more_clicked', {visible_count: visibleCouncilsCount}); }
 function updateStats() { const e = document.getElementById("stat-councils"), t = document.getElementById("stat-deliberations"); e && (e.textContent = allCouncils.length), t && (t.textContent = allCouncils.reduce((e, t) => e + (t.deliberations?.length || 0), 0)) }
 function formatDate(e) { if (!e) return "Date inconnue"; try { const t = new Date(e); return isNaN(t.getTime()) ? e : t.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" }) } catch (t) { return e } }
@@ -258,7 +258,7 @@ function formatBudget(val) {
     return val.toLocaleString('fr-FR', { maximumFractionDigits: 0 }) + " €";
 }
 
-// ── Topic Filter Chips ──
+// ── Topic Filter Dropdown ──
 
 function getAvailableTopics() {
     const topics = new Set();
@@ -270,45 +270,142 @@ function getAvailableTopics() {
     return [...topics].sort((a, b) => a.localeCompare(b, 'fr'));
 }
 
-function renderTopicChips() {
-    const container = document.getElementById('topic-chips');
-    if (!container) return;
-
-    const topics = getAvailableTopics();
-
-    let html = '';
-
-    // "Tous" chip
-    const isAllActive = selectedTopic === null;
-    html += `<button onclick="handleTopicClick(null)" aria-pressed="${isAllActive}" class="chip shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
-        isAllActive
-            ? 'bg-slate-900 text-white shadow-micro'
-            : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300'
-    }">Tous</button>`;
-
-    // Individual topic chips
-    topics.forEach(topic => {
-        const isActive = selectedTopic === topic;
-        const color = COLORS[topic] || COLORS['Autres'];
-        html += `<button onclick="handleTopicClick('${topic.replace(/'/g, "\\'")}')" aria-pressed="${isActive}" class="chip shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 flex items-center gap-2 ${
-            isActive
-                ? 'bg-slate-900 text-white shadow-micro'
-                : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300'
-        }">
-            <span class="w-2 h-2 rounded-full shrink-0" style="background-color: ${color}"></span>
-            ${topic}
-        </button>`;
+function getTopicCounts() {
+    const counts = {};
+    allCouncils.forEach(c => {
+        (c.deliberations || []).forEach(d => {
+            if (d.topic_tag) {
+                counts[d.topic_tag] = (counts[d.topic_tag] || 0) + 1;
+            }
+        });
     });
-
-    container.innerHTML = html;
+    return counts;
 }
 
-function handleTopicClick(tag) {
-    selectedTopic = tag;
-    visibleCouncilsCount = (searchQuery || selectedTopic) ? 5 : 2;
-    if (tag) phCapture('topic_filter_clicked', {topic: tag});
-    renderTopicChips();
+function toggleTopicDropdown(event) {
+    if (event) event.stopPropagation();
+    const menu = document.getElementById('topic-dropdown-menu');
+    if (menu) {
+        const expanded = !menu.classList.contains('hidden');
+        menu.classList.toggle('hidden');
+        document.getElementById('topic-dropdown-btn')?.setAttribute('aria-expanded', !expanded);
+    }
+}
+
+// Close dropdown when clicking outside
+document.addEventListener('click', function(e) {
+    const menu = document.getElementById('topic-dropdown-menu');
+    const container = document.getElementById('topic-dropdown-container');
+    if (menu && container && !container.contains(e.target)) {
+        menu.classList.add('hidden');
+        document.getElementById('topic-dropdown-btn')?.setAttribute('aria-expanded', 'false');
+    }
+});
+
+function handleTopicToggle(topic) {
+    const idx = selectedTopics.indexOf(topic);
+    if (idx > -1) {
+        selectedTopics.splice(idx, 1);
+    } else {
+        selectedTopics.push(topic);
+        phCapture('topic_filter_clicked', {topic: topic});
+    }
+    visibleCouncilsCount = (searchQuery || selectedTopics.length > 0) ? 5 : 2;
+    renderTopicDropdown();
     render();
+}
+
+function clearAllTopics(event) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+    selectedTopics = [];
+    visibleCouncilsCount = searchQuery ? 5 : 2;
+    renderTopicDropdown();
+    render();
+}
+
+function removeTopicTag(topic, event) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+    const idx = selectedTopics.indexOf(topic);
+    if (idx > -1) {
+        selectedTopics.splice(idx, 1);
+    }
+    visibleCouncilsCount = (searchQuery || selectedTopics.length > 0) ? 5 : 2;
+    renderTopicDropdown();
+    render();
+}
+
+function renderTopicDropdown() {
+    const listContainer = document.getElementById('topic-options-list');
+    const btnText = document.getElementById('topic-dropdown-btn-text');
+    const tagsContainer = document.getElementById('selected-topics-tags');
+    if (!listContainer || !btnText) return;
+
+    const topics = getAvailableTopics();
+    const counts = getTopicCounts();
+
+    // 1. Render dropdown checkbox options
+    let listHtml = '';
+    topics.forEach(topic => {
+        const isChecked = selectedTopics.includes(topic);
+        const color = COLORS[topic] || COLORS['Autres'];
+        const count = counts[topic] || 0;
+        
+        listHtml += `
+            <label class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-50 cursor-pointer text-sm text-slate-700 transition-colors">
+                <input type="checkbox" 
+                       class="rounded border-slate-300 text-brand-600 focus:ring-brand-500/20" 
+                       ${isChecked ? 'checked' : ''} 
+                       onchange="handleTopicToggle('${topic.replace(/'/g, "\\'")}')">
+                <span class="w-2.5 h-2.5 rounded-full shrink-0" style="background-color: ${color}"></span>
+                <span class="flex-1 truncate">${topic}</span>
+                <span class="text-xs text-slate-400 font-medium">(${count})</span>
+            </label>
+        `;
+    });
+    listContainer.innerHTML = listHtml;
+
+    // 2. Render button text
+    if (selectedTopics.length === 0) {
+        btnText.textContent = "Toutes les thématiques";
+    } else if (selectedTopics.length === 1) {
+        btnText.textContent = selectedTopics[0];
+    } else {
+        btnText.textContent = `${selectedTopics.length} thématiques`;
+    }
+
+    // 3. Render dismissible tags
+    if (tagsContainer) {
+        let tagsHtml = '';
+        selectedTopics.forEach(topic => {
+            const color = COLORS[topic] || COLORS['Autres'];
+            tagsHtml += `
+                <span class="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-full text-xs font-semibold transition-colors">
+                    <span class="w-1.5 h-1.5 rounded-full shrink-0" style="background-color: ${color}"></span>
+                    ${topic}
+                    <button onclick="removeTopicTag('${topic.replace(/'/g, "\\'")}', event)" class="hover:text-red-600 font-bold ml-0.5 focus:outline-none shrink-0" aria-label="Supprimer le filtre ${topic}">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </span>
+            `;
+        });
+        
+        if (selectedTopics.length > 0) {
+            tagsHtml += `
+                <button onclick="clearAllTopics(event)" class="text-xs font-bold text-slate-400 hover:text-slate-600 transition-colors ml-1 py-1">
+                    Effacer tout
+                </button>
+            `;
+        }
+        tagsContainer.innerHTML = tagsHtml;
+    }
 }
 
 function render() {
@@ -321,7 +418,7 @@ function render() {
                 d.title.toLowerCase().includes(searchQuery) || 
                 d.summary.toLowerCase().includes(searchQuery) || 
                 (d.topic_tag && d.topic_tag.toLowerCase().includes(searchQuery));
-            const matchesTopic = selectedTopic === null || d.topic_tag === selectedTopic;
+            const matchesTopic = selectedTopics.length === 0 || selectedTopics.includes(d.topic_tag);
             return matchesSearch && matchesTopic;
         });
         return matchingDelibs.length > 0 ? { ...council, deliberations: matchingDelibs } : null;
@@ -342,7 +439,7 @@ function render() {
 
     // Event: search_no_results
     if (filteredCouncils.length === 0) {
-      phCapture('search_no_results', {query_length: searchQuery.length, active_topic: selectedTopic || 'none'});
+      phCapture('search_no_results', {query_length: searchQuery.length, active_topic: selectedTopics.join(', ') || 'none'});
     }
 
     const announcer = document.getElementById('search-announcer');

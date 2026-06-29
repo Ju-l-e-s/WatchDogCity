@@ -337,9 +337,33 @@
     </div>
   </header>
 
-  <!-- Topic Filter Chips -->
-  <div id="topic-chips-bar" class="max-w-5xl mx-auto px-4 md:px-6 pb-2">
-    <div id="topic-chips" class="flex gap-2 overflow-x-auto scrollbar-hide py-3" aria-label="Filtrer par thème"></div>
+  <!-- Topic Filter Bar -->
+  <div id="topic-chips-bar" class="max-w-5xl mx-auto px-4 md:px-6 pb-6 flex flex-wrap gap-4 items-center">
+    <div class="relative inline-block text-left" id="topic-dropdown-container">
+      <button id="topic-dropdown-btn" onclick="toggleTopicDropdown(event)" class="flex items-center justify-between gap-2.5 px-4 py-2.5 bg-white border border-slate-200 hover:border-slate-300 rounded-xl text-sm font-semibold text-slate-800 shadow-micro hover:bg-slate-50 transition-all duration-200 focus:outline-none min-h-[44px]" aria-expanded="false" aria-haspopup="true">
+        <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path>
+        </svg>
+        <span id="topic-dropdown-btn-text">Toutes les thématiques</span>
+        <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+        </svg>
+      </button>
+      
+      <!-- Dropdown Menu -->
+      <div id="topic-dropdown-menu" class="hidden absolute left-0 mt-2 w-72 bg-white rounded-2xl border border-slate-100 shadow-elevated py-3 z-[60] origin-top-left max-h-[360px] overflow-y-auto">
+        <div class="px-4 pb-2 mb-2 border-b border-slate-100 flex items-center justify-between">
+          <span class="text-xs font-bold text-slate-400 uppercase tracking-widest">Thématiques</span>
+          <button onclick="clearAllTopics(event)" class="text-xs font-semibold text-brand-600 hover:text-brand-800 transition-colors">Réinitialiser</button>
+        </div>
+        <div id="topic-options-list" class="space-y-0.5 px-2">
+          <!-- Dynamically generated checkbox options -->
+        </div>
+      </div>
+    </div>
+    
+    <!-- Selected tags -->
+    <div id="selected-topics-tags" class="flex flex-wrap gap-2 items-center"></div>
   </div>
 
   <!-- Content Area -->

@@ -1,5 +1,5 @@
 console.log("🚀 L'Observatoire Citoyen : Initialisation...");
-let searchTimeout, allCouncils = [], visibleCouncilsCount = 2, searchQuery = "";
+let searchTimeout, allCouncils = [], visibleCouncilsCount = 2, searchQuery = "", selectedTopic = null;
 const GLOBAL_GLOSSARY = {
     CCAS: "Centre Communal d'Action Sociale",
     ZAC: "Zone d'Aménagement Concerté",
@@ -65,6 +65,7 @@ async function init() {
         console.log("📊 Nombre de conseils:", allCouncils.length);
 
         updateStats();
+        renderTopicChips();
         render();
     } catch (e) {
         console.error("❌ Erreur Init:", e);
@@ -220,7 +221,7 @@ function renderDashboard() {
     console.log("✅ Dashboard rendu avec succès.");
 }
 
-function handleSearch(e) { const t = document.getElementById("nav-search-input"), n = document.getElementById("mobile-search-input"); t && t.value !== e && (t.value = e), n && n.value !== e && (n.value = e), clearTimeout(searchTimeout), searchTimeout = setTimeout(() => { searchQuery = e.toLowerCase().trim(), visibleCouncilsCount = searchQuery ? 5 : 2, render() }, 300) }
+function handleSearch(e) { const t = document.getElementById("nav-search-input"), n = document.getElementById("mobile-search-input"); t && t.value !== e && (t.value = e), n && n.value !== e && (n.value = e), clearTimeout(searchTimeout), searchTimeout = setTimeout(() => { searchQuery = e.toLowerCase().trim(), visibleCouncilsCount = (searchQuery || selectedTopic) ? 5 : 2, render() }, 300) }
 function loadMore() { visibleCouncilsCount += 2, render() }
 function updateStats() { const e = document.getElementById("stat-councils"), t = document.getElementById("stat-deliberations"); e && (e.textContent = allCouncils.length), t && (t.textContent = allCouncils.reduce((e, t) => e + (t.deliberations?.length || 0), 0)) }
 function formatDate(e) { if (!e) return "Date inconnue"; try { const t = new Date(e); return isNaN(t.getTime()) ? e : t.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" }) } catch (t) { return e } }
@@ -229,17 +230,72 @@ function formatBudget(val) {
     return val.toLocaleString('fr-FR', { maximumFractionDigits: 0 }) + " €";
 }
 
+// ── Topic Filter Chips ──
+
+function getAvailableTopics() {
+    const topics = new Set();
+    allCouncils.forEach(c => {
+        (c.deliberations || []).forEach(d => {
+            if (d.topic_tag) topics.add(d.topic_tag);
+        });
+    });
+    return [...topics].sort((a, b) => a.localeCompare(b, 'fr'));
+}
+
+function renderTopicChips() {
+    const container = document.getElementById('topic-chips');
+    if (!container) return;
+
+    const topics = getAvailableTopics();
+
+    let html = '';
+
+    // "Tous" chip
+    const isAllActive = selectedTopic === null;
+    html += `<button onclick="handleTopicClick(null)" class="chip shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
+        isAllActive
+            ? 'bg-slate-900 text-white shadow-micro'
+            : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300'
+    }">Tous</button>`;
+
+    // Individual topic chips
+    topics.forEach(topic => {
+        const isActive = selectedTopic === topic;
+        const color = COLORS[topic] || COLORS['Autres'];
+        html += `<button onclick="handleTopicClick('${topic.replace(/'/g, "\\'")}')" class="chip shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 flex items-center gap-2 ${
+            isActive
+                ? 'bg-slate-900 text-white shadow-micro'
+                : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300'
+        }">
+            <span class="w-2 h-2 rounded-full shrink-0" style="background-color: ${color}"></span>
+            ${topic}
+        </button>`;
+    });
+
+    container.innerHTML = html;
+}
+
+function handleTopicClick(tag) {
+    selectedTopic = tag;
+    visibleCouncilsCount = (searchQuery || selectedTopic) ? 5 : 2;
+    renderTopicChips();
+    render();
+}
+
 function render() {
     const container = document.getElementById("timeline");
     if (!container) return;
 
     const filteredCouncils = allCouncils.map(council => {
-        const matchingDelibs = (council.deliberations || []).filter(d => 
-            d.title.toLowerCase().includes(searchQuery) || 
-            d.summary.toLowerCase().includes(searchQuery) || 
-            (d.topic_tag && d.topic_tag.toLowerCase().includes(searchQuery))
-        );
-        return matchingDelibs.length > 0 || searchQuery === "" ? { ...council, deliberations: matchingDelibs } : null;
+        const matchingDelibs = (council.deliberations || []).filter(d => {
+            const matchesSearch = searchQuery === "" || 
+                d.title.toLowerCase().includes(searchQuery) || 
+                d.summary.toLowerCase().includes(searchQuery) || 
+                (d.topic_tag && d.topic_tag.toLowerCase().includes(searchQuery));
+            const matchesTopic = selectedTopic === null || d.topic_tag === selectedTopic;
+            return matchesSearch && matchesTopic;
+        });
+        return matchingDelibs.length > 0 ? { ...council, deliberations: matchingDelibs } : null;
     }).filter(c => c !== null);
 
     const visibleCouncils = filteredCouncils.slice(0, visibleCouncilsCount);
@@ -484,12 +540,14 @@ function scrollToAndOpenDelib(delibId) {
 function toggleView(viewName) {
     const timelineView = document.getElementById("timeline");
     const budgetView = document.getElementById("budget-view");
+    const chipsBar = document.getElementById("topic-chips-bar");
     const navBudgetBtn = document.getElementById("nav-budget-btn");
     const navTimelineBtn = document.getElementById("nav-timeline-btn");
 
     if (viewName === 'budget') {
         if(timelineView) timelineView.classList.add("hidden");
         if(budgetView) budgetView.classList.remove("hidden");
+        if(chipsBar) chipsBar.classList.add("hidden");
 
         if(navBudgetBtn) {
             navBudgetBtn.classList.add("text-brand-700", "font-bold");
@@ -504,6 +562,7 @@ function toggleView(viewName) {
     } else {
         if(timelineView) timelineView.classList.remove("hidden");
         if(budgetView) budgetView.classList.add("hidden");
+        if(chipsBar) chipsBar.classList.remove("hidden");
 
         if(navTimelineBtn) {
             navTimelineBtn.classList.add("text-brand-700", "font-bold");

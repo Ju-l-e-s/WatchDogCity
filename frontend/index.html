@@ -54,6 +54,9 @@
       color: #0f172a; font-family: 'Outfit', 'Inter', system-ui, sans-serif;
       font-weight: 500; letter-spacing: 0.025em; margin: 0;
     }
+    /* Hide scrollbar for chip overflow */
+    .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+    .scrollbar-hide::-webkit-scrollbar { display: none; }
   </style>
   
   <!-- Global Loader -->
@@ -316,6 +319,11 @@
       <span id="next-council-date" class="text-xs text-orange-700 font-medium tracking-tight">--</span>
     </div>
   </header>
+
+  <!-- Topic Filter Chips -->
+  <div id="topic-chips-bar" class="max-w-5xl mx-auto px-4 md:px-6 pb-2">
+    <div id="topic-chips" class="flex gap-2 overflow-x-auto scrollbar-hide py-3" aria-label="Filtrer par thème"></div>
+  </div>
 
   <!-- Content Area -->
   <main class="max-w-5xl mx-auto px-4 md:px-6 pb-24">

@@ -2,35 +2,37 @@
 
 .PHONY: build build-frontend verify-frontend preflight deploy test logs-orchestrator logs-worker logs-publisher logs-notifier logs-validator logs-aggregator clean update-data
 
+LDFLAGS = -ldflags="-s -w"
+
 # --- Déploiement ---
 build:
 	mkdir -p dist
 	# Orchestrator
-	cd lambdas/orchestrator && GOOS=linux GOARCH=arm64 go build -o bootstrap .
+	cd lambdas/orchestrator && GOOS=linux GOARCH=arm64 go build $(LDFLAGS) -o bootstrap .
 	cd lambdas/orchestrator && zip -j ../../dist/orchestrator.zip bootstrap && rm bootstrap
 	# Worker
-	cd lambdas/worker && GOOS=linux GOARCH=arm64 go build -o bootstrap .
+	cd lambdas/worker && GOOS=linux GOARCH=arm64 go build $(LDFLAGS) -o bootstrap .
 	cd lambdas/worker && zip -j ../../dist/worker.zip bootstrap && rm bootstrap
 	# Aggregator
-	cd lambdas/aggregator && go mod tidy && GOOS=linux GOARCH=arm64 go build -o bootstrap .
+	cd lambdas/aggregator && go mod tidy && GOOS=linux GOARCH=arm64 go build $(LDFLAGS) -o bootstrap .
 	cd lambdas/aggregator && zip -j ../../dist/aggregator.zip bootstrap && rm bootstrap
 	# Publisher
-	cd lambdas/publisher && GOOS=linux GOARCH=arm64 go build -o bootstrap .
+	cd lambdas/publisher && GOOS=linux GOARCH=arm64 go build $(LDFLAGS) -o bootstrap .
 	cd lambdas/publisher && zip -j ../../dist/publisher.zip bootstrap && rm bootstrap
 	# SubscribeFunction
-	cd lambdas/subscriber && go mod tidy && GOOS=linux GOARCH=arm64 go build -o bootstrap .
+	cd lambdas/subscriber && go mod tidy && GOOS=linux GOARCH=arm64 go build $(LDFLAGS) -o bootstrap .
 	cd lambdas/subscriber && zip -j ../../dist/subscriber.zip bootstrap && rm bootstrap
 	# ContactFunction
-	cd lambdas/contact && go mod tidy && GOOS=linux GOARCH=arm64 go build -o bootstrap .
+	cd lambdas/contact && go mod tidy && GOOS=linux GOARCH=arm64 go build $(LDFLAGS) -o bootstrap .
 	cd lambdas/contact && zip -j ../../dist/contact.zip bootstrap && rm bootstrap
 	# Confirmer
-	cd lambdas/confirmer && go mod tidy && GOOS=linux GOARCH=arm64 go build -o bootstrap .
+	cd lambdas/confirmer && go mod tidy && GOOS=linux GOARCH=arm64 go build $(LDFLAGS) -o bootstrap .
 	cd lambdas/confirmer && zip -j ../../dist/confirmer.zip bootstrap && rm bootstrap
 	# Notifier
-	cd lambdas/notifier && go mod tidy && GOOS=linux GOARCH=arm64 go build -o bootstrap .
+	cd lambdas/notifier && go mod tidy && GOOS=linux GOARCH=arm64 go build $(LDFLAGS) -o bootstrap .
 	cd lambdas/notifier && zip -j ../../dist/notifier.zip bootstrap && rm bootstrap
 	# Validator
-	cd lambdas/validator && go mod tidy && GOOS=linux GOARCH=arm64 go build -o bootstrap .
+	cd lambdas/validator && go mod tidy && GOOS=linux GOARCH=arm64 go build $(LDFLAGS) -o bootstrap .
 	cd lambdas/validator && zip -j ../../dist/validator.zip bootstrap && rm bootstrap
 
 build-frontend:

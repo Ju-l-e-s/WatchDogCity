@@ -31,9 +31,25 @@
     rel="stylesheet">
 
   <link rel="stylesheet" href="style.css?v=20260425_V3">
+
+  <!-- PostHog Analytics (RGPD-ready, hosted in EU) -->
+  <script>
+    !function(t,e){var o,n,p,r;e.__SV||(window.posthog=e,e._i=[],e.init=function(i,s,a){function g(t,e){var o=e.split(".");2==o.length&&(t=t[o[0]],e=o[1]),t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}}(p=t.createElement("script")).type="text/javascript",p.crossOrigin="anonymous",p.async=!0,p.src=s.api_host.replace(".i.posthog.com","-assets.i.posthog.com")+"/static/array.js",(r=t.getElementsByTagName("script")[0]).parentNode.insertBefore(p,r);var u=e;for(void 0!==a?u=e[a]=[]:a="posthog",u.people=u.people||[],u.toString=function(t){var e="posthog";return"posthog"!==a&&(e+="."+a),t||(e+=" (stub)"),e},u.people.toString=function(){return u.toString(1)+".people (stub)"},o="init capture register register_once register_for_session unregister unregister_for_session getFeatureFlag getFeatureFlagPayload isFeatureEnabled reloadFeatureFlags updateEarlyAccessFeatureEnrollment getEarlyAccessFeatures on onFeatureFlags onSessionId getSurveys getActiveMatchingSurveys renderSurvey canRenderSurvey identify setPersonProperties group resetGroups setPersonPropertiesForFlags resetPersonPropertiesForFlags setGroupPropertiesForFlags resetGroupPropertiesForFlags alias opt_in_capturing opt_out_capturing has_opted_in_capturing has_opted_out_capturing disable_compression get_distinct_id get_session_id get_session_replay_url startSessionRecording stopSessionRecording sessionRecordingStarted get_config loadToolbar get_property set_property add_group set_config".split(" "),n=0;n<o.length;n++)g(u,o[n]);e._i.push([i,s,a])},e.__SV=1)}(document,window.posthog||[]);
+    posthog.init('phc_placeholder', {
+      api_host: 'https://eu.i.posthog.com',
+      persistence: 'memory',
+      disable_session_recording: true,
+      autocapture: false,
+      loaded: function(posthog) {
+        window.phReady = true;
+        window.ph = posthog;
+      }
+    })
+  </script>
 </head>
 
 <body class="bg-[#F8FAFC] text-slate-900 min-h-screen overflow-x-hidden">
+  <a href="#main-content" class="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[200] focus:bg-brand-700 focus:text-white focus:px-6 focus:py-3 focus:rounded-xl">Aller au contenu</a>
 
   <style>
     #global-loader {
@@ -57,6 +73,7 @@
     /* Hide scrollbar for chip overflow */
     .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
     .scrollbar-hide::-webkit-scrollbar { display: none; }
+    @media (prefers-reduced-motion: reduce) { .animate-fade-in, .animate-slide-up, .loader-spinner { animation: none !important; } }
   </style>
   
   <!-- Global Loader -->
@@ -155,7 +172,7 @@
   </div>
 
   <!-- About Modal -->
-  <div id="about-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center p-4">
+  <div id="about-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center p-4" role="dialog" aria-modal="true">
     <div class="modal-overlay absolute inset-0" onclick="toggleAboutModal(false)" aria-hidden="true"></div>
     <div class="bg-white w-full max-w-2xl max-h-[90vh] rounded-[2.5rem] shadow-2xl relative z-10 overflow-hidden flex flex-col animate-slide-up">
       <div class="absolute top-8 right-8 z-20">
@@ -260,7 +277,7 @@
   </div>
 
   <!-- Contact Modal -->
-  <div id="contact-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center p-4">
+  <div id="contact-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center p-4" role="dialog" aria-modal="true">
     <div class="modal-overlay absolute inset-0" onclick="toggleContactModal(false)" aria-hidden="true"></div>
     <div class="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl relative z-10 overflow-hidden animate-slide-up">
       <div class="absolute top-8 right-8">
@@ -326,7 +343,8 @@
   </div>
 
   <!-- Content Area -->
-  <main class="max-w-5xl mx-auto px-4 md:px-6 pb-24">
+  <main id="main-content" class="max-w-5xl mx-auto px-4 md:px-6 pb-24">
+    <div id="search-announcer" class="sr-only" aria-live="polite" aria-atomic="true"></div>
     <div id="timeline" class="space-y-16 min-h-[400px]">
       <!-- Skeleton Loader -->
       <section class="mb-20" aria-busy="true" aria-label="Chargement des données">
@@ -390,6 +408,7 @@
 
       <form id="newsletter-form" class="flex flex-col gap-3 max-w-md mx-auto">
         <div class="flex flex-col md:flex-row gap-3">
+          <label for="newsletter-email" class="sr-only">Votre adresse email</label>
           <input type="email" id="newsletter-email" required placeholder="votre@email.com" class="flex-1 bg-white/10 border border-white/20 px-6 py-4 rounded-2xl text-white font-medium placeholder:text-slate-200 focus:outline-none focus:border-brand-400 transition-colors">
           <button type="submit" id="newsletter-submit" disabled class="bg-brand-700 text-white font-bold px-8 py-4 rounded-2xl hover:bg-brand-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
             S'inscrire
@@ -446,7 +465,7 @@
   </footer>
 
   <!-- Team Modal -->
-  <div id="team-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center p-4">
+  <div id="team-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center p-4" role="dialog" aria-modal="true">
     <div class="modal-overlay absolute inset-0" onclick="toggleTeamModal(false)" aria-hidden="true"></div>
     <div class="bg-white w-full max-w-4xl max-h-[85vh] rounded-[2rem] shadow-2xl relative z-10 overflow-hidden flex flex-col animate-slide-up">
       <div class="p-8 border-b border-slate-100 flex items-center justify-between shrink-0">
@@ -620,6 +639,23 @@
         <svg class="w-5 h-5 text-brand-700 drop-shadow-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
         </svg>
+      </div>
+    </div>
+  </div>
+
+  <!-- RGPD Cookie Consent Banner -->
+  <div id="cookie-consent-banner" class="hidden fixed bottom-0 left-0 right-0 z-[200] bg-white/95 backdrop-blur-xl border-t border-slate-200 shadow-2xl transition-all duration-500 transform translate-y-full">
+    <div class="max-w-5xl mx-auto px-4 md:px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+      <p class="text-sm text-slate-600 leading-relaxed flex-1">
+        <span class="font-semibold text-slate-800">🔒 Vie privée</span> — Nous utilisons PostHog pour mesurer l'audience et améliorer le service. Ces données sont anonymes et hébergées en Europe.
+      </p>
+      <div class="flex items-center gap-3 shrink-0">
+        <button id="cookie-refuse-btn" class="px-5 py-2.5 text-sm font-medium text-slate-500 hover:text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all min-h-[44px]">
+          Refuser
+        </button>
+        <button id="cookie-accept-btn" class="px-5 py-2.5 text-sm font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-xl transition-all shadow-micro min-h-[44px]">
+          Accepter
+        </button>
       </div>
     </div>
   </div>

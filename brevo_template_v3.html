@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>L'Essentiel du Conseil</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #F3F4F6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased;">
+
+    <table width="100%" border="0" cellspacing="0" cellpadding="0" bgcolor="#F3F4F6" style="table-layout: fixed; padding: 20px 0;">
+        <tr>
+            <td align="center">
+                
+                <table width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width: 620px; background-color: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 8px; overflow: hidden; text-align: left;">
+                    <tr>
+                        <td>
+
+                            <table width="100%" border="0" cellspacing="0" cellpadding="0" style="border-bottom: 1px solid #E5E7EB;">
+                                <tr>
+                                    <td style="padding: 35px 20px 25px 20px;">
+                                        <span style="font-size: 12px; font-weight: 700; color: #6B7280; text-transform: uppercase; letter-spacing: 1.5px;">Observatoire de Begles</span>
+                                        <h1 style="margin: 12px 0 10px 0; font-size: 32px; color: #111827; line-height: 1.2; font-weight: 800; letter-spacing: -0.5px;">L'Essentiel du Conseil</h1>
+                                        <span style="font-size: 16px; color: #4B5563;">Conseil Municipal du <strong style="color: #111827; font-weight: 700;">{{ params.council_date }}</strong></span>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <table width="100%" border="0" cellspacing="0" cellpadding="0">
+                                <tr>
+                                    <td style="padding: 35px 20px;">
+
+                                        <!-- CTA HAUT -->
+                                        <table width="100%" border="0" cellspacing="0" cellpadding="0" style="text-align: center; margin-bottom: 30px;">
+                                            <tr>
+                                                <td>
+                                                    <a href="{{ params.website_url }}" style="display: inline-block; background-color: #111827; color: #FFFFFF; text-decoration: none; font-weight: 600; font-size: 16px; padding: 16px 32px; border-radius: 6px;">
+                                                        Explorer les {{ params.total_delibs_in_council }} deliberations
+                                                    </a>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td style="font-size: 14px; color: #6B7280; padding-top: 10px;">
+                                                    Les debats complets et PDFs officiels sont sur l'Observatoire
+                                                </td>
+                                            </tr>
+                                        </table>
+
+                                        <!-- RESUME 3 CHIFFRES CLES -->
+                                        <table width="100%" border="0" cellspacing="0" cellpadding="0" style="margin-bottom: 35px;">
+                                            <tr>
+                                                {% if params.has_global_budget %}
+                                                <td width="33%" style="text-align: center; padding: 14px 8px; background-color: #F0FDF4; border-radius: 8px;">
+                                                    <span style="font-size: 11px; font-weight: 700; color: #065F46; text-transform: uppercase; letter-spacing: 1px;">Budget</span><br>
+                                                    <span style="font-size: 22px; font-weight: 800; color: #111827; line-height: 1.3;">{{ params.budget_total }} EUR</span>
+                                                </td>
+                                                {% endif %}
+                                                <td width="33%" style="text-align: center; padding: 14px 8px; background-color: #FEF2F2; border-radius: 8px;">
+                                                    <span style="font-size: 11px; font-weight: 700; color: #991B1B; text-transform: uppercase; letter-spacing: 1px;">Climat</span><br>
+                                                    <span style="font-size: 18px; font-weight: 800; color: {{ params.climat_color }}; line-height: 1.3;">{{ params.vote_climat }}</span>
+                                                </td>
+                                                <td width="33%" style="text-align: center; padding: 14px 8px; background-color: #EFF6FF; border-radius: 8px;">
+                                                    <span style="font-size: 11px; font-weight: 700; color: #1D4ED8; text-transform: uppercase; letter-spacing: 1px;">Deliberations</span><br>
+                                                    <span style="font-size: 22px; font-weight: 800; color: #111827; line-height: 1.3;">{{ params.total_delibs_in_council }}</span>
+                                                </td>
+                                            </tr>
+                                        </table>
+
+                                        <!-- DETAIL DES VOTES -->
+                                        <table width="100%" border="0" cellspacing="0" cellpadding="0" style="margin-bottom: 35px;">
+                                            <tr>
+                                                <td style="font-size: 12px; font-weight: 700; color: #6B7280; text-transform: uppercase; letter-spacing: 1px; padding-bottom: 6px;">Detail des votes</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="font-size: 14px; color: #4B5563; font-weight: 500;">{{ params.vote_stats }}</td>
+                                            </tr>
+                                        </table>
+
+                                        <!-- EN RESUME (apres les faits) -->
+                                        <table width="100%" border="0" cellspacing="0" cellpadding="0" style="margin-bottom: 35px;">
+                                            <tr>
+                                                <td style="font-size: 19px; line-height: 1.6; color: #374151; border-left: 4px solid #3B82F6; padding-left: 15px;">
+                                                    <strong>En resume :</strong> {{ params.main_issue }}
+                                                </td>
+                                            </tr>
+                                        </table>
+
+                                        {% if params.tensions %}
+                                        <table width="100%" border="0" cellspacing="0" cellpadding="0" style="margin-bottom: 25px;">
+                                            <tr>
+                                                <td style="font-size: 16px; font-weight: 700; color: #4B5563; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid #E5E7EB; padding-bottom: 8px;">
+                                                    Les points de tension
+                                                </td>
+                                            </tr>
+                                            <tr><td style="line-height: 25px; height: 25px;">&nbsp;</td></tr>
+                                            <tr>
+                                                <td>
+                                                    {% for item in params.tensions %}
+                                                    <table width="100%" border="0" cellspacing="0" cellpadding="0" style="margin-bottom: 25px; border-bottom: 1px solid #F3F4F6;">
+                                                        <tr>
+                                                            <td style="padding-bottom: 25px; text-align: left; vertical-align: top;">
+                                                                <h3 style="margin: 0 0 10px 0; font-size: 20px; color: #111827; font-weight: 700; line-height: 1.3;">{{ item.title }}</h3>
+                                                                
+                                                                <div style="margin: 0 0 15px 0; line-height: 1;">
+                                                                    <span style="display: inline-block; background-color: #FEE2E2; color: #991B1B; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; text-transform: uppercase; margin-right: 6px; margin-bottom: 4px; vertical-align: middle;">Debat</span>
+                                                                    <span style="display: inline-block; background-color: #FEF3C7; color: #92400E; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; margin-right: 6px; margin-bottom: 4px; vertical-align: middle;">{{ item.vote_details }}</span>
+                                                                    {% if item.has_budget %}
+                                                                    <span style="display: inline-block; background-color: #D1FAE5; color: #065F46; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; margin-bottom: 4px; vertical-align: middle;">{{ item.budget }} EUR</span>
+                                                                    {% endif %}
+                                                                </div>
+
+                                                                <div style="font-size: 16px; color: #4B5563; line-height: 1.6; margin: 0;">
+                                                                    <strong style="color: #111827;">Le Contexte :</strong> {{ item.context }}
+                                                                    <br><br>
+                                                                    <strong style="color: #111827;">L'Impact :</strong> {{ item.impact }}
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    </table>
+                                                    {% endfor %}
+                                                </td>
+                                            </tr>
+                                        </table>
+                                        {% endif %}
+
+                                        {% if params.adopted %}
+                                        <table width="100%" border="0" cellspacing="0" cellpadding="0" style="margin-bottom: 25px;">
+                                            <tr>
+                                                <td style="font-size: 16px; font-weight: 700; color: #065F46; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid #A7F3D0; padding-bottom: 8px;">
+                                                    Decisions adoptees
+                                                </td>
+                                            </tr>
+                                            <tr><td style="line-height: 25px; height: 25px;">&nbsp;</td></tr>
+                                            <tr>
+                                                <td>
+                                                    {% for item in params.adopted %}
+                                                    <table width="100%" border="0" cellspacing="0" cellpadding="0" style="margin-bottom: 25px; border-bottom: 1px solid #F3F4F6;">
+                                                        <tr>
+                                                            <td style="padding-bottom: 25px; text-align: left; vertical-align: top;">
+                                                                <h3 style="margin: 0 0 10px 0; font-size: 20px; color: #111827; font-weight: 700; line-height: 1.3;">{{ item.title }}</h3>
+                                                                
+                                                                <div style="margin: 0 0 15px 0; line-height: 1;">
+                                                                    <span style="display: inline-block; background-color: #E0F2FE; color: #0369A1; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; text-transform: uppercase; margin-right: 6px; margin-bottom: 4px; vertical-align: middle;">{{ item.tag }}</span>
+                                                                    {% if item.has_budget %}
+                                                                    <span style="display: inline-block; background-color: #D1FAE5; color: #065F46; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; margin-bottom: 4px; vertical-align: middle;">{{ item.budget }} EUR</span>
+                                                                    {% endif %}
+                                                                </div>
+
+                                                                <div style="font-size: 16px; color: #4B5563; line-height: 1.6; margin: 0;">
+                                                                    <strong style="color: #111827;">Pourquoi ?</strong> {{ item.context }}
+                                                                    <br><br>
+                                                                    <strong style="color: #111827;">Concretement :</strong> {{ item.impact }}
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    </table>
+                                                    {% endfor %}
+                                                </td>
+                                            </tr>
+                                        </table>
+                                        {% endif %}
+
+                                        {% if params.briefs %}
+                                        <table width="100%" border="0" cellspacing="0" cellpadding="0" style="margin-bottom: 40px;">
+                                            <tr>
+                                                <td style="background-color: #F9FAFB; padding: 25px 20px; border-radius: 8px; border: 1px solid #E5E7EB;">
+                                                    <h2 style="font-size: 16px; color: #4B5563; text-transform: uppercase; letter-spacing: 1px; margin: 0 0 15px 0; font-weight: 700;">Egalement au Conseil...</h2>
+                                                    <ul style="margin: 0; padding-left: 20px; color: #374151; font-size: 15px; line-height: 1.6;">
+                                                        {% for item in params.briefs %}
+                                                        <li style="margin-bottom: 10px;"><strong>{{ item.tag }} :</strong> {{ item.summary }}</li>
+                                                        {% endfor %}
+                                                    </ul>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                        {% endif %}
+
+                                        <table width="100%" border="0" cellspacing="0" cellpadding="0" style="margin-bottom: 35px;">
+                                            <tr>
+                                                <td style="background-color: #F8FAFC; padding: 30px 20px; border-radius: 12px; border: 1px solid #E2E8F0; text-align: center;">
+                                                    <p style="margin: 0 0 10px 0; font-size: 17px; color: #1E293B; font-weight: 700;">Vous trouvez ce service utile ?</p>
+                                                    <p style="margin: 0 0 20px 0; font-size: 15px; color: #64748B; line-height: 1.5;">
+                                                        L'Observatoire est un projet independant. Partagez l'essentiel de Begles a vos proches en un clic.
+                                                    </p>
+                                                    
+                                                    <table border="0" cellspacing="0" cellpadding="0" align="center" style="margin: 0 auto 12px auto;">
+                                                        <tr>
+                                                            <td align="center" bgcolor="#25D366" style="border-radius: 6px;">
+                                                                <a href="https://api.whatsapp.com/send?text=Salut ! Je te conseille de t'abonner a l'Observatoire de Begles. Ils decryptent le conseil municipal de maniere neutre et pedagogique : {{ params.website_url }}" target="_blank" style="display: inline-block; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 15px; font-weight: 600; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 6px; vertical-align: middle;">
+                                                                    Partager sur WhatsApp
+                                                                </a>
+                                                            </td>
+                                                        </tr>
+                                                    </table>
+
+                                                    <p style="margin: 12px 0 0 0; font-size: 14px; color: #4B5563;">
+                                                        ou <a href="sms:?&body=Salut ! Regarde ce site, il decrypte les decisions de la mairie de Begles de facon claire et neutre : {{ params.website_url }}" style="color: #3B82F6; text-decoration: underline; font-weight: 600;">l'envoyer par SMS</a>
+                                                    </p>
+                                                </td>
+                                            </tr>
+                                        </table>
+
+                                        <table width="100%" border="0" cellspacing="0" cellpadding="0" style="text-align: center;">
+                                            <tr>
+                                                <td style="font-size: 16px; color: #4B5563; padding-bottom: 20px; font-style: italic;">
+                                                    Ce message ne presente qu'une selection de quelques deliberations marquantes. L'integralite du conseil et l'ensemble des deliberations detaillees vous attendent sur l'Observatoire.
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td>
+                                                    <a href="{{ params.website_url }}" style="display: inline-block; background-color: #111827; color: #FFFFFF; text-decoration: none; font-weight: 600; font-size: 16px; padding: 18px 36px; border-radius: 6px;">
+                                                        Explorer les {{ params.total_delibs_in_council }} deliberations
+                                                    </a>
+                                                </td>
+                                            </tr>
+                                        </table>
+
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <table width="100%" border="0" cellspacing="0" cellpadding="0" bgcolor="#F9FAFB" style="border-top: 1px solid #E5E7EB;">
+                                <tr>
+                                    <td style="padding: 35px 20px; text-align: left;">
+                                        <p style="margin: 0 0 15px 0; color: #374151; font-size: 15px; font-weight: 600;">Prochain Conseil : <span style="color: #111827;">{{ params.next_meeting }}</span></p>
+                                        <p style="margin: 0; color: #6B7280; font-size: 13px; line-height: 1.5;">{{ params.total_councils }} Conseils analyses * {{ params.total_delibs }} Decryptages IA<br>Donnees publiques gratuites sourcees sur mairie-begles.fr</p>
+                                        <p style="margin: 25px 0 0 0; color: #9CA3AF; font-size: 12px;">
+                                            Vous recevez cet email car vous etes inscrit a l'Observatoire.<br>
+                                            <a href="{{ unsubscribe }}" style="color: #6B7280; text-decoration: underline;">Se desabonner</a>
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+
+                        </td>
+                    </tr>
+                </table>
+
+            </td>
+        </tr>
+    </table>
+
+</body>
+</html>

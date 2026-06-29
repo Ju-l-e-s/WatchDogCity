@@ -675,14 +675,14 @@ function renderDeliberationRow(e) {
     
     return `<div class="group/item border-b border-slate-100 last:border-0" data-delib-id="${e.id}">
         <div class="relative flex items-center">
-            <button onclick="toggleDelib('${t}')" id="btn-${t}" aria-expanded="false" aria-controls="content-${t}" class="delib-trigger flex-1 text-left pl-4 pr-12 py-4 md:pl-8 md:pr-20 md:py-6 flex items-center gap-4 min-h-[64px]">
+            <button onclick="toggleDelib('${t}')" id="btn-${t}" aria-expanded="false" aria-controls="content-${t}" class="delib-trigger flex-1 text-left pl-4 pr-12 py-4 md:pl-12 md:pr-24 md:py-6 flex items-center gap-4 min-h-[64px]">
                 <!-- Chevron on the left -->
                 <div class="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-300 group-hover/item:text-brand-600 group-hover/item:bg-brand-50 transition-all shrink-0">
                     <svg id="icon-${t}" class="w-4 h-4 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
                 </div>
                 
                 <div class="flex-1 min-w-0">
-                    <div class="flex items-center gap-2.5 mb-2">
+                    <div class="flex flex-wrap items-center gap-2 mb-2">
                         <span class="w-1.5 h-1.5 rounded-full ${a > 50 || r ? "bg-emerald-400" : n ? "bg-amber-400" : "bg-slate-300"} shrink-0"></span>
                         <span class="text-[11px] font-medium text-slate-600 uppercase tracking-widest">${i}</span>
                         ${budgetBadge}
@@ -693,14 +693,14 @@ function renderDeliberationRow(e) {
             </button>
             
             <!-- Share button on the right, vertically centered in the header -->
-            <button class="absolute right-4 md:right-8 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-slate-50 hover:bg-brand-50 flex items-center justify-center text-slate-400 hover:text-brand-600 transition-all shrink-0 md:opacity-0 group-hover/item:opacity-100 z-10" title="Copier le lien de partage" aria-label="Partager cette délibération" onclick="copyShareLink('${e.id}')">
+            <button class="absolute right-4 md:right-12 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-slate-50 hover:bg-brand-50 flex items-center justify-center text-slate-400 hover:text-brand-600 transition-all shrink-0 md:opacity-0 group-hover/item:opacity-100 z-10" title="Copier le lien de partage" aria-label="Partager cette délibération" onclick="copyShareLink('${e.id}')">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 15l6-6m0 0l-6-6m6 6H9a6 6 0 00-6 6v3"></path></svg>
             </button>
         </div>
         <div id="content-${t}" class="delib-panel" role="region" aria-labelledby="btn-${t}">
             <div class="delib-panel-inner">
                 <div class="border-t border-slate-100/60 bg-slate-50/30">
-                    <div class="px-4 pt-5 pb-5 md:px-10 md:py-8">
+                    <div class="px-4 pt-5 pb-5 md:px-12 md:py-8">
                         <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
                             <div class="lg:col-span-7">
                                 <p class="text-slate-500 leading-relaxed text-base mb-8">${l}</p>

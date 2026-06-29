@@ -38,7 +38,7 @@ const scrollDepthTracked = {25: false, 50: false, 75: false, 100: false};
 
 function phCapture(eventName, props = {}) {
   try {
-    if (window.phReady && window.ph && !localStorage.getItem('watchdogcity-cookies-refused')) {
+    if (window.phReady && window.ph) {
       window.ph.capture(eventName, props);
     }
   } catch(e) { /* fail silently */ }
@@ -847,33 +847,3 @@ window.addEventListener('scroll', () => {
   }, 200);
 }, {passive: true});
 
-// ── RGPD Cookie Consent Banner ──
-(function() {
-  const banner = document.getElementById('cookie-consent-banner');
-  if (!banner) return;
-
-  const choice = localStorage.getItem('watchdogcity-cookies-consent');
-  if (choice === null) {
-    banner.classList.remove('hidden');
-    requestAnimationFrame(() => {
-      banner.classList.remove('translate-y-full');
-    });
-  }
-
-  document.getElementById('cookie-accept-btn')?.addEventListener('click', () => {
-    localStorage.setItem('watchdogcity-cookies-consent', 'accepted');
-    localStorage.removeItem('watchdogcity-cookies-refused');
-    banner.classList.add('translate-y-full');
-    setTimeout(() => banner.classList.add('hidden'), 500);
-  });
-
-  document.getElementById('cookie-refuse-btn')?.addEventListener('click', () => {
-    localStorage.setItem('watchdogcity-cookies-consent', 'refused');
-    localStorage.setItem('watchdogcity-cookies-refused', '1');
-    if (window.ph && typeof window.ph.opt_out_capturing === 'function') {
-      window.ph.opt_out_capturing();
-    }
-    banner.classList.add('translate-y-full');
-    setTimeout(() => banner.classList.add('hidden'), 500);
-  });
-})();

@@ -673,8 +673,54 @@ function renderDeliberationRow(e) {
     }
     const d = n ? `<div class="bg-white rounded-2xl p-6 shadow-micro border border-slate-100/80">\n            <div class="flex items-center justify-between mb-5">\n                <h5 class="text-[11px] font-semibold text-slate-900 uppercase tracking-widest">Vote</h5>\n                ${r ? '<span class="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-full ml-2">Unanimité</span>' : ""}\n            </div>\n            ${r ? `<div class="flex items-center gap-3"><div class="h-1.5 flex-1 bg-emerald-500 rounded-full"></div><span class="text-sm font-semibold text-emerald-700">${e.vote.pour} pour</span></div>` : `<div class="space-y-3">${renderVoteBar("Pour", e.vote.pour, s, "bg-emerald-500")}${renderVoteBar("Contre", e.vote.contre, s, "bg-rose-400")}${renderVoteBar("Abstention", e.vote.abstention, s, "bg-slate-300")}</div>`}\n           </div>` : '<div class="bg-slate-50 rounded-2xl p-6 border border-slate-100/50">\n            <p class="text-[11px] font-medium text-slate-600 uppercase tracking-widest text-center">Pas de vote enregistré</p>\n           </div>';
     
-    return `<div class="group/item" data-delib-id="${e.id}">
-        <button onclick="toggleDelib('${t}')" id="btn-${t}" aria-expanded="false" aria-controls="content-${t}" class="delib-trigger w-full text-left px-4 py-4 md:px-8 md:py-6 flex items-center justify-between gap-4 min-h-[64px]">\n            <div class="flex-1 min-w-0">\n                <div class="flex items-center gap-2.5 mb-2">\n                    <span class="w-1.5 h-1.5 rounded-full ${a > 50 || r ? "bg-emerald-400" : n ? "bg-amber-400" : "bg-slate-300"} shrink-0"></span>\n                    <span class="text-[11px] font-medium text-slate-600 uppercase tracking-widest">${i}</span>\n                    ${budgetBadge}\n                    ${r ? '<span class="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">Unanime</span>' : ""}\n                </div>\n                <h4 class="text-base md:text-base font-semibold text-slate-800 group-hover/item:text-brand-600 transition-colors leading-snug">${o}<button class="opacity-0 group-hover/item:opacity-100 transition-opacity duration-200 ml-2 text-slate-400 hover:text-brand-600 align-middle inline-flex items-center" title="Copier le lien de partage" aria-label="Partager cette délibération" onclick="event.stopPropagation(); copyShareLink('${e.id}')"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg></button></h4>\n            </div>\n            <div class="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-300 group-hover/item:text-brand-600 group-hover/item:bg-brand-50 transition-all shrink-0">\n                <svg id="icon-${t}" class="w-4 h-4 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>\n            </div>\n        </button>\n        <div id="content-${t}" class="delib-panel" role="region" aria-labelledby="btn-${t}">\n            <div class="delib-panel-inner">\n                <div class="border-t border-slate-100/60 bg-slate-50/30">\n                    <div class="px-4 pt-5 pb-5 md:px-10 md:py-8">\n                        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">\n                            <div class="lg:col-span-7">\n                                <p class="text-slate-500 leading-relaxed text-base mb-8">${l}</p>\n                                ${c}\n                                <div class="mt-8 pt-8 border-t border-slate-100/60 flex flex-wrap gap-4">\n                                    <a href="${e.pdf_url}" target="_blank" class="inline-flex items-center gap-2 text-xs font-bold text-brand-600 hover:text-brand-700 bg-brand-50 px-4 py-2 rounded-lg transition-all border border-brand-100 hover:shadow-sm">\n                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>\n                                        Consulter le PDF officiel\n                                    </a>\n                                </div>\n                            </div>\n                            <div class="lg:col-span-5">\n                                ${d}\n                            </div>\n                        </div>\n                    </div>\n                </div>\n            </div>\n        </div>\n    </div>`;
+    return `<div class="group/item border-b border-slate-100 last:border-0" data-delib-id="${e.id}">
+        <div class="relative flex items-center">
+            <button onclick="toggleDelib('${t}')" id="btn-${t}" aria-expanded="false" aria-controls="content-${t}" class="delib-trigger flex-1 text-left pl-4 pr-12 py-4 md:pl-8 md:pr-20 md:py-6 flex items-center gap-4 min-h-[64px]">
+                <!-- Chevron on the left -->
+                <div class="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-300 group-hover/item:text-brand-600 group-hover/item:bg-brand-50 transition-all shrink-0">
+                    <svg id="icon-${t}" class="w-4 h-4 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                </div>
+                
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2.5 mb-2">
+                        <span class="w-1.5 h-1.5 rounded-full ${a > 50 || r ? "bg-emerald-400" : n ? "bg-amber-400" : "bg-slate-300"} shrink-0"></span>
+                        <span class="text-[11px] font-medium text-slate-600 uppercase tracking-widest">${i}</span>
+                        ${budgetBadge}
+                        ${r ? '<span class="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">Unanime</span>' : ""}
+                    </div>
+                    <h4 class="text-base font-semibold text-slate-800 group-hover/item:text-brand-600 transition-colors leading-snug">${o}</h4>
+                </div>
+            </button>
+            
+            <!-- Share button on the right, vertically centered in the header -->
+            <button class="absolute right-4 md:right-8 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-slate-50 hover:bg-brand-50 flex items-center justify-center text-slate-400 hover:text-brand-600 transition-all shrink-0 md:opacity-0 group-hover/item:opacity-100 z-10" title="Copier le lien de partage" aria-label="Partager cette délibération" onclick="copyShareLink('${e.id}')">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 15l6-6m0 0l-6-6m6 6H9a6 6 0 00-6 6v3"></path></svg>
+            </button>
+        </div>
+        <div id="content-${t}" class="delib-panel" role="region" aria-labelledby="btn-${t}">
+            <div class="delib-panel-inner">
+                <div class="border-t border-slate-100/60 bg-slate-50/30">
+                    <div class="px-4 pt-5 pb-5 md:px-10 md:py-8">
+                        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                            <div class="lg:col-span-7">
+                                <p class="text-slate-500 leading-relaxed text-base mb-8">${l}</p>
+                                ${c}
+                                <div class="mt-8 pt-8 border-t border-slate-100/60 flex flex-wrap gap-4">
+                                    <a href="${e.pdf_url}" target="_blank" class="inline-flex items-center gap-2 text-xs font-bold text-brand-600 hover:text-brand-700 bg-brand-50 px-4 py-2 rounded-lg transition-all border border-brand-100 hover:shadow-sm">
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                                        Consulter le PDF officiel
+                                    </a>
+                                </div>
+                            </div>
+                            <div class="lg:col-span-5">
+                                ${d}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>`;
 }
 
 function renderVoteBar(e, t, n, s) { if (null == t) return `<div class="flex justify-between text-[11px] font-light text-slate-300 tracking-wide"><span>${e}</span><span>—</span></div>`; return `<div><div class="flex justify-between text-[11px] font-medium mb-1"><span class="text-slate-600">${e}</span><span class="text-slate-600 font-semibold">${t}</span></div><div class="h-1.5 bg-slate-100 rounded-full overflow-hidden"><div class="${s} h-full rounded-full transition-all duration-500" style="width:${n > 0 ? t / n * 100 : 0}%"></div></div></div>` }

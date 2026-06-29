@@ -302,6 +302,20 @@ class WatchdogStack(Stack):
             alarm_description="Notifier DLQ non-empty: at least one newsletter failed.",
         ).add_alarm_action(cw_actions.SnsAction(notifier_dlq_alarm_topic))
 
+        # ── PDF DLQ Alarm ─────────────────────────────────────────────────
+        cloudwatch.Alarm(
+            self, "PdfDLQAlarm",
+            metric=dlq.metric_approximate_number_of_messages_visible(
+                period=Duration.minutes(5),
+                statistic="Maximum",
+            ),
+            threshold=0,
+            evaluation_periods=1,
+            comparison_operator=cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
+            treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING,
+            alarm_description="PDF DLQ non-empty: at least one PDF processing failed after 3 retries.",
+        ).add_alarm_action(cw_actions.SnsAction(notifier_dlq_alarm_topic))
+
         notifier = lambda_.Function(
             self, "Notifier",
             runtime=lambda_.Runtime.PROVIDED_AL2023,

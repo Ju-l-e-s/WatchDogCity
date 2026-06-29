@@ -63,7 +63,7 @@ test:
 	@for dir in lambdas/*/ ; do \
 		if [ -f "$${dir}go.mod" ]; then \
 			echo "Testing $$dir..." ; \
-			(cd $$dir && go test ./... || exit 1) ; \
+			(cd $$dir && go test -race ./... || exit 1) ; \
 		fi \
 	done
 

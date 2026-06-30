@@ -11,6 +11,7 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-lambda-go/lambdacontext"
@@ -278,8 +279,10 @@ func HandleRequest(ctx context.Context, event PublisherEvent) error {
 	// A missing council_id means the Notifier would fetch council "" → 404 and
 	// silently drop the newsletter. Bail before invoking; data.json is already
 	// published, which is the side effect that matters.
-	if event.CouncilID == "" {
-		log.Printf("notifier skip: empty council_id (probably invoked by aggregator without payload)")
+	// We also skip invoking the notifier if the council_id represents metadata
+	// (starts with "metadata#") as those are not actual municipal councils.
+	if event.CouncilID == "" || strings.HasPrefix(event.CouncilID, "metadata#") {
+		log.Printf("notifier skip: council_id is empty or metadata (%q)", event.CouncilID)
 		return nil
 	}
 

@@ -429,3 +429,14 @@ func TestTriggerSend_SkipsIfAlreadyQueued(t *testing.T) {
 		t.Errorf("expected 0 sendNow POSTs when already queued, got %d", n)
 	}
 }
+
+func TestHandle_SkipsMetadata(t *testing.T) {
+	d := &notifierDeps{} // All fields nil/zero-value
+	err := d.handle(context.Background(), NotifierEvent{
+		CouncilID: "metadata#next_council",
+	})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+}
+

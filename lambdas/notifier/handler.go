@@ -11,6 +11,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -115,6 +116,11 @@ func HandleRequest(ctx context.Context, event NotifierEvent) error {
 }
 
 func (d *notifierDeps) handle(ctx context.Context, event NotifierEvent) error {
+	if strings.HasPrefix(event.CouncilID, "metadata#") {
+		log.Printf("notifier skip: council_id represents metadata (%q)", event.CouncilID)
+		return nil
+	}
+
 	// Only check the Gemini circuit when we are about to call Gemini.
 	// If the validator already generated newsletter_params, skip Gemini entirely.
 	if event.NewsletterParams == nil {

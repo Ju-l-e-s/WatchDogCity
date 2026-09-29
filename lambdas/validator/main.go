@@ -13,14 +13,12 @@ import (
 	"github.com/watchdog/shared"
 )
 
-var handler *ValidatorHandler
-
-func init() {
+func main() {
 	cfg, err := config.LoadDefaultConfig(context.Background())
 	if err != nil {
-		log.Fatalf("init: load aws config: %v", err)
+		log.Fatalf("load aws config: %v", err)
 	}
-	handler = &ValidatorHandler{
+	handler := &ValidatorHandler{
 		ddb:                dynamodb.NewFromConfig(cfg),
 		lambdaClient:       awslambda.NewFromConfig(cfg),
 		sqsClient:          sqs.NewFromConfig(cfg),
@@ -35,16 +33,13 @@ func init() {
 		},
 		cfg: shared.DefaultQcConfig(),
 	}
+	lambda.Start(handler.HandleRequest)
 }
 
 func mustEnv(key string) string {
 	v := os.Getenv(key)
 	if v == "" {
-		log.Fatalf("init: required env var %s not set", key)
+		log.Fatalf("required env var %s not set", key)
 	}
 	return v
-}
-
-func main() {
-	lambda.Start(handler.HandleRequest)
 }

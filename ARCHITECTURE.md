@@ -50,8 +50,8 @@ Publisher Lambda (Go, ARM64)
 Notifier Lambda (Go, ARM64)
     ├─ Reçoit les newsletter_params pré-générés et approuvés.
     ├─ Relit les paramètres validés du conseil APPROVED, puis crée le brouillon Brevo pour la liste de production.
-    ├─ Envoie un aperçu via sendTest à BREVO_TEST_EMAIL ; avec AUTO_SEND_ENABLED=false (défaut), crée et envoie
-    │  une campagne distincte de même contenu vers la liste test #3, sans envoyer le brouillon de production.
+    ├─ Avec AUTO_SEND_ENABLED=false (défaut), crée et envoie une campagne distincte de même contenu vers la liste
+    │  test #3, sans envoyer le brouillon de production ; sendTest ajoute un aperçu si BREVO_TEST_EMAIL est configuré.
     ├─ Avec AUTO_SEND_ENABLED=true, appelle sendNow sur la campagne de production après l'aperçu.
     ├─ Enregistre l'identifiant de la campagne de production dans DynamoDB ; une invocation reconcile_only
     │  vérifie son statut Brevo après envoi manuel et renseigne newsletter_sent_at seulement si elle est sent.

@@ -595,9 +595,14 @@ func parseNewsletterParams(raw string) (*NewsletterParams, error) {
 
 func (d *notifierDeps) sendCampaign(ctx context.Context, params *NewsletterParams, councilID, councilDate string, scheduledAt *string) (int, error) {
 	testEmail := strings.TrimSpace(d.testEmail)
-	address, err := mail.ParseAddress(testEmail)
-	if err != nil || address.Address != testEmail {
-		return 0, fmt.Errorf("BREVO_TEST_EMAIL must contain one valid email address")
+	if testEmail == "" && d.autoSendEnabled {
+		return 0, fmt.Errorf("BREVO_TEST_EMAIL is required when AUTO_SEND_ENABLED is true")
+	}
+	if testEmail != "" {
+		address, err := mail.ParseAddress(testEmail)
+		if err != nil || address.Address != testEmail {
+			return 0, fmt.Errorf("BREVO_TEST_EMAIL must contain one valid email address")
+		}
 	}
 	// A deterministic name keyed on (councilID, councilDate) lets us recognise a
 	// campaign a previous — possibly transparently retried — invocation already
@@ -630,8 +635,10 @@ func (d *notifierDeps) sendCampaign(ctx context.Context, params *NewsletterParam
 		}
 	}
 
-	if err := d.sendTest(ctx, campaignID, testEmail); err != nil {
-		return 0, fmt.Errorf("send test for campaign %d: %w", campaignID, err)
+	if testEmail != "" {
+		if err := d.sendTest(ctx, campaignID, testEmail); err != nil {
+			return 0, fmt.Errorf("send test for campaign %d: %w", campaignID, err)
+		}
 	}
 	if !d.autoSendEnabled {
 		log.Printf("Brevo campaign %d kept as draft for manual approval", campaignID)

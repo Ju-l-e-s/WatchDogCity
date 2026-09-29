@@ -553,11 +553,13 @@ func TestHandleTest_RejectsUnapprovedAndNonTestEvents(t *testing.T) {
 
 func TestHandle_PreviewAndAutomaticSend(t *testing.T) {
 	for _, tc := range []struct {
-		name     string
-		autoSend bool
+		name      string
+		autoSend  bool
+		testEmail string
 	}{
-		{name: "manual draft"},
-		{name: "automatic send", autoSend: true},
+		{name: "manual list 3 only"},
+		{name: "manual draft with sendTest", testEmail: "owner@example.com"},
+		{name: "automatic send", autoSend: true, testEmail: "owner@example.com"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			ddb := &fakeDDB{getResponse: func(_ *dynamodb.GetItemInput) (*dynamodb.GetItemOutput, error) {
@@ -624,7 +626,7 @@ func TestHandle_PreviewAndAutomaticSend(t *testing.T) {
 				return fakeResp{500, "unexpected request"}
 			}}
 			d := &notifierDeps{
-				ddb: ddb, httpClient: h, brevoKey: "k", testEmail: "owner@example.com", brevoListID: 2,
+				ddb: ddb, httpClient: h, brevoKey: "k", testEmail: tc.testEmail, brevoListID: 2,
 				autoSendEnabled: tc.autoSend, councilsTable: "councils-test", now: fixedClock(time.Now()),
 			}
 			var scheduledAt *string
@@ -638,7 +640,10 @@ func TestHandle_PreviewAndAutomaticSend(t *testing.T) {
 			}); err != nil {
 				t.Fatal(err)
 			}
-			wantCalls := []string{"create", "sendTest"}
+			wantCalls := []string{"create"}
+			if tc.testEmail != "" {
+				wantCalls = append(wantCalls, "sendTest")
+			}
 			wantUpdate := "REMOVE newsletter_pending_at"
 			if tc.autoSend {
 				wantCalls = append(wantCalls, "sendNow")
@@ -664,9 +669,9 @@ func TestHandle_PreviewAndAutomaticSend(t *testing.T) {
 	}
 }
 
-func TestSendCampaign_RequiresTestRecipientBeforeCreation(t *testing.T) {
+func TestSendCampaign_RequiresTestRecipientForAutomaticSend(t *testing.T) {
 	h := &fakeHTTP{}
-	d := &notifierDeps{httpClient: h, brevoKey: "k"}
+	d := &notifierDeps{httpClient: h, brevoKey: "k", autoSendEnabled: true}
 	_, err := d.sendCampaign(context.Background(), &NewsletterParams{}, "council-1", "2026-06-22", nil)
 	if err == nil || !strings.Contains(err.Error(), "BREVO_TEST_EMAIL") {
 		t.Fatalf("expected missing test recipient error, got %v", err)

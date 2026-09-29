@@ -34,6 +34,11 @@ func envInt(key string, def int) int {
 	return def
 }
 
+func envBool(key string) bool {
+	value, err := strconv.ParseBool(os.Getenv(key))
+	return err == nil && value
+}
+
 var sharedDeps *notifierDeps
 
 func init() {
@@ -56,6 +61,8 @@ func init() {
 		brevoKey:           os.Getenv("BREVO_API_KEY"),
 		brevoTemplateID:    envInt("BREVO_NEWSLETTER_TEMPLATE_ID", 2),
 		brevoListID:        envInt("BREVO_LIST_ID", 2),
+		testEmail:          envOrDefault("BREVO_TEST_EMAIL", os.Getenv("ADMIN_EMAIL")),
+		autoSendEnabled:    envBool("AUTO_SEND_ENABLED"),
 		senderEmail:        envOrDefault("SENDER_EMAIL", "noreply@lobservatoiredebegles.fr"),
 		councilsTable:      os.Getenv("COUNCILS_TABLE"),
 		deliberationsTable: os.Getenv("DELIBERATIONS_TABLE"),

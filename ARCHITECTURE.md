@@ -37,7 +37,7 @@ Validator Lambda (Go, ARM64) — Le "QC Gateway" & Générateur Deprivé
     │       ├─ Émet une métrique CloudWatch "QcQuarantined" (Alarme SNS activée).
     │       └─ [Optionnel] Auto-guérison : Ré-enfile les PDFs des délibérations en faute dans SQS (limite de 2 essais).
     └─ 4b. Verdict = APPROVED :
-            ├─ Extrait uniquement les faits froids standardisés (ColdDeliberation whitelist - pas de texte brut).
+            ├─ Sélectionne les champs ColdDeliberation, dont le résumé et les impacts rédigés par le Worker.
             ├─ Invoque Gemini (gemini-2.5-pro) sous privation sensorielle pour générer le contenu de la newsletter.
             ├─ Sauvegarde les newsletter_params et passe le statut du conseil à APPROVED.
             └─ Invoque le Publisher puis le Notifier (de manière asynchrone).
@@ -49,7 +49,18 @@ Publisher Lambda (Go, ARM64)
 
 Notifier Lambda (Go, ARM64)
     ├─ Reçoit les newsletter_params pré-générés et approuvés.
-    └─ Crée et envoie directement la campagne e-mail via Brevo (sans nouvel appel LLM).
+    ├─ Relit les paramètres validés du conseil APPROVED, puis crée le brouillon Brevo pour la liste de production.
+    ├─ Envoie un aperçu via sendTest à BREVO_TEST_EMAIL ; avec AUTO_SEND_ENABLED=false (défaut), crée et envoie
+    │  une campagne distincte de même contenu vers la liste test #3, sans envoyer le brouillon de production.
+    ├─ Avec AUTO_SEND_ENABLED=true, appelle sendNow sur la campagne de production après l'aperçu.
+    ├─ Enregistre l'identifiant de la campagne de production dans DynamoDB ; une invocation reconcile_only
+    │  vérifie son statut Brevo après envoi manuel et renseigne newsletter_sent_at seulement si elle est sent.
+    └─ En mode test isolé (test_list_id = 3), envoie uniquement à la liste test sans toucher au registre public.
+
+BrevoCampaignWebhook Lambda (Go, ARM64) — créée si WEBHOOK_SECRET est configuré, avec Function URL publique protégée par ce jeton
+    ├─ Reçoit les événements marketing email `delivered` de Brevo (camp_id, ts_sent).
+    ├─ Retrouve le conseil APPROVED par newsletter_campaign_id et contrôle la campagne Brevo et sa liste de production.
+    └─ Inscrit newsletter_sent_at conditionnellement, sans écraser un envoi déjà enregistré.
 
 API Gateway (Endpoints publics d'interaction)
     ├─ POST /subscribe  ──► Subscribe Lambda (Go) ──► Enregistrement DynamoDB + Email confirmation Brevo
@@ -107,8 +118,8 @@ Le module de validation de la QC Gateway s'assure qu'aucun résumé incohérent 
 - **Principe de moindre privilège** : Chaque fonction possède un rôle IAM unique et restreint au strict minimum (ex : la Lambda `Worker` n'a pas accès à SES ou S3 ; `Notifier` ne peut pas modifier la file SQS).
 - **Chiffrement & Restauration** : Les tables DynamoDB ont le Point-In-Time-Recovery (PITR) activé. Le bucket S3 est protégé contre la suppression accidentelle.
 
-### 4.2 Garantie de Neutralité par Privation Sensorielle (Sensory Deprivation)
-Pour éviter tout biais d'interprétation, de lissage ou d'exagération de la part de l'intelligence artificielle dans la rédaction de la newsletter :
-1. **Zéro Texte Source pour le Rédacteur** : Le LLM de rédaction (dans la phase finale du Validator) n'a jamais accès aux rapports PDFs complets, ni aux résumés écrits par le premier Worker, ni aux explications textuelles des votes et désaccords.
-2. **Entrée exclusive par Faits Froids (`ColdDeliberation`)** : L'IA reçoit uniquement une liste d'attributs typés et validés par le Go (des booléens de présence de désaccord, des chiffres de vote, des montants financiers, et le titre factuel de la délibération).
-3. **Impossibilité d'Halluciner** : N'ayant aucune matière textuelle ou contexte subjectif, le modèle ne peut inventer de conflits politiques, d'historique de parti, de jugements de valeur ou de justifications géographiques. Les statistiques et calculs financiers restent calculés en pur Go sans intervention du LLM.
+### 4.2 Champs transmis au modèle de rédaction
+Le Validator construit une liste `ColdDeliberation` avant de générer la newsletter :
+1. **PDF source exclu** : Le modèle de rédaction ne reçoit pas le PDF complet ni le détail textuel des désaccords.
+2. **Champs sélectionnés** : Il reçoit le titre, la catégorie, le budget, les votes et les indicateurs calculés, mais aussi `Summary` et `Impacts`, deux champs textuels produits par le Worker. Le prompt utilise ces textes pour rédiger le contexte et l'impact citoyen.
+3. **Limite de la garantie** : La sélection des champs et les règles déterministes de la QC Gateway réduisent certains risques, mais elles ne rendent pas les textes générés exempts d'inventions ou de biais. Les statistiques et calculs financiers restent calculés en Go.

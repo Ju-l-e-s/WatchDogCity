@@ -1,3 +1,9 @@
+# Archive — brief d'implémentation de la QC Gateway
+
+Ce document décrit une demande d'implémentation historique. Ses affirmations sur l'état « current » du dépôt et ses consignes à un agent ne sont pas des instructions de travail actuelles. Pour le fonctionnement présent, consulter [ARCHITECTURE.md](../../ARCHITECTURE.md) et le code des Lambdas.
+
+---
+
 # Production Prompt — Watchdog QC Gateway (Deterministic Gate + Sensory-Deprived Generation)
 
 > Self-contained implementation brief. Hand this file verbatim to a coding agent.

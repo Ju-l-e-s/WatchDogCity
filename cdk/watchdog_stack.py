@@ -38,6 +38,12 @@ class WatchdogStack(Stack):
             point_in_time_recovery=True, # Autorise la restauration à la seconde près
             removal_policy=RemovalPolicy.RETAIN # Empêche la suppression de la DB si tu supprimes la stack
         )
+        councils_table.add_global_secondary_index(
+            index_name="newsletter_campaign_id-index",
+            partition_key=dynamodb.Attribute(name="newsletter_campaign_id", type=dynamodb.AttributeType.NUMBER),
+            projection_type=dynamodb.ProjectionType.INCLUDE,
+            non_key_attributes=["qc_status", "newsletter_sent_at"],
+        )
 
         deliberations_table = dynamodb.Table(
             self, "DeliberationsTable",
@@ -272,6 +278,7 @@ class WatchdogStack(Stack):
         brevo_list_id = os.environ.get("BREVO_LIST_ID", "2")
         brevo_template_id = os.environ.get("BREVO_TEMPLATE_ID", "1")
         brevo_newsletter_template_id = os.environ.get("BREVO_NEWSLETTER_TEMPLATE_ID", "7")
+        webhook_secret = os.environ.get("WEBHOOK_SECRET", "")
 
         # ── Lambda: Notifier ──────────────────────────────────────────────
         notifier_dlq = sqs.Queue(
@@ -335,6 +342,8 @@ class WatchdogStack(Stack):
                 "BREVO_NEWSLETTER_TEMPLATE_ID": brevo_newsletter_template_id,
                 "BREVO_LIST_ID": brevo_list_id,
                 "SENDER_EMAIL": sender_email,
+                "BREVO_TEST_EMAIL": os.environ.get("BREVO_TEST_EMAIL", admin_email),
+                "AUTO_SEND_ENABLED": os.environ.get("AUTO_SEND_ENABLED", "false"),
             },
         )
         # Notifier needs write access to councils to mark newsletter_sent_at
@@ -344,6 +353,37 @@ class WatchdogStack(Stack):
         # Wire validator → notifier now that notifier is defined.
         notifier.grant_invoke(validator)
         validator.add_environment("NOTIFIER_FUNCTION_NAME", notifier.function_name)
+
+        # Marketing email webhooks report per-recipient delivery events. The
+        # handler checks Brevo's campaign and the saved production campaign ID
+        # before updating the council's newsletter_sent_at field.
+        if webhook_secret:
+            brevo_webhook = lambda_.Function(
+                self, "BrevoCampaignWebhook",
+                runtime=lambda_.Runtime.PROVIDED_AL2023,
+                architecture=lambda_.Architecture.ARM_64,
+                handler="bootstrap",
+                code=lambda_.Code.from_asset("../dist/brevo-webhook.zip"),
+                timeout=Duration.seconds(30),
+                log_retention=logs.RetentionDays.TWO_WEEKS,
+                environment={
+                    "COUNCILS_TABLE": councils_table.table_name,
+                    "WEBHOOK_SECRET": webhook_secret,
+                    "BREVO_API_KEY": mail_api_key,
+                    "BREVO_LIST_ID": brevo_list_id,
+                },
+            )
+            councils_table.grant(brevo_webhook, "dynamodb:UpdateItem")
+            brevo_webhook.add_to_role_policy(iam.PolicyStatement(
+                actions=["dynamodb:Query"],
+                resources=[f"{councils_table.table_arn}/index/newsletter_campaign_id-index"],
+            ))
+            brevo_webhook_url = brevo_webhook.add_function_url(
+                auth_type=lambda_.FunctionUrlAuthType.NONE,
+            )
+            CfnOutput(self, "BrevoWebhookUrl", value=brevo_webhook_url.url)
+        else:
+            print("WARN: WEBHOOK_SECRET is unset; Brevo webhook is not deployed")
 
         # ── QcQuarantined alarm ───────────────────────────────────────────────
         qc_alarm_topic = sns.Topic(self, "QcQuarantinedAlarmTopic")

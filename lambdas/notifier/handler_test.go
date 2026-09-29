@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -65,14 +66,22 @@ func isSendNowPOST(r *http.Request) bool {
 	return r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/sendNow")
 }
 
+func isSendTestPOST(r *http.Request) bool {
+	return r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/sendTest")
+}
+
 // fakeDDB captures UpdateItem inputs and replays scripted responses.
 type fakeDDB struct {
 	mu             sync.Mutex
 	updateInputs   []*dynamodb.UpdateItemInput
 	updateResponse func(call int, in *dynamodb.UpdateItemInput) (*dynamodb.UpdateItemOutput, error)
+	getResponse    func(in *dynamodb.GetItemInput) (*dynamodb.GetItemOutput, error)
 }
 
-func (f *fakeDDB) GetItem(_ context.Context, _ *dynamodb.GetItemInput, _ ...func(*dynamodb.Options)) (*dynamodb.GetItemOutput, error) {
+func (f *fakeDDB) GetItem(_ context.Context, in *dynamodb.GetItemInput, _ ...func(*dynamodb.Options)) (*dynamodb.GetItemOutput, error) {
+	if f.getResponse != nil {
+		return f.getResponse(in)
+	}
 	return &dynamodb.GetItemOutput{}, nil
 }
 func (f *fakeDDB) Query(_ context.Context, _ *dynamodb.QueryInput, _ ...func(*dynamodb.Options)) (*dynamodb.QueryOutput, error) {
@@ -368,9 +377,9 @@ func TestSendCampaign_SkipsWhenAlreadySent(t *testing.T) {
 		}
 		return fakeResp{200, "{}"}
 	}}
-	d := &notifierDeps{httpClient: h, brevoKey: "k"}
+	d := &notifierDeps{httpClient: h, brevoKey: "k", testEmail: "owner@example.com", autoSendEnabled: true}
 
-	if err := d.sendCampaign(context.Background(), &NewsletterParams{}, councilID, councilDate, nil); err != nil {
+	if _, err := d.sendCampaign(context.Background(), &NewsletterParams{}, councilID, councilDate, nil); err != nil {
 		t.Fatalf("sendCampaign: %v", err)
 	}
 	if n := h.count(isCreatePOST); n != 0 {
@@ -393,14 +402,16 @@ func TestSendCampaign_ReusesDraft(t *testing.T) {
 			return fakeResp{200, fmt.Sprintf(`{"campaigns":[{"id":42,"name":%q,"status":"draft"}],"count":1}`, name)}
 		case req.Method == http.MethodGet && strings.HasSuffix(req.URL.Path, "/emailCampaigns/42"):
 			return fakeResp{200, `{"status":"draft"}`}
+		case isSendTestPOST(req):
+			return fakeResp{204, ""}
 		case isSendNowPOST(req):
 			return fakeResp{204, ""}
 		}
 		return fakeResp{200, "{}"}
 	}}
-	d := &notifierDeps{httpClient: h, brevoKey: "k"}
+	d := &notifierDeps{httpClient: h, brevoKey: "k", testEmail: "owner@example.com", autoSendEnabled: true}
 
-	if err := d.sendCampaign(context.Background(), &NewsletterParams{}, councilID, councilDate, nil); err != nil {
+	if _, err := d.sendCampaign(context.Background(), &NewsletterParams{}, councilID, councilDate, nil); err != nil {
 		t.Fatalf("sendCampaign: %v", err)
 	}
 	if n := h.count(isCreatePOST); n != 0 {
@@ -408,6 +419,9 @@ func TestSendCampaign_ReusesDraft(t *testing.T) {
 	}
 	if n := h.count(isSendNowPOST); n != 1 {
 		t.Errorf("expected exactly 1 sendNow POST, got %d", n)
+	}
+	if n := h.count(isSendTestPOST); n != 1 {
+		t.Errorf("expected exactly 1 sendTest POST, got %d", n)
 	}
 }
 
@@ -440,3 +454,289 @@ func TestHandle_SkipsMetadata(t *testing.T) {
 	}
 }
 
+func TestHandleTest_UsesApprovedStoredContentAndIsolatedCampaign(t *testing.T) {
+	ddb := &fakeDDB{getResponse: func(in *dynamodb.GetItemInput) (*dynamodb.GetItemOutput, error) {
+		if in.ConsistentRead == nil || !*in.ConsistentRead {
+			t.Error("test council must be read consistently")
+		}
+		return &dynamodb.GetItemOutput{Item: map[string]types.AttributeValue{
+			"council_id":             &types.AttributeValueMemberS{Value: "council-1"},
+			"category":               &types.AttributeValueMemberS{Value: "Conseil municipal"},
+			"qc_status":              &types.AttributeValueMemberS{Value: "APPROVED"},
+			"date":                   &types.AttributeValueMemberS{Value: "2026-06-22"},
+			"newsletter_params_json": &types.AttributeValueMemberS{Value: `{"email_subject":"Sujet validé"}`},
+		}}, nil
+	}}
+	var names []string
+	h := &fakeHTTP{route: func(req *http.Request) fakeResp {
+		switch {
+		case req.Method == http.MethodGet && strings.Contains(req.URL.RawQuery, "limit=50"):
+			return fakeResp{200, `{"campaigns":[]}`}
+		case isCreatePOST(req):
+			var body struct {
+				Name       string `json:"name"`
+				Subject    string `json:"subject"`
+				Recipients struct {
+					ListIDs []int `json:"listIds"`
+				} `json:"recipients"`
+			}
+			if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
+				t.Fatal(err)
+			}
+			if body.Subject != "Sujet validé" || len(body.Recipients.ListIDs) != 1 || body.Recipients.ListIDs[0] != 3 {
+				t.Errorf("unexpected campaign: %+v", body)
+			}
+			if !strings.HasPrefix(body.Name, "Newsletter-TEST-list-3-") {
+				t.Errorf("campaign name %q is not isolated from production", body.Name)
+			}
+			names = append(names, body.Name)
+			return fakeResp{201, `{"id":42}`}
+		case req.Method == http.MethodGet && strings.HasSuffix(req.URL.Path, "/emailCampaigns/42"):
+			return fakeResp{200, `{"status":"draft"}`}
+		case isSendTestPOST(req):
+			if req.Header.Get("Content-Type") != "application/json" || req.Header.Get("api-key") != "k" {
+				t.Error("sendTest missing Brevo headers")
+			}
+			var body struct {
+				EmailTo []string `json:"emailTo"`
+			}
+			if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
+				t.Fatal(err)
+			}
+			if len(body.EmailTo) != 1 || body.EmailTo[0] != "owner@example.com" {
+				t.Errorf("unexpected sendTest recipients: %v", body.EmailTo)
+			}
+			return fakeResp{204, ""}
+		case isSendNowPOST(req):
+			return fakeResp{204, ""}
+		}
+		return fakeResp{200, `{}`}
+	}}
+	d := &notifierDeps{ddb: ddb, httpClient: h, brevoKey: "k", brevoListID: 2, brevoTemplateID: 7, councilsTable: "councils-test", testEmail: "owner@example.com"}
+	listID := 3
+	for range 2 {
+		if err := d.handle(context.Background(), NotifierEvent{CouncilID: "council-1", TestListID: &listID}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if len(names) != 2 || names[0] == names[1] || h.count(isSendTestPOST) != 0 || h.count(isSendNowPOST) != 2 {
+		t.Fatalf("expected two distinct test-list sends, got names=%v previews=%d sends=%d", names, h.count(isSendTestPOST), h.count(isSendNowPOST))
+	}
+	if d.brevoListID != 2 || len(ddb.updateInputs) != 0 {
+		t.Fatal("test send changed production configuration or send ledger")
+	}
+}
+
+func TestHandleTest_RejectsUnapprovedAndNonTestEvents(t *testing.T) {
+	listID := 2
+	d := &notifierDeps{}
+	if err := d.handle(context.Background(), NotifierEvent{CouncilID: "council-1", TestListID: &listID}); err == nil {
+		t.Fatal("accepted a non-test Brevo list")
+	}
+	listID = 3
+	params := &NewsletterParams{EmailSubject: "Injected"}
+	if err := d.handle(context.Background(), NotifierEvent{CouncilID: "council-1", TestListID: &listID, NewsletterParams: params}); err == nil {
+		t.Fatal("accepted caller-supplied newsletter params")
+	}
+	ddb := &fakeDDB{getResponse: func(_ *dynamodb.GetItemInput) (*dynamodb.GetItemOutput, error) {
+		return &dynamodb.GetItemOutput{Item: map[string]types.AttributeValue{
+			"qc_status": &types.AttributeValueMemberS{Value: "QUARANTINED"},
+			"category":  &types.AttributeValueMemberS{Value: "Conseil municipal"},
+		}}, nil
+	}}
+	d.ddb = ddb
+	d.councilsTable = "councils-test"
+	if err := d.handle(context.Background(), NotifierEvent{CouncilID: "council-1", TestListID: &listID}); err == nil {
+		t.Fatal("accepted a council without APPROVED status")
+	}
+}
+
+func TestHandle_PreviewAndAutomaticSend(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		autoSend bool
+	}{
+		{name: "manual draft"},
+		{name: "automatic send", autoSend: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ddb := &fakeDDB{getResponse: func(_ *dynamodb.GetItemInput) (*dynamodb.GetItemOutput, error) {
+				return &dynamodb.GetItemOutput{Item: map[string]types.AttributeValue{
+					"council_id":             &types.AttributeValueMemberS{Value: "council-1"},
+					"qc_status":              &types.AttributeValueMemberS{Value: "APPROVED"},
+					"date":                   &types.AttributeValueMemberS{Value: "2026-06-22"},
+					"newsletter_params_json": &types.AttributeValueMemberS{Value: `{"email_subject":"Sujet validé"}`},
+				}}, nil
+			}}
+			var calls []string
+			h := &fakeHTTP{route: func(req *http.Request) fakeResp {
+				switch {
+				case req.Method == http.MethodGet && req.URL.Path == "/v3/emailCampaigns":
+					return fakeResp{200, `{"campaigns":[]}`}
+				case isCreatePOST(req):
+					var body map[string]json.RawMessage
+					if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
+						t.Fatal(err)
+					}
+					if _, scheduled := body["scheduledAt"]; scheduled {
+						t.Error("manual preview must create an unscheduled draft")
+					}
+					var subject string
+					if err := json.Unmarshal(body["subject"], &subject); err != nil || subject != "Sujet validé" {
+						t.Errorf("campaign subject = %q, want Validator content", subject)
+					}
+					var recipients struct {
+						ListIDs []int `json:"listIds"`
+					}
+					if err := json.Unmarshal(body["recipients"], &recipients); err != nil {
+						t.Fatal(err)
+					}
+					if len(recipients.ListIDs) != 1 {
+						t.Fatalf("unexpected recipients: %v", recipients.ListIDs)
+					}
+					if recipients.ListIDs[0] == 3 {
+						calls = append(calls, "createTest")
+						return fakeResp{201, `{"id":43}`}
+					}
+					if recipients.ListIDs[0] != 2 {
+						t.Errorf("production campaign targets list %d, want 2", recipients.ListIDs[0])
+					}
+					calls = append(calls, "create")
+					return fakeResp{201, `{"id":42}`}
+				case isSendTestPOST(req):
+					calls = append(calls, "sendTest")
+					return fakeResp{204, ""}
+				case req.Method == http.MethodGet && strings.HasSuffix(req.URL.Path, "/emailCampaigns/42"):
+					return fakeResp{200, `{"status":"draft"}`}
+				case req.Method == http.MethodGet && strings.HasSuffix(req.URL.Path, "/emailCampaigns/43"):
+					return fakeResp{200, `{"status":"draft"}`}
+				case isSendNowPOST(req):
+					wantID := "/emailCampaigns/43/sendNow"
+					if tc.autoSend {
+						wantID = "/emailCampaigns/42/sendNow"
+					}
+					if !strings.HasSuffix(req.URL.Path, wantID) {
+						t.Errorf("sent wrong campaign: %s", req.URL.Path)
+					}
+					calls = append(calls, "sendNow")
+					return fakeResp{204, ""}
+				}
+				return fakeResp{500, "unexpected request"}
+			}}
+			d := &notifierDeps{
+				ddb: ddb, httpClient: h, brevoKey: "k", testEmail: "owner@example.com", brevoListID: 2,
+				autoSendEnabled: tc.autoSend, councilsTable: "councils-test", now: fixedClock(time.Now()),
+			}
+			var scheduledAt *string
+			if !tc.autoSend {
+				value := "2026-10-01T18:00:00Z"
+				scheduledAt = &value
+			}
+			if err := d.handle(context.Background(), NotifierEvent{
+				CouncilID: "council-1", NewsletterParams: &NewsletterParams{EmailSubject: "Injected"},
+				ScheduledAt: scheduledAt,
+			}); err != nil {
+				t.Fatal(err)
+			}
+			wantCalls := []string{"create", "sendTest"}
+			wantUpdate := "REMOVE newsletter_pending_at"
+			if tc.autoSend {
+				wantCalls = append(wantCalls, "sendNow")
+				wantUpdate = "SET newsletter_sent_at = :ts REMOVE newsletter_pending_at"
+			} else {
+				wantCalls = append(wantCalls, "createTest", "sendNow")
+			}
+			if fmt.Sprint(calls) != fmt.Sprint(wantCalls) {
+				t.Errorf("Brevo calls = %v, want %v", calls, wantCalls)
+			}
+			if len(ddb.updateInputs) != 3 || *ddb.updateInputs[2].UpdateExpression != wantUpdate {
+				t.Errorf("DynamoDB updates do not match %q", wantUpdate)
+			}
+			if len(ddb.updateInputs) >= 2 && *ddb.updateInputs[1].UpdateExpression != "SET newsletter_campaign_id = :id" {
+				t.Error("production campaign ID was not recorded")
+			}
+			if len(ddb.updateInputs) >= 2 {
+				if got := ddb.updateInputs[1].ExpressionAttributeValues[":id"].(*types.AttributeValueMemberN).Value; got != "42" {
+					t.Errorf("recorded campaign ID = %s, want production campaign 42", got)
+				}
+			}
+		})
+	}
+}
+
+func TestSendCampaign_RequiresTestRecipientBeforeCreation(t *testing.T) {
+	h := &fakeHTTP{}
+	d := &notifierDeps{httpClient: h, brevoKey: "k"}
+	_, err := d.sendCampaign(context.Background(), &NewsletterParams{}, "council-1", "2026-06-22", nil)
+	if err == nil || !strings.Contains(err.Error(), "BREVO_TEST_EMAIL") {
+		t.Fatalf("expected missing test recipient error, got %v", err)
+	}
+	if len(h.requests) != 0 {
+		t.Fatal("Brevo was called without a test recipient")
+	}
+}
+
+func TestSendCampaign_TestFailureDoesNotSendNow(t *testing.T) {
+	h := &fakeHTTP{route: func(req *http.Request) fakeResp {
+		switch {
+		case req.Method == http.MethodGet:
+			return fakeResp{200, `{"campaigns":[]}`}
+		case isCreatePOST(req):
+			return fakeResp{201, `{"id":42}`}
+		case isSendTestPOST(req):
+			return fakeResp{400, `{"message":"invalid recipient"}`}
+		}
+		return fakeResp{500, "unexpected request"}
+	}}
+	d := &notifierDeps{httpClient: h, brevoKey: "k", testEmail: "owner@example.com", autoSendEnabled: true}
+	_, err := d.sendCampaign(context.Background(), &NewsletterParams{}, "council-1", "2026-06-22", nil)
+	if err == nil || !strings.Contains(err.Error(), "sendTest status 400") {
+		t.Fatalf("expected Brevo sendTest failure, got %v", err)
+	}
+	if h.count(isSendNowPOST) != 0 {
+		t.Fatal("sent campaign despite failed preview")
+	}
+}
+
+func TestReconcileOnly_RecordsBrevoSentDate(t *testing.T) {
+	ddb := &fakeDDB{getResponse: func(_ *dynamodb.GetItemInput) (*dynamodb.GetItemOutput, error) {
+		return &dynamodb.GetItemOutput{Item: map[string]types.AttributeValue{
+			"council_id":             &types.AttributeValueMemberS{Value: "council-1"},
+			"qc_status":              &types.AttributeValueMemberS{Value: "APPROVED"},
+			"newsletter_campaign_id": &types.AttributeValueMemberN{Value: "42"},
+		}}, nil
+	}}
+	h := &fakeHTTP{route: func(req *http.Request) fakeResp {
+		if req.Method != http.MethodGet || !strings.HasSuffix(req.URL.Path, "/emailCampaigns/42") {
+			t.Errorf("unexpected Brevo request: %s %s", req.Method, req.URL.Path)
+		}
+		return fakeResp{200, `{"status":"sent","sentDate":"2026-09-29T15:30:00Z"}`}
+	}}
+	d := &notifierDeps{ddb: ddb, httpClient: h, brevoKey: "k", councilsTable: "councils-test", now: fixedClock(time.Now())}
+	if err := d.handle(context.Background(), NotifierEvent{CouncilID: "council-1", ReconcileOnly: true}); err != nil {
+		t.Fatal(err)
+	}
+	if len(ddb.updateInputs) != 1 || *ddb.updateInputs[0].UpdateExpression != "SET newsletter_sent_at = :ts REMOVE newsletter_pending_at" {
+		t.Fatal("manual send was not recorded")
+	}
+	if got := ddb.updateInputs[0].ExpressionAttributeValues[":ts"].(*types.AttributeValueMemberS).Value; got != "2026-09-29T15:30:00Z" {
+		t.Errorf("recorded timestamp = %q", got)
+	}
+}
+
+func TestReconcileOnly_LeavesDraftUnsent(t *testing.T) {
+	ddb := &fakeDDB{getResponse: func(_ *dynamodb.GetItemInput) (*dynamodb.GetItemOutput, error) {
+		return &dynamodb.GetItemOutput{Item: map[string]types.AttributeValue{
+			"qc_status":              &types.AttributeValueMemberS{Value: "APPROVED"},
+			"newsletter_campaign_id": &types.AttributeValueMemberN{Value: "42"},
+		}}, nil
+	}}
+	h := &fakeHTTP{route: func(_ *http.Request) fakeResp { return fakeResp{200, `{"status":"draft"}`} }}
+	d := &notifierDeps{ddb: ddb, httpClient: h, councilsTable: "councils-test"}
+	if err := d.handle(context.Background(), NotifierEvent{CouncilID: "council-1", ReconcileOnly: true}); err == nil {
+		t.Fatal("draft was incorrectly reconciled as sent")
+	}
+	if len(ddb.updateInputs) != 0 {
+		t.Fatal("draft changed the send ledger")
+	}
+}

@@ -1,10 +1,10 @@
 import json
 import boto3
-import time
 from datetime import datetime
+from pathlib import Path
 
 # Configuration
-DATA_FILE = 'frontend/data.json'
+DATA_FILE = Path(__file__).resolve().parents[2] / 'frontend' / 'data.json'
 COUNCILS_TABLE = 'watchdog-councils'
 DELIBERATIONS_TABLE = 'watchdog-deliberations'
 REGION = 'eu-west-3'

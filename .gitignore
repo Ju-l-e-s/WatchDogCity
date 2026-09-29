@@ -28,6 +28,7 @@ node_modules/
 bootstrap
 .claude/
 .superpowers/
+/ .superpowers/
 
 # Frontend generated assets
 frontend/style.css

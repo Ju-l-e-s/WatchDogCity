@@ -31,6 +31,9 @@ build:
 	# Notifier
 	cd lambdas/notifier && go mod tidy && GOOS=linux GOARCH=arm64 go build $(LDFLAGS) -o bootstrap .
 	cd lambdas/notifier && zip -j ../../dist/notifier.zip bootstrap && rm bootstrap
+	# Brevo campaign webhook
+	cd lambdas/brevo-webhook && GOOS=linux GOARCH=arm64 go build $(LDFLAGS) -o bootstrap .
+	cd lambdas/brevo-webhook && zip -j ../../dist/brevo-webhook.zip bootstrap && rm bootstrap
 	# Validator
 	cd lambdas/validator && go mod tidy && GOOS=linux GOARCH=arm64 go build $(LDFLAGS) -o bootstrap .
 	cd lambdas/validator && zip -j ../../dist/validator.zip bootstrap && rm bootstrap

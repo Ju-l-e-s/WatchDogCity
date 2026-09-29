@@ -1,5 +1,7 @@
 # 🔭 WatchdogCity — Propositions de Fonctionnalités Innovantes
 
+> **Statut : propositions à évaluer.** Les fonctionnalités et estimations ci-dessous ne décrivent pas nécessairement le produit actuel. Pour l'architecture en place, voir [ARCHITECTURE.md](../../ARCHITECTURE.md).
+
 > **Contexte** : Observatoire citoyen des conseils municipaux de Bègles (site statique HTML/JS, données dans `data.json`, backend serverless Lambda Go, analyse par IA des PDFs officiels). Public : citoyens non-experts. Principe : neutralité, transparence, accessibilité.
 
 ---

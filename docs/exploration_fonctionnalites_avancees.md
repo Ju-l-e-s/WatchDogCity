@@ -128,7 +128,7 @@ Le Notifier actuel envoie une campagne Brevo unique à toute la liste après cha
 | Intégration, déploiement CDK, tests E2E | 4h |
 | **Total** | **~37h** |
 
-**Classification** : **Effort Moyen-Élevé** (semaine de travail complète). Plus lourd que l'estimation initiale dans INNOVATIONS.md car l'implémentation correcte du lien magique + API transactionnelle Brevo + séparation en table dédiée ajoute de la robustesse mais aussi de la complexité.
+**Classification** : **Effort Moyen-Élevé** (semaine de travail complète). Plus lourd que l'estimation initiale dans [INNOVATIONS.md](proposals/INNOVATIONS.md) car l'implémentation correcte du lien magique + API transactionnelle Brevo + séparation en table dédiée ajoute de la robustesse mais aussi de la complexité.
 
 ---
 

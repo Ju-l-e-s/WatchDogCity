@@ -1,5 +1,7 @@
 # Technical Handover — WatchdogCity
 
+Guide explicatif et support de soutenance. Pour vérifier l'état actuel du pipeline, se référer à [ARCHITECTURE.md](../ARCHITECTURE.md) puis au code des Lambdas et du CDK.
+
 Ce document d'architecture et de transfert technique synthétise le fonctionnement du projet **WatchdogCity** (Watchdog municipal de la ville de Bègles, déployé sur [lobservatoiredebegles.fr](https://www.lobservatoiredebegles.fr)). Conçu sous forme de guide de soutenance, il détaille les choix d'infrastructure (IaC), d'automatisation (CI/CD), de flux applicatif, d'observabilité et propose une section "Self-Defense" pour l'entretien technique.
 
 ---
@@ -152,7 +154,7 @@ Le pipeline de données respecte les principes d'asynchronisme, de découplage e
    - Le **Validator** verrouille le traitement en passant l'état à `VALIDATING`.
    - Il charge le conseil et toutes ses délibérations associées, puis applique des règles de qualité déterministes et statistiques (voir chapitre 4).
    - S'il y a quarantaine (verdict invalide) et que le compteur d'essais est inférieur à la limite, il déclenche un auto-nettoyage (effacement des délibérations corrompues et ré-enfilement des PDF dans SQS pour ré-analyse).
-   - Si le conseil est validé, il génère le contenu de la newsletter en mode **Sensory Deprivation** via **Gemini 2.5 Pro**, stocke le JSON final dans le conseil, passe l'état à `APPROVED`, puis invoque les Lambdas **Publisher** et **Notifier**.
+   - Si le conseil est validé, il génère le contenu de la newsletter via **Gemini 2.5 Pro** à partir de champs sélectionnés, dont le résumé et les impacts rédigés par le Worker, stocke le JSON final dans le conseil, passe l'état à `APPROVED`, puis invoque les Lambdas **Publisher** et **Notifier**.
 7. **Diffusion Web & Email** :
    - Le **Publisher** compile le fichier `data.json` regroupant uniquement les conseils `APPROVED`, l'envoie sur S3 et invalide CloudFront.
    - Le **Notifier** récupère les paramètres de la newsletter pré-générés par le Validator, crée la campagne d'emailing sur **Brevo**, l'envoie à la liste de diffusion et consigne `newsletter_sent_at` dans DynamoDB.
@@ -196,18 +198,18 @@ Plutôt que d'utiliser un modèle d'IA pour évaluer la production d'un autre mo
 - **S5 (Axe Budgétaire Aberrant - HIGH)** : Bloque le conseil si une délibération dépasse un budget unitaire de 500 000 000 € (détection d'une erreur de décimale ou de parsing de l'IA).
 - **S6 (Plausibilité Démocratique - HIGH)** : Bloque si le cumul des votes exprimés (Pour + Contre + Abstention) dépasse 60 (la ville de Bègles comportant moins de 40 élus municipaux).
 
-### 4.2 Le Principe de la "Sensory Deprivation" (Garantie de Neutralité)
-Pour garantir la probité du projet et écarter tout risque de biais éditorial ou de prise de position politique de l'IA dans la newsletter, la génération du texte est exécutée sous **privation sensorielle**.
-- La fonction `GenerateNewsletterParams` appelée par le Validator reçoit exclusivement la structure épurée `ColdDeliberation`.
-- Cette structure ne contient **aucun champ de texte libre** rédigé par le Worker (pas de résumé, pas de détail de décision, pas de motif de désaccord, pas de texte brut issu du PDF). Elle ne contient que des métadonnées froides : titre factuel de la délibération, montant budgétaire en euros, sens des votes et tags d'énumération.
-- N'ayant aucun support textuel narratif pour s'inspirer, le modèle Gemini 2.5 Pro ne peut pas inventer d'histoire, de reproches ou de justifications politiques. Il se limite à reformuler et structurer des faits mathématiques et catégoriels.
+### 4.2 Données transmises à la génération de newsletter
+Le Validator construit une structure `ColdDeliberation` avec des champs sélectionnés avant d'appeler `GenerateNewsletterParams`.
+- Le modèle de rédaction ne reçoit pas le PDF source complet ni le détail textuel des désaccords.
+- Il reçoit notamment le titre, la catégorie, le budget, les votes, **ainsi que `Summary` et `Impacts` produits par le Worker**. Ces deux derniers champs sont du texte libre ; la sélection des champs ne constitue donc pas une garantie absolue de neutralité.
+- Les statistiques et les règles de la QC Gateway sont calculées en Go. Le modèle de rédaction reste génératif et ses sorties doivent être vérifiées comme telles.
 
 ### 4.3 Gestion des Erreurs et Robustesse (Circuit Breaker & Alerting)
 1. **Gemini Circuit Breaker** :
-   Pour éviter de consommer inutilement les quotas d'API et de bloquer les files d'attente lors d'une panne généralisée des services Google Gemini, un circuit breaker est stocké dans DynamoDB. Chaque échec d'appel à Gemini incrémente un compteur d'erreurs. Si le seuil est dépassé, le circuit s'ouvre : les Lambdas Workers et Notifiers détectent immédiatement cet état et retournent leurs messages en file d'attente SQS sans tenter d'appeler l'API Gemini. Le circuit se referme automatiquement après une période d'attente et un appel de test réussi.
+   Pour limiter les appels à Gemini en cas de panne, un circuit breaker est stocké dans DynamoDB. Les chemins qui appellent Gemini vérifient son état. Le Notifier ne le consulte que si les paramètres de la newsletter n'ont pas été pré-générés par le Validator, notamment sur le chemin historique ou de test.
 2. **Auto-Guérison (Self-Healing)** :
    Lorsqu'un conseil est envoyé en quarantaine à cause d'une règle de qualité HIGH (ex: divergence de ventilation budgétaire ou format invalide), le Validator applique une procédure d'auto-guérison si le nombre d'essais (`qc_attempts`) est inférieur à 3 :
-   - Il supprime les enregistrements de délibérations défaillantes dans DynamoDB.
+   - Il supprime les enregistrements de toutes les délibérations du conseil dans DynamoDB.
    - Il réinitialise le compteur `processed_pdfs` à 0 sur le conseil.
    - Il ré-enfile les messages PDF d'origine dans SQS pour forcer une ré-analyse complète par les Workers.
    - Si l'erreur était due à une mauvaise interprétation ponctuelle du LLM, la ré-analyse avec une température de 0 a de fortes chances de corriger le tir sans intervention humaine.
@@ -239,7 +241,7 @@ Le pipeline WatchdogCity a été conçu en respectant scrupuleusement les pilier
    - **Édition du site** : Le `Publisher` utilise un verrou de verrouillage atomique (`metadata#publisher_lock`) pour sérialiser l'écriture dans `data.json` sur S3 et éviter les collisions d'écritures concurrentes.
    - **Campagne Brevo** : Le `Notifier` utilise un double verrouillage d'état (`newsletter_pending_at` et `newsletter_sent_at`) et dérive une clé d'idempotence stable à partir de l'identité du conseil. Il interroge Brevo pour vérifier si la campagne existe déjà avant de la créer.
 2. **Mécanisme de Circuit Breaker (Gemini)** :
-   Les Lambdas `Worker` et `Notifier` intègrent un circuit breaker distribué. Si l'API Gemini est en surcharge ou en panne, le système détecte la succession d'erreurs et "ouvre" le circuit. Les messages SQS sont alors immédiatement reportés sans appeler l'API Gemini, protégeant ainsi nos quotas et notre budget contre des boucles infinies de requêtes d'erreur.
+   Les chemins qui appellent Gemini utilisent un circuit breaker distribué. Le Notifier ne génère pas de texte sur le chemin normal où il reçoit les paramètres pré-générés par le Validator ; son chemin historique ou de test peut encore appeler Gemini.
 3. **Auto-Guérison (Self-Healing)** :
    En cas de validation défectueuse détectée par la QC Gateway (Validator), si `qc_attempts` < 3, le Validator purge automatiquement les délibérations existantes pour ce conseil, remet le compteur `processed_pdfs` à 0, et renvoie toutes les URLs PDF dans la file SQS. Ce processus gère automatiquement les erreurs de parsing transitoires de l'IA sans intervention humaine.
 4. **Isolations des Pannes via SQS et DLQ** :
@@ -270,11 +272,11 @@ Cette section prépare aux questions difficiles qu'un architecte ou un recruteur
 
 #### Q5 : Pourquoi avoir centralisé la génération de la newsletter dans le Validator plutôt que de la laisser dans le Notifier ?
 * **Réponse attendue** : « Il y a deux raisons fondamentales à ce choix :
-  1. **La cohérence de l'état** : En centralisant la génération dans le Validator, les paramètres de la newsletter sont calculés une seule fois pour toutes, validés, et sauvegardés directement dans le document du conseil au sein de DynamoDB (`newsletter_params_json`). Le Notifier devient une fonction "pure", sans état et sans intelligence artificielle : son seul rôle est de lire ces paramètres et de les envoyer à Brevo.
+  1. **La cohérence de l'état** : En centralisant la génération dans le Validator, les paramètres de la newsletter sont calculés puis sauvegardés dans le document du conseil au sein de DynamoDB. Sur le chemin normal, le Notifier reçoit ces paramètres et gère l'état de l'envoi Brevo. Un chemin historique ou de test peut encore générer des paramètres via Gemini.
   2. **La résilience aux retries** : Si l'envoi vers Brevo échoue (panne réseau temporaire), le Notifier va être rejoué par AWS Lambda. S'il devait appeler Gemini à chaque rejeu, nous risquerions d'envoyer un contenu légèrement différent à chaque tentative en raison de la nature générative de l'IA (même avec une température à 0). Sauvegarder la newsletter validée en amont garantit que l'email envoyé est exactement celui qui a passé les contrôles de qualité. »
 
 #### Q6 : Qu'est-ce que la Gateway de Validation et pourquoi n'utilises-tu pas un LLM pour juger les résultats (LLM-as-a-Judge) ?
 * **Réponse attendue** : « La Gateway de Validation est une barrière de qualité logicielle codée de manière déterministe en Go. Elle applique des assertions strictes (comme la ventilation budgétaire, la cohérence des votes et les limites physiques de sièges du conseil municipal). Je refuse d'utiliser un modèle d'IA pour évaluer la production d'une autre IA (*LLM-as-a-Judge*) car cela introduirait de l'indéterminisme (le verdict pourrait changer d'un appel à l'autre), de la latence supplémentaire, des coûts d'API accrus et un risque d'hallucination secondaire (le juge qui valide une erreur). Notre approche déterministe garantit un comportement prévisible, auditable et permet de mettre en quarantaine de façon certaine toute anomalie de données. »
 
-#### Q7 : Explique le principe de "Sensory Deprivation" appliqué à la génération du contenu.
-* **Réponse attendue** : « La privation sensorielle est notre garantie absolue de neutralité politique. L'IA chargée de rédiger la newsletter ne reçoit jamais le texte des résumés ou des décisions rédigés par les workers, ni le texte brut des PDF originaux. Elle reçoit uniquement un dictionnaire de données structurées et factuelles (`ColdDeliberation`) : le titre factuel de la délibération, la catégorie, le montant en euros et le décompte des votes. N'ayant accès à aucun récit ou commentaire politique d'origine, le modèle est structurellement incapable d'insérer des jugements de valeur, d'interpréter des intentions ou d'introduire des biais éditoriaux. Il ne fait que formuler des faits froids et quantifiables. »
+#### Q7 : Quelles données reçoit le modèle qui génère la newsletter ?
+* **Réponse attendue** : « Le Validator sélectionne les champs transmis au modèle : titre, catégorie, budget et votes, mais aussi les champs textuels `Summary` et `Impacts` produits par le Worker. Le PDF source complet et le détail textuel des désaccords ne sont pas transmis. Cette restriction limite le contexte disponible ; elle ne rend pas le modèle incapable d'inventer ou d'introduire un biais. Les règles déterministes de la QC Gateway et une vérification des textes générés restent nécessaires. »

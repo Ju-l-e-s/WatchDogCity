@@ -1,5 +1,7 @@
 # White-Label Architecture — Watchdog Municipal Newsletter
 
+> **Statut : proposition d'évolution.** La section « As-Is » reflète l'état du projet lors de sa rédaction et peut être périmée. Pour l'architecture actuelle, voir [ARCHITECTURE.md](../../ARCHITECTURE.md) et le code CDK.
+
 ---
 
 ## 1. Cartographie de l'Existant (As-Is)

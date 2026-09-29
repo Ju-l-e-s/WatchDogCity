@@ -1,0 +1,111 @@
+{
+  "council_id": "https://www.mairie-begles.fr/d%C3%A9lib%C3%A9rations/deliberation-du-conseil-municipal-du-22-juin-2026/",
+  "title": "Délibérations du conseil municipal du 22 juin 2026",
+  "date": "2026-06-22",
+  "category": "Conseil municipal",
+  "source_url": "https://www.mairie-begles.fr/d%C3%A9lib%C3%A9rations/deliberation-du-conseil-municipal-du-22-juin-2026/",
+  "qc_status": "APPROVED",
+  "captured_at_utc": "2026-09-29T12:03:01+00:00",
+  "newsletter_params": {
+    "email_subject": "L'Essentiel du Conseil",
+    "council_title": "Délibérations du conseil municipal du 22 juin 2026",
+    "council_date": "22 juin 2026",
+    "main_issue": "Le conseil a principalement traité des ajustements budgétaires pour l'année en cours et de la planification des investissements à long terme. Le budget supplémentaire, d'un montant de plus de 10 millions d'euros, a été adopté malgré 9 votes contre.",
+    "budget_total": "14266499",
+    "has_global_budget": true,
+    "vote_climat": "CONSENSUS",
+    "climat_color": "",
+    "vote_stats": "7 délib. non unanimes / jusqu'à 9 voix contre",
+    "total_delibs_in_council": 23,
+    "tensions": [
+      {
+        "title": "Adoption du budget supplémentaire 2026",
+        "context": "Le conseil a voté pour ajuster les comptes de l'année en cours. Cette procédure permet de réallouer des fonds pour répondre à de nouveaux besoins ou à des dépenses imprévues.",
+        "impact": "",
+        "budget": "10 547 053",
+        "has_budget": true,
+        "vote_details": "9 votes contre"
+      },
+      {
+        "title": "Mise à jour des budgets pluriannuels pour les investissements",
+        "context": "Le conseil a mis à jour la programmation pluriannuelle des investissements (AP/CP). Ce vote planifie les dépenses pour les grands projets sur plusieurs années.",
+        "impact": "",
+        "budget": "14 266 499",
+        "has_budget": true,
+        "vote_details": "9 abstentions"
+      },
+      {
+        "title": "Augmentation annuelle des tarifs des services municipaux",
+        "context": "Le conseil a voté une augmentation de 2,1% sur les tarifs des services municipaux pour 2026.",
+        "impact": "",
+        "budget": "",
+        "has_budget": false,
+        "vote_details": "9 abstentions"
+      }
+    ],
+    "adopted": [
+      {
+        "tag": "Budget",
+        "title": "Affectation des résultats financiers de 2025",
+        "context": "Le conseil a décidé de l'utilisation des résultats financiers de l'exercice 2025. Cette étape consiste à répartir les excédents de l'année passée pour financer de nouvelles actions.",
+        "impact": "",
+        "budget": "13 660 775",
+        "has_budget": true
+      },
+      {
+        "tag": "Budget",
+        "title": "Adoption du bilan financier de la ville pour 2025",
+        "context": "Le conseil a validé le Compte Financier Unique (CFU), qui est le bilan financier de l'année 2025. Ce document présente les dépenses et les recettes réelles de la ville.",
+        "impact": "",
+        "budget": "7 034 925",
+        "has_budget": true
+      },
+      {
+        "tag": "Environnement",
+        "title": "Modernisation de l'éclairage public",
+        "context": "Un programme de modernisation de l'éclairage public a été approuvé pour remplacer les anciennes ampoules par des LED et installer un système de gestion à distance.",
+        "impact": "Le projet prévoit le remplacement des ampoules existantes par des LED et l'installation d'un système de télégestion pour contrôler l'éclairage.",
+        "budget": "2 900 000",
+        "has_budget": true
+      },
+      {
+        "tag": "Social",
+        "title": "Ajustement de la subvention au Centre Communal d'Action Sociale",
+        "context": "Le conseil a ajusté la subvention d'équilibre versée au Centre Communal d'Action Sociale (l'organisme d'action sociale de la ville) pour financer ses activités.",
+        "impact": "",
+        "budget": "1 440 000",
+        "has_budget": true
+      },
+      {
+        "tag": "Administration",
+        "title": "Création et modification de postes au sein des services municipaux",
+        "context": "Le conseil a approuvé des ajustements dans les effectifs de la mairie pour répondre aux besoins des services.",
+        "impact": "Des postes permanents sont créés ou modifiés au sein de l'administration municipale.",
+        "budget": "",
+        "has_budget": false
+      }
+    ],
+    "briefs": [
+      {
+        "tag": "Social",
+        "summary": "Une subvention de 870 000 € est ajustée pour le Centre Social et Culturel L'Estey."
+      },
+      {
+        "tag": "Sport",
+        "summary": "La piscine municipale sera fermée durant l'été ; un partenariat est mis en place avec Villenave d'Ornon pour accueillir les usagers."
+      },
+      {
+        "tag": "Sécurité",
+        "summary": "Une convention est signée pour un service de télé-alerte mutualisé, pour un coût de 2 556 €."
+      },
+      {
+        "tag": "Environnement",
+        "summary": "Le conseil a voté une motion pour marquer son opposition aux vols de nuit survolant le territoire de la commune."
+      }
+    ],
+    "next_meeting": "Lundi 22 juin 2026, à 18h30",
+    "website_url": "https://lobservatoiredebegles.fr",
+    "total_councils": 17,
+    "total_delibs": 0
+  }
+}

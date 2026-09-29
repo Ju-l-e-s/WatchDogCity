@@ -93,5 +93,8 @@ jobs:
           AWS_DEFAULT_REGION: eu-west-3
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
+          WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
+          BREVO_TEST_EMAIL: ${{ secrets.BREVO_TEST_EMAIL }}
+          AUTO_SEND_ENABLED: ${{ vars.AUTO_SEND_ENABLED || 'false' }}
           ACM_CERTIFICATE_ARN: ${{ secrets.ACM_CERTIFICATE_ARN }}
           DOMAIN_NAME: 'lobservatoiredebegles.fr'

@@ -341,9 +341,6 @@ class WatchdogStack(Stack):
         # for idempotence (prevents duplicate sends on retry / re-aggregation).
         councils_table.grant(notifier, "dynamodb:GetItem", "dynamodb:UpdateItem", "dynamodb:Scan")
         deliberations_table.grant_read_data(notifier)
-        notifier.grant_invoke(publisher)
-        publisher.add_environment("NOTIFIER_FUNCTION_NAME", notifier.function_name)
-
         # Wire validator → notifier now that notifier is defined.
         notifier.grant_invoke(validator)
         validator.add_environment("NOTIFIER_FUNCTION_NAME", notifier.function_name)

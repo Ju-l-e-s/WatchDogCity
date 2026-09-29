@@ -8,7 +8,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
-	lambdaSvc "github.com/aws/aws-sdk-go-v2/service/lambda"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
@@ -16,7 +15,6 @@ var (
 	publisherCfg aws.Config
 	ddb          *dynamodb.Client
 	s3Client     *s3.Client
-	lambdaClient *lambdaSvc.Client
 )
 
 func init() {
@@ -27,7 +25,6 @@ func init() {
 	}
 	ddb = dynamodb.NewFromConfig(publisherCfg)
 	s3Client = s3.NewFromConfig(publisherCfg)
-	lambdaClient = lambdaSvc.NewFromConfig(publisherCfg)
 }
 
 func main() {

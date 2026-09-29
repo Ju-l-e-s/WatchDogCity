@@ -11,7 +11,6 @@ import (
 	"log"
 	"os"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/aws/aws-lambda-go/lambdacontext"
@@ -19,8 +18,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
-	lambdaSvc "github.com/aws/aws-sdk-go-v2/service/lambda"
-	lambdaTypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
@@ -275,37 +272,6 @@ func HandleRequest(ctx context.Context, event PublisherEvent) error {
 		return fmt.Errorf("upload data.json: %w", err)
 	}
 	log.Printf("data.json uploaded (%d bytes)", len(jsonBytes))
-
-	// A missing council_id means the Notifier would fetch council "" → 404 and
-	// silently drop the newsletter. Bail before invoking; data.json is already
-	// published, which is the side effect that matters.
-	// We also skip invoking the notifier if the council_id represents metadata
-	// (starts with "metadata#") as those are not actual municipal councils.
-	if event.CouncilID == "" || strings.HasPrefix(event.CouncilID, "metadata#") {
-		log.Printf("notifier skip: council_id is empty or metadata (%q)", event.CouncilID)
-		return nil
-	}
-
-	// Trigger newsletter Notifier asynchronously — last instruction, after S3.
-	if fn := os.Getenv("NOTIFIER_FUNCTION_NAME"); fn != "" && fn != "disabled" && fn != "placeholder" {
-		notifierPayload, _ := json.Marshal(map[string]string{"council_id": event.CouncilID})
-		_, err := lambdaClient.Invoke(ctx, &lambdaSvc.InvokeInput{
-			FunctionName:   aws.String(fn),
-			InvocationType: lambdaTypes.InvocationTypeEvent,
-			Payload:        notifierPayload,
-		})
-		if err != nil {
-			log.Printf("warn: could not invoke notifier for council %s: %v", event.CouncilID, err)
-			// Emit a CloudWatch EMF metric so a failed fan-out is alarmable
-			// rather than buried in a warn log.
-			log.Printf(`{"_aws":{"Timestamp":%d,"CloudWatchMetrics":[{"Namespace":"Watchdog","Dimensions":[["FunctionName"]],"Metrics":[{"Name":"NotifierInvokeFailed","Unit":"Count"}]}]},"FunctionName":"publisher","NotifierInvokeFailed":1}`,
-				time.Now().UnixMilli())
-		} else {
-			log.Printf("notifier invoked async for council %s", event.CouncilID)
-		}
-	} else if fn == "disabled" || fn == "placeholder" {
-		log.Printf("notifier invocation skipped: notifier is disabled or placeholder (%s)", fn)
-	}
 
 	return nil
 }

@@ -106,7 +106,7 @@ func DefaultQcConfig() QcConfig {
 
 // Verdict is the final QC decision for a council.
 type Verdict struct {
-	Status     string      `json:"status"`     // "APPROVED" | "QUARANTINED"
+	Status     string      `json:"status"` // "APPROVED" | "QUARANTINED"
 	Violations []Violation `json:"violations"`
 }
 
@@ -125,7 +125,40 @@ var leakedMarkupRe = regexp.MustCompile(
 	`(?i)(<[^>]+>|\[[^\]]+\]\([^)]+\)|en savoir plus|voir sur le site|→)`,
 )
 
-// ValidateDeterministic runs per-deliberation invariants D1–D10.
+var landscapeAreaRe = regexp.MustCompile(`(?i)([0-9][0-9 \x{00a0}\x{202f}]*)\s*m[²2]\s+d['’]espaces?\s+paysagers?`)
+var landAreaRe = regexp.MustCompile(`(?i)([0-9][0-9 \x{00a0}\x{202f}]*)\s*m[²2]\s+(?:de\s+|d['’])(?:terrains?|parcelles?|emprises?)`)
+
+func areaDigits(s string) string {
+	return strings.Map(func(r rune) rune {
+		if r >= '0' && r <= '9' {
+			return r
+		}
+		return -1
+	}, s)
+}
+
+func reattributedLandscapeArea(summary, impact string) bool {
+	for _, claim := range landscapeAreaRe.FindAllStringSubmatch(impact, -1) {
+		claimArea := areaDigits(claim[1])
+		for _, land := range landAreaRe.FindAllStringSubmatch(summary, -1) {
+			if areaDigits(land[1]) == claimArea {
+				grounded := false
+				for _, landscape := range landscapeAreaRe.FindAllStringSubmatch(summary, -1) {
+					if areaDigits(landscape[1]) == claimArea {
+						grounded = true
+						break
+					}
+				}
+				if !grounded {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+// ValidateDeterministic runs per-deliberation invariants D1–D11.
 // Pure function — no AWS calls, no randomness. Same input → same output, every time.
 func ValidateDeterministic(_ CouncilView, delibs []DeliberationView) []Violation {
 	cfg := DefaultQcConfig()
@@ -324,6 +357,15 @@ func ValidateDeterministic(_ CouncilView, delibs []DeliberationView) []Violation
 				})
 				break // one WARN per deliberation is sufficient
 			}
+		}
+
+		// ── D11: A total land area cannot become a landscaping area ────────
+		if d.AnalysisData.Impacts != nil && reattributedLandscapeArea(d.Summary, *d.AnalysisData.Impacts) {
+			viols = append(viols, Violation{
+				Rule: "D11_AREA_REFERENT_MISMATCH", Severity: SeverityHigh,
+				DeliberationID: id, Field: "analysis_data.impacts",
+				Detail: "total land area is reattributed to landscaping without support in summary",
+			})
 		}
 	}
 

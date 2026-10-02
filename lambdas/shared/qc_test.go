@@ -15,16 +15,16 @@ func okDelib(id string) DeliberationView {
 	imp := "Néant"
 	ctx := "Contexte factuel."
 	return DeliberationView{
-		ID:            id,
-		Title:         "Délibération " + id,
-		Summary:       "Résumé court.",
-		TopicTag:      "Budget",
-		BudgetType:    "DÉPENSE",
-		BudgetImpact:  1000,
-		ClimateImpact: "neutre",
-		HasVote:       true,
-		VotePour:      ptrInt(35),
-		VoteContre:    ptrInt(0),
+		ID:             id,
+		Title:          "Délibération " + id,
+		Summary:        "Résumé court.",
+		TopicTag:       "Budget",
+		BudgetType:     "DÉPENSE",
+		BudgetImpact:   1000,
+		ClimateImpact:  "neutre",
+		HasVote:        true,
+		VotePour:       ptrInt(35),
+		VoteContre:     ptrInt(0),
 		VoteAbstention: ptrInt(0),
 		AnalysisData: QcAnalysisData{
 			Contexte: &ctx,
@@ -54,6 +54,19 @@ func hasRuleAndSev(viols []Violation, rule string, sev Severity) bool {
 		}
 	}
 	return false
+}
+
+func TestD11BlocksLandAreaReattributedToLandscaping(t *testing.T) {
+	d := okDelib("D13-2026_103.pdf")
+	d.Summary = "La ville cède gratuitement 980 m² de terrains pour une piste cyclable et des espaces paysagers."
+	d.AnalysisData.Impacts = ptrStr("Une piste cyclable sera créée. Aménagement de 980 m² d'espaces paysagers ouverts au public.")
+	if !hasRuleAndSev(ValidateDeterministic(okCouncil(), []DeliberationView{d}), "D11_AREA_REFERENT_MISMATCH", SeverityHigh) {
+		t.Fatal("unsupported landscaping area passed QC")
+	}
+	d.AnalysisData.Impacts = ptrStr("Une piste cyclable et des espaces paysagers seront créés sur les terrains cédés.")
+	if hasRule(ValidateDeterministic(okCouncil(), []DeliberationView{d}), "D11_AREA_REFERENT_MISMATCH") {
+		t.Fatal("grounded statement was rejected")
+	}
 }
 
 // ── D1: Enum validity ─────────────────────────────────────────────────────────
@@ -598,7 +611,7 @@ func TestDecide_Deterministic(t *testing.T) {
 func TestStatistical_SmallBaseline_StillRunsAbsoluteChecks(t *testing.T) {
 	cfg := DefaultQcConfig()
 	d := okDelib("abs")
-	d.BudgetImpact = 600_000_000 // S5 trigger
+	d.BudgetImpact = 600_000_000    // S5 trigger
 	base := Baseline{SampleSize: 2} // below MinBaselineSample
 
 	viols := ValidateStatistical(okCouncil(), []DeliberationView{d}, base, cfg)

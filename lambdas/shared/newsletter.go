@@ -358,6 +358,7 @@ func buildColdNewsletterPrompt(
 	sb.WriteString("- PÉDAGOGIE ET NEUTRALITÉ : Agis en traducteur neutre. Bannis le jargon juridique et administratif. N'utilise aucune formulation partisane.\n")
 	sb.WriteString("- ANCRAGE STRICT : N'ajoute AUCUNE information qui n'est pas présente dans les données structurées d'entrée. Zéro fait géographique, historique ou éditorial externe.\n")
 	sb.WriteString("- PARTS ET SOUS-ENSEMBLES : Si un projet comprend plusieurs catégories (par exemple logements sociaux et logements intermédiaires), conserve les quantités de chaque catégorie ; ne présente jamais l'ensemble comme appartenant à une seule catégorie.\n")
+	sb.WriteString("- PORTÉE DES CHIFFRES : Un total (par exemple une surface de terrains cédés pour une piste cyclable et des espaces paysagers) ne décrit pas automatiquement la taille de chacune de ses composantes. N'attribue une quantité à une composante que si les champs d'entrée l'indiquent explicitement et sans contradiction.\n")
 	sb.WriteString("- INTERDICTION FORMELLE : N'ajoute JAMAIS de liens HTML ou de texte 'En savoir plus' dans les champs context ou impact.\n")
 	sb.WriteString("- CATÉGORISATION STRICTE : Police et Vidéoprotection → Sécurité. Clubs sportifs → Sport.\n")
 	sb.WriteString("- AFFICHAGE CONDITIONNEL : Ne mentionne pas de budget ('0 €') si l'impact est nul. Laisse le champ budget vide.\n")
@@ -478,7 +479,7 @@ func GenerateNewsletterParams(
 				ResponseSchema:   newsletterSchema,
 				// A full council can include dozens of selected items plus model
 				// reasoning tokens. An 8192-token cap intermittently truncated JSON.
-				MaxOutputTokens:  32768,
+				MaxOutputTokens: 32768,
 			},
 		)
 	}, 4)

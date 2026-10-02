@@ -50,6 +50,7 @@ RÈGLES IMPÉRATIVES DE TRAITEMENT :
    - Bannis absolument toutes les notions politiques, subjectives, marketing ou promotionnelles (ex: "sécurité accrue", "bien-être", "transition écologique", "confort des usagers").
    - "impacts" n'est JAMAIS null ni vide. Soit il décrit un impact physique concret, soit il vaut EXACTEMENT la chaîne "Néant". Aucune autre valeur (pas de "null", "N/A", "-", chaîne vide).
    - RÈGLE STRICTE : Si la délibération est de nature purement administrative, interne (élections de représentants, création de commissions, frais de mission des élus) ou sans impact matériel tangible direct sur le quotidien citoyen, la valeur DOIT ÊTRE STRICTEMENT "Néant". N'invente JAMAIS d'impacts indirects, théoriques ou idéologiques.
+   - CONSERVE LE RÉFÉRENT DES CHIFFRES : une surface totale de terrains cédés pour plusieurs usages ne devient pas une surface d'espaces paysagers. Associe chaque nombre uniquement à ce qu'il mesure explicitement dans le PDF ; si la répartition n'est pas donnée, n'en invente aucune.
 
 5. VULGARISATION ET PÉDAGOGIE CITOYENNE :
    - INTERDICTION ABSOLUE DU JARGON COMPTABLE ET LÉGAL :

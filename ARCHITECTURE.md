@@ -100,6 +100,7 @@ Le module de validation de la QC Gateway s'assure qu'aucun résumé incohérent 
 | **D8** | Texte Obligatoire | Le `title`, `summary` ou `decision` est vide ou ne contient que des espaces. |
 | **D9** | Impacts Présents | Le champ `impacts` est vide, absent, ou contient la chaîne littérale `"null"` (doit être soit `"Néant"`, soit un texte valide). |
 | **D10** | Balisage Fuité (WARN) | Le résumé ou le texte décisionnel contient du code HTML, des liens markdown, ou des appels à l'action promotionnels (`En savoir plus`, `Voir sur le site`, `→`). |
+| **D11** | Réattribution de surface | Un impact présente la surface totale de terrains cédés comme une surface d'espaces paysagers alors que le résumé ne justifie pas cette attribution. |
 
 ### 3.2 Règles Statistiques (ValidateStatistical - HIGH = Quarantaine)
 

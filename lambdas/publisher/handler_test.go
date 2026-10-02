@@ -127,26 +127,31 @@ func TestBuildDataJSON(t *testing.T) {
 	assert.Equal(t, 32, *data.Councils[0].Deliberations[0].Vote.Pour)
 }
 
-// --- Budget double-counting prevention ---
-// The council record may have a pre-computed BudgetImpact from the aggregator.
-// buildDataJSON MUST ignore it and recompute from deliberations to avoid double-counting.
-func TestBuildDataJSON_BudgetFromDeliberations(t *testing.T) {
+// Council-level aggregates can mix receipts, expenses and repeated operations.
+// The publisher must expose only the classified deliberation-level amounts.
+func TestBuildDataJSON_OmitsMisleadingCouncilAggregates(t *testing.T) {
 	councils := []CouncilRecord{{
 		CouncilID: "c1",
 		Analysis: CouncilAnalysis{
-			BudgetImpact: 9_999_999, // pre-computed council-level value — must be overridden
+			BudgetImpact: 9_999_999,
+			VoteClimat:   "consensus",
+			VoteSummary:  "Le budget est concentré sur l'urbanisme.",
 		},
 	}}
 	delibs := map[string][]DeliberationRecord{
 		"c1": {
-			{ID: "d1", CouncilID: "c1", BudgetImpact: 100_000},
-			{ID: "d2", CouncilID: "c1", BudgetImpact: 50_000},
+			{ID: "d1", CouncilID: "c1", BudgetImpact: 100_000, BudgetType: "RECETTE"},
+			{ID: "d2", CouncilID: "c1", BudgetImpact: 50_000, BudgetType: "DÉPENSE"},
 		},
 	}
 	data, err := buildDataJSON(context.Background(), nil, councils, delibs)
 	require.NoError(t, err)
-	assert.Equal(t, int64(150_000), data.Councils[0].Analysis.BudgetImpact,
-		"budget_impact must be the sum of deliberations, not the pre-computed council value")
+	assert.Equal(t, CouncilAnalysis{}, data.Councils[0].Analysis)
+	assert.Equal(t, int64(100_000), data.Councils[0].Deliberations[0].BudgetImpact)
+	assert.Equal(t, "RECETTE", data.Councils[0].Deliberations[0].BudgetType)
+	raw, err := json.Marshal(data.Councils[0].Analysis)
+	require.NoError(t, err)
+	assert.JSONEq(t, `{}`, string(raw))
 }
 
 func TestBuildDataJSON_BudgetZeroWhenNoDeliberations(t *testing.T) {

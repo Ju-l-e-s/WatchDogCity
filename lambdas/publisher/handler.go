@@ -42,12 +42,12 @@ type CouncilRecord struct {
 }
 
 type CouncilAnalysis struct {
-	BudgetImpact int64  `dynamodbav:"budget_impact" json:"budget_impact"`
-	BudgetLabel  string `dynamodbav:"budget_label" json:"budget_label"`
-	VoteClimat   string `dynamodbav:"vote_climat" json:"vote_climat"`
-	VoteSummary  string `dynamodbav:"vote_summary" json:"vote_summary"`
-	VotesPour    int    `dynamodbav:"votes_pour" json:"votes_pour"`
-	VotesContre  int    `dynamodbav:"votes_contre" json:"votes_contre"`
+	BudgetImpact int64  `dynamodbav:"budget_impact" json:"budget_impact,omitempty"`
+	BudgetLabel  string `dynamodbav:"budget_label" json:"budget_label,omitempty"`
+	VoteClimat   string `dynamodbav:"vote_climat" json:"vote_climat,omitempty"`
+	VoteSummary  string `dynamodbav:"vote_summary" json:"vote_summary,omitempty"`
+	VotesPour    int    `dynamodbav:"votes_pour" json:"votes_pour,omitempty"`
+	VotesContre  int    `dynamodbav:"votes_contre" json:"votes_contre,omitempty"`
 }
 
 type BudgetBreakdownItem struct {
@@ -134,26 +134,10 @@ func buildDataJSON(ctx context.Context, ddb *dynamodb.Client, councils []Council
 		NextCouncilDate: fetchNextCouncilDate(ctx, ddb),
 	}
 	for _, c := range councils {
-		analysis := c.Analysis
-		// Budget impact = max of budget-tagged deliberations, or sum of other items to avoid double-counting
-		var hasBudgetTopic bool
-		var maxBudgetTopic int64
-		var otherTopicsSum int64
-		for _, d := range delibs[c.CouncilID] {
-			if d.TopicTag == "Budget" {
-				hasBudgetTopic = true
-				if d.BudgetImpact > maxBudgetTopic {
-					maxBudgetTopic = d.BudgetImpact
-				}
-			} else {
-				otherTopicsSum += d.BudgetImpact
-			}
-		}
-		if hasBudgetTopic {
-			analysis.BudgetImpact = maxBudgetTopic
-		} else {
-			analysis.BudgetImpact = otherTopicsSum
-		}
+		// Council aggregates stored by older versions mix receipts and expenses,
+		// and can describe non-unanimous votes as consensus. Deliberation-level
+		// amounts and vote counts are the published source for these displays.
+		analysis := CouncilAnalysis{}
 
 		co := CouncilOutput{
 			CouncilID: c.CouncilID,
@@ -319,7 +303,7 @@ func fetchAllData(ctx context.Context, ddb *dynamodb.Client) ([]CouncilRecord, m
 	var lastKey map[string]types.AttributeValue
 	for {
 		cOut, err := ddb.Scan(ctx, &dynamodb.ScanInput{
-			TableName:        aws.String(os.Getenv("COUNCILS_TABLE")),
+			TableName: aws.String(os.Getenv("COUNCILS_TABLE")),
 			// Hard filter: only QC-approved councils appear on the public website.
 			// Councils without qc_status (pre-gate) are excluded intentionally.
 			FilterExpression: aws.String(

@@ -262,6 +262,46 @@ function formatBudget(val) {
     return amount.toLocaleString('fr-FR', { maximumFractionDigits: 0 }).replace(/\u202f/g, '\u00a0') + ' €';
 }
 
+function renderCouncilFinanceCard(deliberations) {
+    const groups = new Map();
+    const types = {
+        'DÉPENSE': 'Dépenses',
+        'RECETTE': 'Recettes',
+        'CAUTION': 'Cautions',
+    };
+    let count = 0;
+    for (const d of deliberations) {
+        const amount = Number(d.budget_impact);
+        if (!Number.isFinite(amount) || amount <= 0) continue;
+        count++;
+        const type = types[d.budget_type] || 'Nature non renseignée';
+        const topic = d.topic_tag || 'Autres';
+        if (!groups.has(type)) groups.set(type, { total: 0, topics: new Map() });
+        const group = groups.get(type);
+        group.total += amount;
+        group.topics.set(topic, (group.topics.get(topic) || 0) + amount);
+    }
+
+    let details = '';
+    for (const type of ['Dépenses', 'Recettes', 'Cautions', 'Nature non renseignée']) {
+        const group = groups.get(type);
+        if (!group) continue;
+        const topics = [...group.topics.entries()].sort((a, b) => b[1] - a[1]);
+        const bar = topics.map(([topic, amount]) => {
+            const pct = amount / group.total * 100;
+            const label = escapeHTML(topic).replace(/"/g, '&quot;');
+            return `<div style="width:${pct.toFixed(2)}%;background:${COLORS[topic] || COLORS.Autres}" title="${label} : ${formatBudget(amount)}"><span class="sr-only">${label} : ${pct.toFixed(1)} %</span></div>`;
+        }).join('');
+        const legend = topics.map(([topic, amount]) => {
+            const pct = amount / group.total * 100;
+            return `<div class="flex items-center gap-2"><span class="mr-1" style="width:10px;height:10px;border-radius:2px;background:${COLORS[topic] || COLORS.Autres}"></span><span>${pct.toFixed(1)} % ${escapeHTML(topic)} · ${formatBudget(amount)}</span></div>`;
+        }).join('');
+        details += `<div class="mt-5 first:mt-0"><div class="text-xs font-bold text-slate-500 uppercase tracking-wider">${type}</div><div class="text-2xl font-black text-slate-900">${formatBudget(group.total)}</div><div class="flex rounded-full overflow-hidden mt-3 bg-slate-100" style="height:10px" role="img" aria-label="Répartition des montants ${type.toLowerCase()} par thème">${bar}</div><div class="flex flex-wrap mt-3 text-xs font-bold text-slate-500 leading-none" style="gap:20px;row-gap:12px">${legend}</div></div>`;
+    }
+
+    return `<div class="analysis-card bg-slate-50/50 border border-slate-100 rounded-2xl p-6"><span class="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">💰 Montants financiers cités</span>${count ? `${details}<p class="text-xs text-slate-500 mt-5">${count} délibération${count > 1 ? 's' : ''} chiffrée${count > 1 ? 's' : ''}. Les montants sont regroupés par nature et par thème. Une même opération peut figurer dans plusieurs décisions : ces sommes ne sont pas un budget de séance.</p>` : '<div class="text-sm text-slate-600">Aucun montant chiffré dans les délibérations publiées.</div>'}</div>`;
+}
+
 // ── Topic Filter Dropdown ──
 
 function getAvailableTopics() {
@@ -467,8 +507,6 @@ function render() {
         // A council can contain receipts, expenses, guarantees and budget transfers.
         // Their amounts cannot be combined into a meaningful council total.
         const allDelibs = allCouncils.find(c => c.id === council.id)?.deliberations || council.deliberations || [];
-        const financialDelibs = allDelibs.filter(d => d.budget_impact > 0);
-
         // Calculate vote climate from every deliberation in the council.
         const votedDelibs = allDelibs.filter(d => d.vote && (d.vote.has_vote || d.vote.pour != null || d.vote.contre != null));
         const unanimousDelibs = votedDelibs.filter(d => (d.vote.contre || 0) === 0 && (d.vote.abstention || 0) === 0);
@@ -480,13 +518,10 @@ function render() {
         const hasVotesFromDelibs = votedDelibs.length > 0;
 
         let analysisHtml = "";
-        if (council.analysis || financialDelibs.length) {
-            const hasFinancial = financialDelibs.length > 0;
-            if (hasFinancial || hasVotesFromDelibs) {
+        if (council.analysis || allDelibs.length) {
+            if (allDelibs.length || hasVotesFromDelibs) {
                 analysisHtml = `<div class="analysis-grid grid grid-cols-1 gap-4 mt-6">`;
-                if (hasFinancial) {
-                    analysisHtml += `<div class="analysis-card bg-slate-50/50 border border-slate-100 rounded-2xl p-6"><span class="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">💰 Montants financiers cités</span><div class="text-2xl font-black text-slate-900">${financialDelibs.length} délibération${financialDelibs.length > 1 ? 's' : ''}</div><p class="text-xs text-slate-500 mt-2">Recettes et dépenses de ce conseil ne sont pas additionnées.</p></div>`;
-                }
+                analysisHtml += renderCouncilFinanceCard(allDelibs);
                 if (hasVotesFromDelibs) {
                     const badgeClasses = isConsensus
                         ? "bg-emerald-50 text-emerald-700 border-emerald-200"
@@ -521,8 +556,6 @@ function render() {
             }
         }
         
-        const enjeuCleHtml = council.analysis && council.analysis.vote_summary ? 
-            `<p class="text-slate-600 leading-relaxed max-w-4xl text-xl font-light mt-8"><span class="font-bold text-slate-900 mr-2">Enjeu Clé :</span>${council.analysis.vote_summary.replace("Enjeu Clé :", "").replace("Enjeu Clé", "")}</p>` : "";
 
         section.innerHTML = `
             <div class="flex items-center gap-6 mb-8">
@@ -535,7 +568,6 @@ function render() {
                     ${agendaHtml}
                     <h3 class="text-2xl md:text-3xl font-bold text-slate-900 pt-4 md:pt-0 mb-4 tracking-tight">${title}</h3>
                     ${analysisHtml}
-                    ${enjeuCleHtml}
                 </div>
                 <div class="divide-y divide-slate-100/50">${council.deliberations.map(d => renderDeliberationRow(d)).join("")}</div>
             </div>`;

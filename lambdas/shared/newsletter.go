@@ -580,6 +580,10 @@ func deterministicMainIssue(params *NewsletterParams) string {
 		if !strings.HasSuffix(context, ".") {
 			context += "."
 		}
+		context = strings.Replace(context, "La Ville ", "La ville ", 1)
+		if len(sentences) == 1 && strings.HasPrefix(sentences[0], "La ville ") && strings.HasPrefix(context, "La ville ") {
+			context = "Elle " + strings.TrimPrefix(context, "La ville ")
+		}
 		sentences = append(sentences, context)
 		if len(sentences) == 2 {
 			break

@@ -55,8 +55,8 @@ func TestFinalizeNewsletterParamsOverridesModelFacts(t *testing.T) {
 		TotalCouncils:        999,
 		TotalDelibs:          999,
 		Adopted: []AdoptedItem{
-			{Context: "La ville attribue 30 000 euros à l'association SAGE. Cette aide soutient l'accueil des enfants."},
-			{Context: "Le conseil approuve un financement pour la plantation d'arbres. Le projet concerne deux sites."},
+			{Context: "La Ville attribue 30 000 euros à l'association SAGE. Cette aide soutient l'accueil des enfants."},
+			{Context: "La ville reçoit un financement pour la plantation d'arbres. Le projet concerne deux sites."},
 		},
 	}
 	finalizeNewsletterParams(params, "2026-09-28", cold,
@@ -70,7 +70,7 @@ func TestFinalizeNewsletterParamsOverridesModelFacts(t *testing.T) {
 	if params.CouncilTitle != "Conseil municipal du 28 septembre 2026" || params.CouncilDate != "28 septembre 2026" || params.TotalDelibsInCouncil != 2 || params.TotalCouncils != 10 || params.TotalDelibs != 171 {
 		t.Fatalf("model metadata remains: %+v", params)
 	}
-	if params.MainIssue != "La ville attribue 30 000 euros à l'association SAGE. Le conseil approuve un financement pour la plantation d'arbres." {
+	if params.MainIssue != "La ville attribue 30 000 euros à l'association SAGE. Elle reçoit un financement pour la plantation d'arbres." {
 		t.Fatalf("main issue does not lead with adopted decisions: %q", params.MainIssue)
 	}
 }

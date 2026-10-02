@@ -109,16 +109,16 @@ async function init() {
 
 function getBudgetData() {
     let primitifDelib = null;
-    let maxBreakdownItems = 0;
+    let primitifDate = '';
     
-    // 1. Trouver le Budget Primitif (délibération avec le plus grand breakdown thématique et contenant VOTE et BUDGET dans son titre)
+    // Use the most recent published primitive budget, with its council date.
     allCouncils.forEach(c => {
         (c.deliberations || []).forEach(d => {
             const titleUpper = (d.title || "").toUpperCase();
             const breakdown = d.budget_breakdown;
-            if (breakdown && breakdown.length > maxBreakdownItems && titleUpper.includes("VOTE") && titleUpper.includes("BUDGET")) {
-                primitifDelib = d;
-                maxBreakdownItems = breakdown.length;
+            if (breakdown?.length && titleUpper.includes("VOTE") && titleUpper.includes("BUDGET PRIMITIF") && c.date > primitifDate) {
+                primitifDelib = { ...d, council_date: c.date };
+                primitifDate = c.date;
             }
         });
     });
@@ -187,6 +187,8 @@ function renderDashboard() {
     const budgetData = getBudgetData();
     const totalBudget = budgetData.totalBudget;
     const categories = budgetData.categories;
+    const expensesOnly = budgetData.primitifDelib?.budget_breakdown?.every(item => /^(Dépenses\b|Remboursement du capital de la dette)/i.test(item.label || ''));
+    const budgetLabel = expensesOnly ? 'Dépenses prévues' : 'Montants ventilés';
 
     if (totalBudget === 0) { container.classList.add('hidden'); return; }
     container.classList.remove('hidden');
@@ -234,13 +236,13 @@ function renderDashboard() {
             <div class="mb-8">
                 <span class="dashboard-title flex items-center gap-2 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2m0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
-                    Budget de Référence ${budgetData.primitifDelib ? '2026' : ''}
+                    ${budgetLabel} au budget primitif ${budgetData.primitifDelib?.title.match(/\b20\d{2}\b/)?.[0] || ''}
                 </span>
                 <div class="budget-total-val text-4xl md:text-5xl font-black text-slate-900 tracking-tight">${formatBudget(totalBudget)}</div>
-                ${budgetData.primitifDelib ? `<p class="text-xs text-slate-500 mt-2">Basé sur le Budget Primitif voté le ${formatDate(budgetData.primitifDelib.council_date || '2025-12-18')}</p>` : ''}
+                ${budgetData.primitifDelib ? `<p class="text-xs text-slate-500 mt-2">D'après les montants ventilés dans le budget primitif voté le ${formatDate(budgetData.primitifDelib.council_date)}. Les autres décisions financières sont présentées séparément.</p>` : ''}
             </div>
             
-            <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Répartition thématique du Budget de Référence</h4>
+            <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Répartition thématique de ces montants</h4>
             ${ribbonHtml}
             ${legendHtml}
             ${gridHtml}
@@ -255,7 +257,9 @@ function updateStats() { const e = document.getElementById("stat-councils"), t =
 function formatDate(e) { if (!e) return "Date inconnue"; try { const t = new Date(e); return isNaN(t.getTime()) ? e : t.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" }) } catch (t) { return e } }
 
 function formatBudget(val) {
-    return val.toLocaleString('fr-FR', { maximumFractionDigits: 0 }) + " €";
+    const amount = Number(val);
+    if (!Number.isFinite(amount)) return 'Montant non renseigné';
+    return amount.toLocaleString('fr-FR', { maximumFractionDigits: 0 }).replace(/\u202f/g, '\u00a0') + ' €';
 }
 
 // ── Topic Filter Dropdown ──
@@ -460,65 +464,28 @@ function render() {
 
         const agendaHtml = council.agenda ? `<div class="badge-agenda"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>${council.agenda}</div>` : "";
         
-        let councilRibbonHtml = '', councilLegendHtml = '';
-        const councilTotal = council.analysis ? council.analysis.budget_impact : 0;
-        if (councilTotal > 0) {
-            // Use the ORIGINAL (unfiltered) council deliberations for the budget ribbon,
-            // so percentages reflect the full council, not just the filtered subset.
-            const originalCouncil = allCouncils.find(c => c.id === council.id);
-            const budgetDelibs = originalCouncil ? (originalCouncil.deliberations || []) : (council.deliberations || []);
-            const cats = {};
-            let councilThematicTotal = 0;
-            budgetDelibs.forEach(d => {
-                if (d.budget_impact > 0 && d.topic_tag !== 'Budget') {
-                    const cat = d.topic_tag || 'Autres';
-                    cats[cat] = (cats[cat] || 0) + d.budget_impact;
-                    councilThematicTotal += d.budget_impact;
-                }
-            });
-            if (councilThematicTotal > 0) {
-                const sortedCats = Object.entries(cats).sort((a, b) => b[1] - a[1]);
-                councilRibbonHtml = '<div class="flex rounded-full overflow-hidden mt-5 bg-slate-100" style="height: 10px;" role="progressbar" aria-label="Répartition du budget">';
-                sortedCats.forEach(([name, val]) => {
-                    const pct = (val / councilThematicTotal * 100).toFixed(1);
-                    councilRibbonHtml += `<div style="width:${pct}%;background:${COLORS[name]||COLORS['Autres']}" title="${name}: ${pct}%"><span class="sr-only">${name} : ${pct}%</span></div>`;
-                });
-                councilRibbonHtml += '</div>';
-                councilLegendHtml = '<div class="flex flex-wrap mt-4 text-xs font-bold text-slate-500 leading-none" style="gap:20px;row-gap:12px;">';
-                sortedCats.forEach(([name, val]) => {
-                    const pct = Math.round(val / councilThematicTotal * 100);
-                    const color = COLORS[name] || COLORS['Autres'];
-                    councilLegendHtml += `<div class="flex items-center gap-2"><span class="mr-1" style="width:10px;height:10px;border-radius:2px;background:${color}"></span><span>${pct}% ${name}</span></div>`;
-                });
-                councilLegendHtml += '</div>';
-            }
-        }
+        // A council can contain receipts, expenses, guarantees and budget transfers.
+        // Their amounts cannot be combined into a meaningful council total.
+        const allDelibs = allCouncils.find(c => c.id === council.id)?.deliberations || council.deliberations || [];
+        const financialDelibs = allDelibs.filter(d => d.budget_impact > 0);
 
-        // Calculate vote climate from individual deliberations
-        const allDelibs = council.deliberations || [];
+        // Calculate vote climate from every deliberation in the council.
         const votedDelibs = allDelibs.filter(d => d.vote && (d.vote.has_vote || d.vote.pour != null || d.vote.contre != null));
         const unanimousDelibs = votedDelibs.filter(d => (d.vote.contre || 0) === 0 && (d.vote.abstention || 0) === 0);
         const abstentionDelibs = votedDelibs.filter(d => (d.vote.contre || 0) === 0 && (d.vote.abstention || 0) > 0);
         const oppositionDelibs = votedDelibs.filter(d => (d.vote.contre || 0) > 0);
         
-        // Stricter logic: Tension if any opposition OR ratio > 10%
-        let totalVotes = 0, totalOpposition = 0;
-        votedDelibs.forEach(d => {
-            totalVotes += (d.vote.pour || 0) + (d.vote.contre || 0) + (d.vote.abstention || 0);
-            totalOpposition += (d.vote.contre || 0) + (d.vote.abstention || 0);
-        });
-        const ratio = totalVotes > 0 ? totalOpposition / totalVotes : 0;
-        const isConsensus = oppositionDelibs.length === 0 && ratio <= 0.10;
+        const isConsensus = votedDelibs.length > 0 && votedDelibs.length === unanimousDelibs.length;
         
         const hasVotesFromDelibs = votedDelibs.length > 0;
 
         let analysisHtml = "";
-        if (council.analysis) {
-            const hasFinancial = council.analysis.budget_impact > 0;
+        if (council.analysis || financialDelibs.length) {
+            const hasFinancial = financialDelibs.length > 0;
             if (hasFinancial || hasVotesFromDelibs) {
                 analysisHtml = `<div class="analysis-grid grid grid-cols-1 gap-4 mt-6">`;
                 if (hasFinancial) {
-                    analysisHtml += `<div class="analysis-card bg-slate-50/50 border border-slate-100 rounded-2xl p-6"><span class="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">💰 Impact Financier</span><div class="text-2xl font-black text-slate-900">${council.analysis.budget_impact.toLocaleString("fr-FR")} €</div>${councilRibbonHtml}${councilLegendHtml}</div>`;
+                    analysisHtml += `<div class="analysis-card bg-slate-50/50 border border-slate-100 rounded-2xl p-6"><span class="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">💰 Montants financiers cités</span><div class="text-2xl font-black text-slate-900">${financialDelibs.length} délibération${financialDelibs.length > 1 ? 's' : ''}</div><p class="text-xs text-slate-500 mt-2">Recettes et dépenses de ce conseil ne sont pas additionnées.</p></div>`;
                 }
                 if (hasVotesFromDelibs) {
                     const badgeClasses = isConsensus
@@ -609,11 +576,11 @@ function renderDeliberationRow(e) {
     if (e.budget_impact > 0) {
         let badgeClasses = 'bg-slate-100 text-slate-700 border-slate-200';
         let icon = '💰';
-        let prefix = '';
-        if (e.budget_type === 'DÉPENSE') { badgeClasses = 'bg-slate-50 text-slate-600 border-slate-200'; icon = '💰'; prefix = ''; }
-        else if (e.budget_type === 'RECETTE') { badgeClasses = 'bg-emerald-50 text-emerald-700 border-emerald-200'; icon = '🟢'; prefix = '+'; }
-        else if (e.budget_type === 'CAUTION') { badgeClasses = 'bg-amber-50 text-amber-700 border-amber-200'; icon = '🟠'; }
-        budgetBadge = `<span class="inline-flex items-center whitespace-nowrap shrink-0 px-2 py-0.5 rounded text-[10px] font-bold ${badgeClasses} border ml-2 shadow-sm">${icon} ${prefix}${e.budget_impact.toLocaleString('fr-FR')} €</span>`;
+        let typeLabel = 'Montant mentionné';
+        if (e.budget_type === 'DÉPENSE') { badgeClasses = 'bg-slate-50 text-slate-600 border-slate-200'; icon = '💰'; typeLabel = 'Dépense'; }
+        else if (e.budget_type === 'RECETTE') { badgeClasses = 'bg-emerald-50 text-emerald-700 border-emerald-200'; icon = '🟢'; typeLabel = 'Recette'; }
+        else if (e.budget_type === 'CAUTION') { badgeClasses = 'bg-amber-50 text-amber-700 border-amber-200'; icon = '🟠'; typeLabel = 'Caution'; }
+        budgetBadge = `<span class="inline-flex items-center whitespace-nowrap shrink-0 px-2 py-0.5 rounded text-[10px] font-bold ${badgeClasses} border ml-2 shadow-sm">${icon} ${typeLabel} : ${formatBudget(e.budget_impact)}</span>`;
     }
     let c = "";
     if (e.analysis_data) {
@@ -622,7 +589,7 @@ function renderDeliberationRow(e) {
         if (e.budget_impact > 0) {
             let badgeClasses = 'text-slate-600 bg-slate-100 border-slate-200'; // Fallback
             let icon = '💰';
-            let typeLabel = e.budget_type || '';
+            let typeLabel = e.budget_type || 'montant mentionné';
         
             switch (e.budget_type) {
                 case 'DÉPENSE':
@@ -646,7 +613,7 @@ function renderDeliberationRow(e) {
                     <p class="text-[11px] font-semibold text-brand-600 uppercase tracking-widest mb-1.5">Impact Financier</p>
                     <div class="inline-flex items-center whitespace-nowrap shrink-0 gap-1.5 px-2.5 py-1 rounded border ${badgeClasses} text-[13px] font-bold shadow-sm">
                         <span>${icon}</span>
-                        <span>${e.budget_impact.toLocaleString('fr-FR')} €</span>
+                        <span>${formatBudget(e.budget_impact)}</span>
                         ${typeHtml}
                     </div>
                 </div>
@@ -821,7 +788,7 @@ function renderBudgetView() {
             thematicData[theme].breakdowns.push({
                 label: item.label || item.topic_tag,
                 amount: item.amount,
-                council_date: budgetData.primitifDelib.council_date || '2025-12-18',
+                council_date: budgetData.primitifDelib.council_date,
                 source_title: d.title,
                 source_pdf: d.pdf_url,
             });
@@ -862,14 +829,14 @@ function renderBudgetView() {
                 const linesHtml = src.lines.map(l => `
                     <div class="flex items-center justify-between py-2 border-b border-slate-100/60 last:border-0">
                         <span class="text-[13px] text-slate-600 leading-snug flex-1 pr-4">${escapeHTML(l.label)}</span>
-                        <span class="text-[13px] font-semibold text-slate-800 shrink-0">${l.amount.toLocaleString('fr-FR')} €</span>
+                            <span class="text-[13px] font-semibold text-slate-800 shrink-0">${formatBudget(l.amount)}</span>
                     </div>`).join('');
                 primHtml += `
                     <div class="px-4 py-5 md:px-6 md:py-5">
                         <div class="flex items-center gap-2 mb-2">
                             <span class="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0"></span>
                             <span class="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">${formatDate(src.date)}</span>
-                            <span class="inline-flex items-center whitespace-nowrap shrink-0 px-2 py-0.5 rounded text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-100 ml-2 shadow-sm">💰 ${srcTotal.toLocaleString('fr-FR')} €</span>
+                            <span class="inline-flex items-center whitespace-nowrap shrink-0 px-2 py-0.5 rounded text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-100 ml-2 shadow-sm">💰 ${formatBudget(srcTotal)}</span>
                         </div>
                         <h5 class="text-sm font-semibold text-slate-700 mb-3">${escapeHTML(src.title)}</h5>
                         <div class="bg-slate-50/60 rounded-xl px-4 py-1">${linesHtml}</div>
@@ -923,7 +890,7 @@ function renderBudgetView() {
             <div class="lg:col-span-8 space-y-12">
                 <div>
                     <h3 class="text-2xl font-bold text-slate-900 mb-6 flex items-center gap-2.5">
-                        📊 Détails du Budget de Référence (Budget Primitif)
+                        📊 Dépenses détaillées du budget primitif
                     </h3>
                     <div class="space-y-8">
                         ${primHtml}
@@ -932,10 +899,10 @@ function renderBudgetView() {
                 
                 <div>
                     <h3 class="text-2xl font-bold text-slate-900 mb-6 flex items-center gap-2.5">
-                        ✨ Décisions & Investissements Complémentaires
+                        ✨ Autres décisions financières
                     </h3>
                     <p class="text-sm text-slate-500 leading-relaxed mb-6">
-                        Ces délibérations concernent des projets précis et des aides financières votés individuellement au cours de l'année. Leurs montants ne sont pas additionnés au budget principal afin d'éviter les double-comptages.
+                        Ces délibérations mentionnent des dépenses, des recettes ou d'autres montants. Ils ne sont pas additionnés au budget primitif : une même somme peut figurer dans plusieurs décisions.
                     </p>
                     <div class="bg-white rounded-[2rem] shadow-card overflow-hidden">
                         <div class="divide-y divide-slate-100/50">
@@ -948,11 +915,11 @@ function renderBudgetView() {
             <!-- Colonne droite : Historique et Ajustements de Trésorerie -->
             <div class="lg:col-span-4 space-y-6">
                 <h3 class="text-xl font-bold text-slate-900 flex items-center gap-2">
-                    ⚙️ Ajustements & Trésorerie
+                    ⚙️ Autres décisions comptables
                 </h3>
                 <div class="bg-white rounded-[2.5rem] shadow-card p-6 border border-slate-100/80 space-y-6">
                     <p class="text-xs text-slate-500 leading-relaxed border-l-2 border-brand-200 pl-3">
-                        Ces votes concernent des écritures comptables d'ajustement ou d'affectation de surplus budgétaires de l'année précédente.
+                        Ces votes concernent notamment des ajustements budgétaires, des comptes financiers et des affectations de résultats.
                     </p>
                     <div class="space-y-4">
                         ${adjustmentsHtml}

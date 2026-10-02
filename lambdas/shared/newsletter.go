@@ -29,7 +29,7 @@ type ColdDeliberation struct {
 	Abstention      *int
 	ClimateImpact   string // enum
 	IsSubstantial   bool
-	HasDisagreement bool // derived from Disagreements != nil && != ""; pass the bool, not the prose
+	HasDisagreement bool   // derived from Disagreements != nil && != ""; pass the bool, not the prose
 	Summary         string // Factual summary from worker
 	Impacts         string // Factual citizen impacts from worker
 }
@@ -95,11 +95,9 @@ const (
 // ── Internal stats (not exported) ─────────────────────────────────────────────
 
 type coldNewsletterStats struct {
-	totalBudget int64
 	voteClimat  string
 	climatColor string
 	voteStats   string
-	budgetFmt   string
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -148,38 +146,23 @@ func computeColdNewsletterStats(cold []ColdDeliberation) coldNewsletterStats {
 	var s coldNewsletterStats
 	nonUnanimousCount := 0
 	maxOpposition := 0
-	totalPour := 0
-	totalContre := 0
-
-	var hasBudgetTopic bool
-	var maxBudgetTopic int64
-	var otherTopicsSum int64
+	hasRecordedVote := false
+	hasAbstention := false
 
 	for _, d := range cold {
-		if d.TopicTag == "Budget" {
-			hasBudgetTopic = true
-			if d.BudgetImpact > maxBudgetTopic {
-				maxBudgetTopic = d.BudgetImpact
-			}
-		} else {
-			otherTopicsSum += d.BudgetImpact
-		}
-
-		pour := 0
-		if d.Pour != nil {
-			pour = *d.Pour
-		}
-		totalPour += pour
-
 		contre := 0
 		if d.Contre != nil {
 			contre = *d.Contre
 		}
-		totalContre += contre
-
 		abst := 0
 		if d.Abstention != nil {
 			abst = *d.Abstention
+		}
+		if d.HasVote && (d.Pour != nil || d.Contre != nil || d.Abstention != nil) {
+			hasRecordedVote = true
+		}
+		if abst > 0 {
+			hasAbstention = true
 		}
 
 		if contre > maxOpposition {
@@ -190,22 +173,19 @@ func computeColdNewsletterStats(cold []ColdDeliberation) coldNewsletterStats {
 		}
 	}
 
-	if hasBudgetTopic {
-		s.totalBudget = maxBudgetTopic
-	} else {
-		s.totalBudget = otherTopicsSum
-	}
-
-	totalVotesCast := totalPour + totalContre
-	if totalVotesCast > 0 && float64(totalContre)/float64(totalVotesCast) > 0.10 {
-		s.voteClimat = "VOTES PARTAGÉS"
+	if maxOpposition > 0 {
+		s.voteClimat = "VOTES AVEC OPPOSITION"
 		s.climatColor = "#E11D48" // Rose 600
-	} else {
-		s.voteClimat = "CONSENSUS"
+	} else if hasAbstention {
+		s.voteClimat = "VOTES AVEC ABSTENTIONS"
+		s.climatColor = "#B45309" // Amber 700
+	} else if hasRecordedVote {
+		s.voteClimat = "VOTES UNANIMES"
 		s.climatColor = "#059669" // Emerald 600
+	} else {
+		s.voteClimat = "VOTES NON RENSEIGNÉS"
+		s.climatColor = "#6B7280" // Gray 500
 	}
-
-	s.budgetFmt = formatBudgetFR(s.totalBudget)
 
 	parts := []string{}
 	if nonUnanimousCount > 0 {
@@ -214,7 +194,11 @@ func computeColdNewsletterStats(cold []ColdDeliberation) coldNewsletterStats {
 			parts = append(parts, fmt.Sprintf("jusqu'à %d voix contre", maxOpposition))
 		}
 	} else {
-		parts = append(parts, "Unanimité totale")
+		if hasRecordedVote {
+			parts = append(parts, "Aucun vote non unanime renseigné")
+		} else {
+			parts = append(parts, "Résultats des votes non renseignés")
+		}
 	}
 	s.voteStats = strings.Join(parts, " / ")
 
@@ -322,10 +306,10 @@ func buildColdNewsletterPrompt(
   "email_subject": "laisse vide, imposé par le système",
   "council_title": "copie verbatim du council_title fourni ci-dessous",
   "council_date": "copie verbatim du council_date fourni ci-dessous",
-  "main_issue": "1 à 2 phrases factuelles décrivant le ou les domaines au plus gros budget et la présence ou absence d'opposition. Aucune notion d'importance, d'enjeu politique ou de jugement de valeur. Déduis uniquement des faits structurés fournis.",
-  "budget_total": "montant total voté (fourni ci-dessous, copie verbatim)",
-  "has_global_budget": true,
-  "vote_climat": "VOTES PARTAGÉS ou CONSENSUS (fourni ci-dessous, copie verbatim)",
+  "main_issue": "laisse vide, imposé par le système à partir des titres, montants et votes structurés",
+  "budget_total": "laisse vide : recettes, dépenses et cautions ne forment pas un total comparable",
+  "has_global_budget": false,
+  "vote_climat": "libellé calculé (fourni ci-dessous, copie verbatim)",
   "climat_color": "code hex couleur (fourni ci-dessous, copie verbatim)",
   "vote_stats": "résumé votes (fourni ci-dessous, copie verbatim)",
   "total_delibs_in_council": 0,
@@ -362,17 +346,18 @@ func buildColdNewsletterPrompt(
 }`)
 
 	sb.WriteString("\n\nCONSIGNES ÉDITORIALES ET LOGIQUES :\n")
-	sb.WriteString("- PRIORITÉ ABSOLUE : Toute délibération avec des votes contre ou division politique DOIT figurer dans 'tensions'.\n")
+	sb.WriteString("- PRIORITÉ ABSOLUE : Toute délibération avec des votes contre DOIT figurer dans 'tensions'. Une abstention seule peut y figurer seulement si un désaccord est explicitement documenté. Une abstention ne prouve pas qu'un débat a eu lieu.\n")
 	sb.WriteString("- ENJEU CLÉ : Si le VOTE DES TAUX d'imposition est présent, il doit être le sujet prioritaire.\n")
 	sb.WriteString("- HIÉRARCHISATION DES BUDGETS : Les délibérations adoptées avec les plus gros budgets (notamment les budgets supplémentaires, Comptes Financiers Uniques (CFU), Comptes Administratifs, etc.) DOIVENT figurer en priorité dans la section 'adopted' avec leurs détails, et non pas dans les simples résumés ('briefs').\n")
 	sb.WriteString("- VULGARISATION INDEMNITÉS : Pour les indemnités des élus, explique simplement : 'Le conseil définit légalement la rémunération des élus pour leur travail, selon un barème national basé sur la taille de la ville'.\n")
 	sb.WriteString("- INTERDICTION ABSOLUE DU JARGON COMPTABLE ET LÉGAL : Bannis tout vocabulaire administratif, technocratique ou juridique brut. Pas de codes d'imputation (ex: Chapitres budgétaires, articles comptables). Ne cite pas d'articles de loi bruts, utilise plutôt 'Conformément à la loi...'. Vulgarise systématiquement tous les acronymes ou termes techniques entre parenthèses lors de leur première apparition (ex: écrire 'CFU (le bilan financier de l'année passée)', 'CCAS (l'organisme d'action sociale de la ville)', 'AP/CP (la programmation pluriannuelle des investissements)', 'TPE (la taxe sur la publicité extérieure)', 'ZAC (zone d'aménagement concerté)', 'DSP (délégation de service public)').\n")
 	sb.WriteString("- STYLE JOURNALISTIQUE PÉDAGOGIQUE : Traduis les termes administratifs complexes en langage clair. Par exemple, au lieu de parler de budget supplémentaire ou d'ajustements de crédits, explique : 'Le conseil ajuste les comptes en cours d'année pour réallouer l'argent là où les besoins sont les plus urgents.' Évite les répétitions vides ou tautologiques (ne pas écrire 'le budget est concentré sur le budget').\n")
 	sb.WriteString("- HUMANISATION DES CHIFFRES : Dans les champs textuels ('context', 'impact', 'summary'), arrondis systématiquement les grands chiffres pour faciliter la lecture (ex: écris 'environ 7 millions d'euros' au lieu de '7 034 925,77 €'). Les montants exacts ne doivent figurer que dans le champ numérique 'budget'.\n")
-	sb.WriteString("- RECADRAGE DES TENSIONS : Ne classe dans 'tensions' que les délibérations ayant fait l'objet d'une réelle contestation ou division politique (votes contre ou débat contradictoire). N'y inclus jamais des procédures administratives obligatoires (ex: le fait légal que le maire quitte la salle lors du vote de son propre bilan financier n'est pas une controverse, c'est une règle de procédure standard, indique alors 'Aucun désaccord, procédure standard.').\n")
+	sb.WriteString("- RECADRAGE DES TENSIONS : Ne qualifie jamais un vote non unanime de débat ou de controverse sans preuve explicite. Décris séparément les voix contre et les abstentions. N'y inclus jamais les procédures administratives obligatoires.\n")
 	sb.WriteString("- NEUTRALITÉ ET IMPACTS : Pour le champ 'impact', décris les conséquences concrètes et opérationnelles en te basant sur le champ 'Impact' d'entrée. Bannis absolument toutes les notions subjectives ou politiques partisanes (comme 'le bien-être', 'la sécurité', 'le confort', 'le dynamisme'). Si aucun impact concret n'est mentionné ou s'il vaut 'Néant', laisse le champ vide.\n")
 	sb.WriteString("- PÉDAGOGIE ET NEUTRALITÉ : Agis en traducteur neutre. Bannis le jargon juridique et administratif. N'utilise aucune formulation partisane.\n")
 	sb.WriteString("- ANCRAGE STRICT : N'ajoute AUCUNE information qui n'est pas présente dans les données structurées d'entrée. Zéro fait géographique, historique ou éditorial externe.\n")
+	sb.WriteString("- PARTS ET SOUS-ENSEMBLES : Si un projet comprend plusieurs catégories (par exemple logements sociaux et logements intermédiaires), conserve les quantités de chaque catégorie ; ne présente jamais l'ensemble comme appartenant à une seule catégorie.\n")
 	sb.WriteString("- INTERDICTION FORMELLE : N'ajoute JAMAIS de liens HTML ou de texte 'En savoir plus' dans les champs context ou impact.\n")
 	sb.WriteString("- CATÉGORISATION STRICTE : Police et Vidéoprotection → Sécurité. Clubs sportifs → Sport.\n")
 	sb.WriteString("- AFFICHAGE CONDITIONNEL : Ne mentionne pas de budget ('0 €') si l'impact est nul. Laisse le champ budget vide.\n")
@@ -382,7 +367,7 @@ func buildColdNewsletterPrompt(
 	fmt.Fprintf(&sb, "- council_title : %s\n", councilTitle)
 	fmt.Fprintf(&sb, "- council_date : %s\n", formatDateFR(councilDate))
 	fmt.Fprintf(&sb, "- Nombre total de délibérations ce jour : %d\n", len(cold))
-	fmt.Fprintf(&sb, "- budget_total : %s\n", stats.budgetFmt)
+	sb.WriteString("- budget_total : non calculé (flux financiers hétérogènes)\n")
 	fmt.Fprintf(&sb, "- vote_climat : %s\n", stats.voteClimat)
 	fmt.Fprintf(&sb, "- vote_stats : %s\n", stats.voteStats)
 	fmt.Fprintf(&sb, "- next_meeting : %s\n", nextMeeting)
@@ -403,7 +388,7 @@ func buildColdNewsletterPrompt(
 		if d.Abstention != nil {
 			abst = *d.Abstention
 		}
-		if contre > 0 || (d.HasDisagreement && (contre > 0 || abst > 0)) {
+		if contre > 0 || (d.HasDisagreement && abst > 0) {
 			tensions = append(tensions, d)
 			continue
 		}
@@ -419,7 +404,7 @@ func buildColdNewsletterPrompt(
 		// Below thresholds and non-contentious: excluded (bruit).
 	}
 
-	sb.WriteString("\nDÉLIBÉRATIONS AVEC OPPOSITION (A METTRE DANS tensions[]) :\n")
+	sb.WriteString("\nDÉLIBÉRATIONS AVEC VOTE NON UNANIME ET DÉSACCORD DOCUMENTÉ (A METTRE DANS tensions[]) :\n")
 	for _, d := range tensions {
 		contre := 0
 		if d.Contre != nil {
@@ -509,11 +494,33 @@ func GenerateNewsletterParams(
 	if err != nil {
 		return nil, err
 	}
+	finalizeNewsletterParams(params, councilDate, cold, stats, nextMeeting, totalCouncils, totalDelibs)
+	return params, nil
+}
 
-	// Override site constants (schema asks Gemini to copy them; override to be safe).
+// finalizeNewsletterParams keeps factual fields outside the model's control.
+func finalizeNewsletterParams(params *NewsletterParams, councilDate string,
+	cold []ColdDeliberation, stats coldNewsletterStats, nextMeeting string,
+	totalCouncils, totalDelibs int,
+) {
 	params.EmailSubject = newsletterEmailSubject
 	params.WebsiteURL = newsletterWebsiteURL
-	params.HasGlobalBudget = params.BudgetTotal != "" && params.BudgetTotal != "0"
+	// The municipal page title can contain a typo in its year. The approved
+	// council date is the canonical source for the newsletter heading.
+	params.CouncilTitle = "Conseil municipal du " + formatDateFR(councilDate)
+	params.CouncilDate = formatDateFR(councilDate)
+	params.NextMeeting = nextMeeting
+	params.TotalDelibsInCouncil = len(cold)
+	params.TotalCouncils = totalCouncils
+	params.TotalDelibs = totalDelibs
+	params.VoteClimat = stats.voteClimat
+	params.ClimatColor = stats.climatColor
+	params.VoteStats = stats.voteStats
+	// A sum of expenses, receipts and guarantees is not a meaningful financial impact.
+	// Keep each decision's amount below, but hide the aggregate tile.
+	params.BudgetTotal = ""
+	params.HasGlobalBudget = false
+	params.MainIssue = deterministicMainIssue(cold, stats)
 
 	// Re-format budget strings: extract raw integer from whatever Gemini emitted
 	// (e.g. "20 000 €", "20000", "20.000") and produce canonical "X XXX" spacing.
@@ -555,7 +562,31 @@ func GenerateNewsletterParams(
 		params.Briefs[i].Summary = stripLinks(params.Briefs[i].Summary)
 	}
 
-	return params, nil
+}
+
+// deterministicMainIssue uses only a verbatim title and a single classified
+// amount. The model must not generalize mixed categories in this prominent text.
+func deterministicMainIssue(cold []ColdDeliberation, stats coldNewsletterStats) string {
+	var largest *ColdDeliberation
+	for i := range cold {
+		if cold[i].BudgetImpact > 0 && (largest == nil || cold[i].BudgetImpact > largest.BudgetImpact) {
+			largest = &cold[i]
+		}
+	}
+	var issue string
+	if largest != nil {
+		budgetType, ok := MatchBudgetType(largest.BudgetType)
+		if !ok || budgetType == "AUCUN" {
+			budgetType = "montant indiqué"
+		} else {
+			budgetType = strings.ToLower(budgetType)
+		}
+		issue = fmt.Sprintf("Le montant le plus élevé renseigné concerne « %s » : %s € (%s).",
+			strings.TrimSpace(largest.Title), formatBudgetFR(largest.BudgetImpact), budgetType)
+	} else {
+		issue = fmt.Sprintf("Le conseil compte %d délibérations.", len(cold))
+	}
+	return issue + " " + stats.voteStats + "."
 }
 
 // ParseNewsletterParams parses a raw JSON string (possibly wrapped in markdown

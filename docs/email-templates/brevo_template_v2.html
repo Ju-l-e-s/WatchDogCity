@@ -24,24 +24,18 @@
                     <a href="{{ params.website_url }}" style="display: inline-block; background-color: #111827; color: #FFFFFF; text-decoration: none; font-weight: 600; font-size: 16px; padding: 16px 32px; border-radius: 6px;">
                         🔍 Explorer les {{ params.total_delibs_in_council }} délibérations
                     </a>
-                    <p style="font-size: 13px; color: #6B7280; margin-top: 10px;">Les débats complets et PDFs officiels sont sur l'Observatoire</p>
+                    <p style="font-size: 13px; color: #6B7280; margin-top: 10px;">Les délibérations détaillées et les PDF officiels sont sur l'Observatoire</p>
                 </div>
 
-                <!-- RÉSUMÉ 3 CHIFFRES CLÉS -->
+                <!-- RÉSUMÉ DES VOTES ET DES DÉLIBÉRATIONS -->
                 <div style="margin-bottom: 35px;">
                     <table width="100%" cellpadding="0" cellspacing="0" border="0">
                         <tr>
-                            {% if params.has_global_budget %}
-                            <td width="33%" style="text-align: center; padding: 12px 8px; background-color: #F0FDF4; border-radius: 8px;">
-                                <span style="font-size: 11px; font-weight: 700; color: #065F46; text-transform: uppercase; letter-spacing: 1px;">💰 Budget</span><br>
-                                <span style="font-size: 20px; font-weight: 800; color: #111827;">{{ params.budget_total }} €</span>
-                            </td>
-                            {% endif %}
-                            <td width="33%" style="text-align: center; padding: 12px 8px; background-color: #FEF2F2; border-radius: 8px;">
+                            <td width="50%" style="text-align: center; padding: 12px 8px; background-color: #FEF2F2; border-radius: 8px;">
                                 <span style="font-size: 11px; font-weight: 700; color: #991B1B; text-transform: uppercase; letter-spacing: 1px;">🗳️ Climat</span><br>
                                 <span style="font-size: 16px; font-weight: 800; color: {{ params.climat_color }};">{{ params.vote_climat }}</span>
                             </td>
-                            <td width="33%" style="text-align: center; padding: 12px 8px; background-color: #EFF6FF; border-radius: 8px;">
+                            <td width="50%" style="text-align: center; padding: 12px 8px; background-color: #EFF6FF; border-radius: 8px;">
                                 <span style="font-size: 11px; font-weight: 700; color: #1D4ED8; text-transform: uppercase; letter-spacing: 1px;">📋 Délibérations</span><br>
                                 <span style="font-size: 20px; font-weight: 800; color: #111827;">{{ params.total_delibs_in_council }}</span>
                             </td>
@@ -63,7 +57,7 @@
                 <!-- TENSIONS -->
                 {% if params.tensions %}
                 <div style="margin-bottom: 40px;">
-                    <h2 style="font-size: 15px; color: #4B5563; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid #E5E7EB; padding-bottom: 8px; margin-bottom: 25px;">Les points de tension</h2>
+                    <h2 style="font-size: 15px; color: #4B5563; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid #E5E7EB; padding-bottom: 8px; margin-bottom: 25px;">Les votes non unanimes</h2>
                     
                     {% for item in params.tensions %}
                     <div style="margin-bottom: 35px; border-bottom: 1px solid #F3F4F6; padding-bottom: 25px;">
@@ -71,7 +65,7 @@
                         
                         <!-- UPPER BADGES (VOTES & BUDGETS) -->
                         <div style="margin: 0 0 12px 0; line-height: 1;">
-                            <span style="display: inline-block; background-color: #FEE2E2; color: #991B1B; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; text-transform: uppercase; margin-right: 6px; margin-bottom: 4px; vertical-align: middle;">⚡ Débat</span>
+                            <span style="display: inline-block; background-color: #FEE2E2; color: #991B1B; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; text-transform: uppercase; margin-right: 6px; margin-bottom: 4px; vertical-align: middle;">Vote non unanime</span>
                             <span style="display: inline-block; background-color: #FEF3C7; color: #92400E; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; margin-right: 6px; margin-bottom: 4px; vertical-align: middle;">🗳️ {{ item.vote_details }}</span>
                             {% if item.has_budget %}
                             <span style="display: inline-block; background-color: #D1FAE5; color: #065F46; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; margin-bottom: 4px; vertical-align: middle;">💰 {{ item.budget }} €</span>
@@ -81,9 +75,11 @@
                         <p style="margin: 0 0 8px 0; font-size: 15px; color: #4B5563; line-height: 1.6;">
                             <strong style="color: #111827;">Le Contexte :</strong> {{ item.context }}
                         </p>
+                        {% if item.impact %}
                         <p style="margin: 0; font-size: 15px; color: #4B5563; line-height: 1.6;">
-                            <strong style="color: #111827;">L'Impact :</strong> {{ item.impact }}
+                            <strong style="color: #111827;">L'impact :</strong> {{ item.impact }}
                         </p>
+                        {% endif %}
                     </div>
                     {% endfor %}
                 </div>
@@ -109,9 +105,11 @@
                         <p style="margin: 0 0 8px 0; font-size: 15px; color: #4B5563; line-height: 1.6;">
                             <strong style="color: #111827;">Pourquoi ?</strong> {{ item.context }}
                         </p>
+                        {% if item.impact %}
                         <p style="margin: 0; font-size: 15px; color: #4B5563; line-height: 1.6;">
                             <strong style="color: #111827;">Concrètement :</strong> {{ item.impact }}
                         </p>
+                        {% endif %}
                     </div>
                     {% endfor %}
                 </div>
@@ -145,7 +143,7 @@
 
                 <!-- MAIN CTA -->
                 <div style="text-align: center;">
-                    <p style="font-size: 15px; color: #4B5563; margin-bottom: 20px; font-style: italic;">Ceci n'est qu'une synthèse. Les subtilités, débats et PDFs officiels vous attendent sur l'Observatoire.</p>
+                    <p style="font-size: 15px; color: #4B5563; margin-bottom: 20px; font-style: italic;">Ceci n'est qu'une synthèse. L'ensemble des délibérations détaillées et les PDF officiels vous attendent sur l'Observatoire.</p>
                     <a href="{{ params.website_url }}" style="display: inline-block; background-color: #111827; color: #FFFFFF; text-decoration: none; font-weight: 600; font-size: 16px; padding: 18px 36px; border-radius: 6px;">
                         Explorer les {{ params.total_delibs_in_council }} délibérations
                     </a>
@@ -156,7 +154,7 @@
             <!-- FOOTER -->
             <div style="background-color: #F9FAFB; padding: 40px; text-align: left; border-top: 1px solid #E5E7EB;">
                 <p style="margin: 0 0 15px 0; color: #374151; font-size: 14px; font-weight: 600;">Prochain Conseil : <span style="color: #111827;">{{ params.next_meeting }}</span></p>
-                <p style="margin: 0; color: #6B7280; font-size: 13px; line-height: 1.5;">{{ params.total_councils }} Conseils analysés • {{ params.total_delibs }} Décryptages IA<br>Données publiques gratuites sourcées sur mairie-begles.fr</p>
+                <p style="margin: 0; color: #6B7280; font-size: 13px; line-height: 1.5;">Données publiques gratuites sourcées sur mairie-begles.fr</p>
                 <p style="margin: 25px 0 0 0; color: #9CA3AF; font-size: 12px;">
                     Vous recevez cet email car vous êtes inscrit à l'Observatoire.<br>
                     <a href="{{ unsubscribe }}" style="color: #6B7280; text-decoration: underline;">Se désabonner</a>

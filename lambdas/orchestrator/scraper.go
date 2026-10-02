@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
+	"path"
 	"regexp"
 	"strconv"
 	"strings"
@@ -65,10 +67,9 @@ func (sc *Scraper) ScrapeCouncilList(ctx context.Context) ([]CouncilListing, err
 		}
 
 		pubDate, _ := s.Find("time").Attr("datetime")
-		// Prefer the actual session date extracted from the title over the
-		// publication date from the <time datetime> attribute (which can be
-		// a few days later than when the council actually met).
-		sessionDate := parseDateFromTitle(title)
+		// The municipality can publish a title with the wrong year. A council
+		// cannot take place after its deliberations have been published.
+		sessionDate, correctedTitle := councilDateAndTitle(title, pubDate)
 		if sessionDate == "" {
 			sessionDate = pubDate
 		}
@@ -78,11 +79,11 @@ func (sc *Scraper) ScrapeCouncilList(ctx context.Context) ([]CouncilListing, err
 		}
 		listings = append(listings, CouncilListing{
 			CouncilID: url,
-			Title:     title,
+			Title:     correctedTitle,
 			Category:  normalizeCategory(category, title),
 			Date:      sessionDate,
 			URL:       url,
-			Summary:   summary,
+			Summary:   strings.Replace(summary, title, correctedTitle, 1),
 		})
 	})
 	return listings, nil
@@ -107,7 +108,77 @@ func (sc *Scraper) ScrapePDFLinks(ctx context.Context, councilURL string) ([]PDF
 			})
 		}
 	})
+	// Distinct documents sometimes point to the same municipal URL. Repair a
+	// mismatched link only when the filename implied by its label exists.
+	for i := 0; i < len(items); i++ {
+		for j := 0; j < i; j++ {
+			if items[i].URL != items[j].URL {
+				continue
+			}
+			repaired := false
+			for _, index := range []int{j, i} {
+				candidate := pdfURLFromTitle(items[index].URL, items[index].Title)
+				if candidate != "" && candidate != items[index].URL && pdfURLExists(ctx, candidate) {
+					log.Printf("warn: duplicate municipal PDF link %s; using verified %s for %s", items[index].URL, candidate, items[index].Title)
+					items[index].URL = candidate
+					repaired = true
+					break
+				}
+			}
+			if !repaired {
+				return nil, fmt.Errorf("duplicate PDF link %s for %q and %q", items[i].URL, items[j].Title, items[i].Title)
+			}
+		}
+	}
 	return items, nil
+}
+
+func councilDateAndTitle(title, published string) (string, string) {
+	session := parseDateFromTitle(title)
+	publicationDate, pubErr := time.Parse("2006-01-02", published)
+	sessionDate, sessionErr := time.Parse("2006-01-02", session)
+	if pubErr != nil || sessionErr != nil || !sessionDate.After(publicationDate) {
+		return session, title
+	}
+	for _, year := range []int{publicationDate.Year(), publicationDate.Year() - 1} {
+		candidate := time.Date(year, sessionDate.Month(), sessionDate.Day(), 0, 0, 0, 0, time.UTC)
+		if candidate.Month() != sessionDate.Month() || candidate.Day() != sessionDate.Day() || candidate.After(publicationDate) || publicationDate.Sub(candidate) > 365*24*time.Hour {
+			continue
+		}
+		fixed := strings.Replace(title, fmt.Sprint(sessionDate.Year()), fmt.Sprint(year), 1)
+		log.Printf("warn: council title date %s is after publication %s; using %s", session, published, candidate.Format("2006-01-02"))
+		return candidate.Format("2006-01-02"), fixed
+	}
+	return session, title
+}
+
+var pdfLabelRE = regexp.MustCompile(`(?i)\bD\s*(\d{1,2})\s*[-–—]?\s*(\d{4})[_-](\d{2,3})\b`)
+
+func pdfURLFromTitle(href, title string) string {
+	match := pdfLabelRE.FindStringSubmatch(title)
+	parsed, err := url.Parse(href)
+	if match == nil || err != nil || parsed.Scheme == "" || parsed.Host == "" {
+		return ""
+	}
+	number, _ := strconv.Atoi(match[1])
+	sequence, _ := strconv.Atoi(match[3])
+	parsed.Path = path.Join(path.Dir(parsed.Path), fmt.Sprintf("D%02d-%s_%03d.pdf", number, match[2], sequence))
+	parsed.RawQuery = ""
+	parsed.Fragment = ""
+	return parsed.String()
+}
+
+func pdfURLExists(ctx context.Context, href string) bool {
+	request, err := http.NewRequestWithContext(ctx, http.MethodHead, href, nil)
+	if err != nil {
+		return false
+	}
+	response, err := (&http.Client{Timeout: 10 * time.Second}).Do(request)
+	if err != nil {
+		return false
+	}
+	defer response.Body.Close()
+	return response.StatusCode == http.StatusOK && strings.HasPrefix(strings.ToLower(response.Header.Get("Content-Type")), "application/pdf")
 }
 
 func (sc *Scraper) ScrapeNextCouncilDate(ctx context.Context, url string) (string, error) {
@@ -154,7 +225,7 @@ func (sc *Scraper) ScrapeNextCouncilDate(ctx context.Context, url string) (strin
 		}
 
 		parsedDate := time.Date(year, time.Month(month), day, 0, 0, 0, 0, time.UTC)
-		
+
 		if parsedDate.Before(todayTime) && m[3] == "" {
 			parsedDate = time.Date(year+1, time.Month(month), day, 0, 0, 0, 0, time.UTC)
 		}

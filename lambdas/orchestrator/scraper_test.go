@@ -88,6 +88,44 @@ func TestScrapePDFLinks(t *testing.T) {
 	assert.Equal(t, "https://example.com/D02.pdf", pdfs[1].URL)
 }
 
+func TestScrapeCouncilListCorrectsFutureYearFromPublication(t *testing.T) {
+	html := `<li class="list__item"><a class="publications-list-item__title-link" href="https://example.com/council-2028/">Délibérations du conseil municipal du 28 septembre 2028</a><div class="publications-list-item__excerpt">Délibérations du conseil municipal du 28 septembre 2028 — 28 documents</div><time datetime="2026-10-01">01/10/2026</time></li>`
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(html))
+	}))
+	defer server.Close()
+
+	listings, err := NewScraper(server.URL).ScrapeCouncilList(context.Background())
+	require.NoError(t, err)
+	require.Len(t, listings, 1)
+	assert.Equal(t, "2026-09-28", listings[0].Date)
+	assert.Equal(t, "Délibérations du conseil municipal du 28 septembre 2026", listings[0].Title)
+	assert.Contains(t, listings[0].Summary, "septembre 2026")
+	assert.Equal(t, "https://example.com/council-2028/", listings[0].CouncilID)
+}
+
+func TestScrapePDFLinksRepairsDuplicateMunicipalLink(t *testing.T) {
+	var server *httptest.Server
+	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodHead && r.URL.Path == "/D07-2026_097.pdf" {
+			w.Header().Set("Content-Type", "application/pdf")
+			return
+		}
+		if r.URL.Path == "/detail" {
+			w.Write([]byte(`<div class="telecharger-item"><p class="telecharger-item__title">D07 – 2026_097</p><a class="telecharger-item__link" href="` + server.URL + `/D08-2026_098.pdf">PDF</a></div><div class="telecharger-item"><p class="telecharger-item__title">D08 – 2026_098</p><a class="telecharger-item__link" href="` + server.URL + `/D08-2026_098.pdf">PDF</a></div>`))
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	defer server.Close()
+
+	items, err := NewScraper("unused").ScrapePDFLinks(context.Background(), server.URL+"/detail")
+	require.NoError(t, err)
+	require.Len(t, items, 2)
+	assert.Equal(t, server.URL+"/D07-2026_097.pdf", items[0].URL)
+	assert.Equal(t, server.URL+"/D08-2026_098.pdf", items[1].URL)
+}
+
 func TestFetchDocumentCancelledContext(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		time.Sleep(500 * time.Millisecond)

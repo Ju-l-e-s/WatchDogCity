@@ -83,6 +83,17 @@ def format_euros(amount):
     if not amount: return "N/A"
     return f"{amount:,.0f} €".replace(',', ' ')
 
+def financial_amount(d):
+    amount = d.get('budget_impact') or 0
+    if amount <= 0:
+        return ""
+    kind = {
+        "DÉPENSE": "Dépense",
+        "RECETTE": "Recette",
+        "CAUTION": "Caution",
+    }.get(d.get('budget_type'), "Montant mentionné")
+    return f'<div class="budget">{kind} : {format_euros(amount)}</div>'
+
 def generate_html(title, desc, url_path, content, breadcrumb, schema=None):
     canonical = f"{BASE_URL}{url_path}"
     schema_script = f'\n    <script type="application/ld+json">\n    {json.dumps(schema, indent=2)}\n    </script>' if schema else ""
@@ -179,7 +190,7 @@ def main():
     home_content = f"""
     <a href="https://www.lobservatoiredebegles.fr" class="spa-link">Explorer les données de façon interactive 🔭</a>
     <h1>{home_title}</h1>
-    <div style="margin-bottom: 2rem;"><a href="/budget/" class="tag" style="background: {THEME_COLORS['budget']}; font-size: 1rem;">💰 Voir le récapitulatif du budget global</a></div>
+    <div style="margin-bottom: 2rem;"><a href="/budget/" class="tag" style="background: {THEME_COLORS['budget']}; font-size: 1rem;">💰 Voir les décisions financières</a></div>
     <div class="grid">
     """
 
@@ -187,13 +198,13 @@ def main():
         c_date = c.get('date', '')
         c_title = c.get('title', '')
         dels = c.get('deliberations', [])
-        budget = sum(d.get('budget_impact') or 0 for d in dels)
+        financial_count = sum((d.get('budget_impact') or 0) > 0 for d in dels)
         home_content += f"""
         <div class="card">
             <h2><a href="/conseils/{c_date}/">{html.escape(c_title)}</a></h2>
             <div class="meta">🗓 {c_date} &nbsp;|&nbsp; 📝 {len(dels)} délibérations</div>
             <p>{html.escape(c.get('summary', '')[:150])}...</p>
-            <div class="budget">Impact budget: {format_euros(budget)}</div>
+            <div class="budget">{financial_count} délibération{'s' if financial_count != 1 else ''} avec montant financier</div>
         </div>"""
     home_content += "</div>"
 
@@ -227,7 +238,7 @@ def main():
                 <h3><a href="/deliberations/{d_id}/">{html.escape(d.get('title', ''))}</a></h3>
                 <div>{tags_html}</div>
                 <p>{html.escape(d.get('summary', '')[:120])}...</p>
-                <div class="budget">Budget: {format_euros(d.get('budget_impact', 0))}</div>
+                {financial_amount(d)}
             </div>"""
         content += "</div>"
 
@@ -271,7 +282,7 @@ def main():
         content = f"""
         <h1>{html.escape(title)}</h1>
         <div style="margin-bottom: 1rem;">{tags_html}</div>
-        <div class="budget" style="margin-bottom: 1.5rem; font-size: 1.1rem;">Impact budgétaire: {format_euros(d.get('budget_impact', 0))}</div>
+        {financial_amount(d)}
         <div>{pdf_link}</div>
         
         <div class="card">
@@ -288,8 +299,7 @@ def main():
             <h3>Impacts</h3>
             <p>{html.escape(analysis.get('impacts') or 'Non précisés')}</p>
             
-            <h3>Points débattus</h3>
-            <p>{html.escape(analysis.get('points_debattus') or 'Aucun débat notable.')}</p>
+            {f'<h3>Points de controverse</h3><p>{html.escape(analysis["points_debattus"])}</p>' if analysis.get('points_debattus') and analysis['points_debattus'].strip().lower() not in ('néant', 'null') else ''}
             
             {vote_html}
         </div>
@@ -320,7 +330,7 @@ def main():
                 <h3><a href="/deliberations/{d_id}/">{html.escape(d.get('title', ''))}</a></h3>
                 <div class="meta">Conseil du {d.get('council_date', '')}</div>
                 <p>{html.escape(d.get('summary', '')[:120])}...</p>
-                <div class="budget">{format_euros(d.get('budget_impact', 0))}</div>
+                {financial_amount(d)}
             </div>"""
         content += "</div>"
 
@@ -337,8 +347,8 @@ def main():
     budget_dels = sorted([d for d in all_deliberations if (d.get('budget_impact') or 0) > 0],
                          key=lambda x: x.get('budget_impact', 0), reverse=True)
 
-    b_title = "Récapitulatif des Budgets"
-    b_desc = "Classement de toutes les délibérations ayant un impact budgétaire pour la ville de Bègles, par ordre décroissant."
+    b_title = "Décisions financières"
+    b_desc = "Délibérations qui mentionnent un montant financier, classées par montant décroissant. La nature du montant est indiquée lorsqu'elle est connue ; aucun total général n'est calculé."
     breadcrumb = '<a href="/">Accueil</a> > Budget'
 
     content = f"<h1>{b_title}</h1><p>{b_desc}</p><div style='overflow-x: auto;'><table><thead><tr><th>Date</th><th>Délibération</th><th>Thèmes</th><th>Montant</th></tr></thead><tbody>"
@@ -351,7 +361,7 @@ def main():
             <td style="white-space: nowrap;">{d.get('council_date', '')}</td>
             <td><a href="/deliberations/{d_id}/">{html.escape(d.get('title', ''))}</a></td>
             <td>{tags_html}</td>
-            <td class="budget" style="white-space: nowrap;">{format_euros(d.get('budget_impact'))}</td>
+            <td style="white-space: nowrap;">{financial_amount(d)}</td>
         </tr>"""
     content += "</tbody></table></div>"
 

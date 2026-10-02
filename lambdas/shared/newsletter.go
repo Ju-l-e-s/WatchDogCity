@@ -306,7 +306,7 @@ func buildColdNewsletterPrompt(
   "email_subject": "laisse vide, imposé par le système",
   "council_title": "copie verbatim du council_title fourni ci-dessous",
   "council_date": "copie verbatim du council_date fourni ci-dessous",
-  "main_issue": "laisse vide, imposé par le système à partir des titres, montants et votes structurés",
+  "main_issue": "laisse vide, imposé par le système à partir des décisions adoptées sélectionnées",
   "budget_total": "laisse vide : recettes, dépenses et cautions ne forment pas un total comparable",
   "has_global_budget": false,
   "vote_climat": "libellé calculé (fourni ci-dessous, copie verbatim)",
@@ -347,7 +347,7 @@ func buildColdNewsletterPrompt(
 
 	sb.WriteString("\n\nCONSIGNES ÉDITORIALES ET LOGIQUES :\n")
 	sb.WriteString("- PRIORITÉ ABSOLUE : Toute délibération avec des votes contre DOIT figurer dans 'tensions'. Une abstention seule peut y figurer seulement si un désaccord est explicitement documenté. Une abstention ne prouve pas qu'un débat a eu lieu.\n")
-	sb.WriteString("- ENJEU CLÉ : Si le VOTE DES TAUX d'imposition est présent, il doit être le sujet prioritaire.\n")
+	sb.WriteString("- ORDRE DES DÉCISIONS ADOPTÉES : Classe d'abord les décisions aux conséquences concrètes les plus larges pour les habitants. Si le VOTE DES TAUX d'imposition est présent, place-le en premier. Les deux premières décisions alimentent l'introduction : choisis des décisions distinctes et rédige leur première phrase de contexte de façon courte, précise et autonome.\n")
 	sb.WriteString("- HIÉRARCHISATION DES BUDGETS : Les délibérations adoptées avec les plus gros budgets (notamment les budgets supplémentaires, Comptes Financiers Uniques (CFU), Comptes Administratifs, etc.) DOIVENT figurer en priorité dans la section 'adopted' avec leurs détails, et non pas dans les simples résumés ('briefs').\n")
 	sb.WriteString("- VULGARISATION INDEMNITÉS : Pour les indemnités des élus, explique simplement : 'Le conseil définit légalement la rémunération des élus pour leur travail, selon un barème national basé sur la taille de la ville'.\n")
 	sb.WriteString("- INTERDICTION ABSOLUE DU JARGON COMPTABLE ET LÉGAL : Bannis tout vocabulaire administratif, technocratique ou juridique brut. Pas de codes d'imputation (ex: Chapitres budgétaires, articles comptables). Ne cite pas d'articles de loi bruts, utilise plutôt 'Conformément à la loi...'. Vulgarise systématiquement tous les acronymes ou termes techniques entre parenthèses lors de leur première apparition (ex: écrire 'CFU (le bilan financier de l'année passée)', 'CCAS (l'organisme d'action sociale de la ville)', 'AP/CP (la programmation pluriannuelle des investissements)', 'TPE (la taxe sur la publicité extérieure)', 'ZAC (zone d'aménagement concerté)', 'DSP (délégation de service public)').\n")
@@ -520,7 +520,6 @@ func finalizeNewsletterParams(params *NewsletterParams, councilDate string,
 	// Keep each decision's amount below, but hide the aggregate tile.
 	params.BudgetTotal = ""
 	params.HasGlobalBudget = false
-	params.MainIssue = deterministicMainIssue(cold, stats)
 
 	// Re-format budget strings: extract raw integer from whatever Gemini emitted
 	// (e.g. "20 000 €", "20000", "20.000") and produce canonical "X XXX" spacing.
@@ -561,32 +560,35 @@ func finalizeNewsletterParams(params *NewsletterParams, councilDate string,
 	for i := range params.Briefs {
 		params.Briefs[i].Summary = stripLinks(params.Briefs[i].Summary)
 	}
+	params.MainIssue = deterministicMainIssue(params)
 
 }
 
-// deterministicMainIssue uses only a verbatim title and a single classified
-// amount. The model must not generalize mixed categories in this prominent text.
-func deterministicMainIssue(cold []ColdDeliberation, stats coldNewsletterStats) string {
-	var largest *ColdDeliberation
-	for i := range cold {
-		if cold[i].BudgetImpact > 0 && (largest == nil || cold[i].BudgetImpact > largest.BudgetImpact) {
-			largest = &cold[i]
+// deterministicMainIssue reuses the first factual sentence of two selected
+// adopted decisions. This keeps the introduction focused on decisions without
+// letting a model invent a new headline or mixing votes with financial amounts.
+func deterministicMainIssue(params *NewsletterParams) string {
+	var sentences []string
+	for _, item := range params.Adopted {
+		context := strings.TrimSpace(item.Context)
+		if context == "" {
+			continue
+		}
+		if end := strings.Index(context, ". "); end >= 0 {
+			context = context[:end+1]
+		}
+		if !strings.HasSuffix(context, ".") {
+			context += "."
+		}
+		sentences = append(sentences, context)
+		if len(sentences) == 2 {
+			break
 		}
 	}
-	var issue string
-	if largest != nil {
-		budgetType, ok := MatchBudgetType(largest.BudgetType)
-		if !ok || budgetType == "AUCUN" {
-			budgetType = "montant indiqué"
-		} else {
-			budgetType = strings.ToLower(budgetType)
-		}
-		issue = fmt.Sprintf("Le montant le plus élevé renseigné concerne « %s » : %s € (%s).",
-			strings.TrimSpace(largest.Title), formatBudgetFR(largest.BudgetImpact), budgetType)
-	} else {
-		issue = fmt.Sprintf("Le conseil compte %d délibérations.", len(cold))
+	if len(sentences) == 0 {
+		return "Cette édition présente les décisions du conseil et les résultats des votes renseignés."
 	}
-	return issue + " " + stats.voteStats + "."
+	return strings.Join(sentences, " ")
 }
 
 // ParseNewsletterParams parses a raw JSON string (possibly wrapped in markdown

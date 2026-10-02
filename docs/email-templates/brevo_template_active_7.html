@@ -57,6 +57,43 @@
                                             </tr>
                                         </table>
 
+                                        {% if params.adopted %}
+                                        <table width="100%" border="0" cellspacing="0" cellpadding="0" style="margin-bottom: 25px;">
+                                            <tr>
+                                                <td style="font-size: 16px; font-weight: 700; color: #065F46; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid #A7F3D0; padding-bottom: 8px;">
+                                                    Décisions adoptées
+                                                </td>
+                                            </tr>
+                                            <tr><td style="line-height: 25px; height: 25px;">&nbsp;</td></tr>
+                                            <tr>
+                                                <td>
+                                                    {% for item in params.adopted %}
+                                                    <table width="100%" border="0" cellspacing="0" cellpadding="0" style="margin-bottom: 25px; border-bottom: 1px solid #F3F4F6;">
+                                                        <tr>
+                                                            <td style="padding-bottom: 25px; text-align: left; vertical-align: top;">
+                                                                <h3 style="margin: 0 0 10px 0; font-size: 20px; color: #111827; font-weight: 700; line-height: 1.3;">{{ item.title }}</h3>
+
+                                                                <div style="margin: 0 0 15px 0; line-height: 1;">
+                                                                    <span style="display: inline-block; background-color: #E0F2FE; color: #0369A1; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; text-transform: uppercase; margin-right: 6px; margin-bottom: 4px; vertical-align: middle;">{{ item.tag }}</span>
+                                                                    {% if item.has_budget %}
+                                                                    <span style="display: inline-block; background-color: #D1FAE5; color: #065F46; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; margin-bottom: 4px; vertical-align: middle;">💰 {{ item.budget }} €</span>
+                                                                    {% endif %}
+                                                                </div>
+
+                                                                <div style="font-size: 16px; color: #4B5563; line-height: 1.6; margin: 0;">
+                                                                    <strong style="color: #111827;">Pourquoi ?</strong> {{ item.context }}
+                                                                    {% if item.impact %}<br><br>
+                                                                    <strong style="color: #111827;">Concrètement :</strong> {{ item.impact }}{% endif %}
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    </table>
+                                                    {% endfor %}
+                                                </td>
+                                            </tr>
+                                        </table>
+                                        {% endif %}
+
                                         {% if params.tensions %}
                                         <table width="100%" border="0" cellspacing="0" cellpadding="0" style="margin-bottom: 25px;">
                                             <tr>
@@ -85,43 +122,6 @@
                                                                     <strong style="color: #111827;">Le Contexte :</strong> {{ item.context }}
                                                                     {% if item.impact %}<br><br>
                                                                     <strong style="color: #111827;">L'impact :</strong> {{ item.impact }}{% endif %}
-                                                                </div>
-                                                            </td>
-                                                        </tr>
-                                                    </table>
-                                                    {% endfor %}
-                                                </td>
-                                            </tr>
-                                        </table>
-                                        {% endif %}
-
-                                        {% if params.adopted %}
-                                        <table width="100%" border="0" cellspacing="0" cellpadding="0" style="margin-bottom: 25px;">
-                                            <tr>
-                                                <td style="font-size: 16px; font-weight: 700; color: #065F46; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid #A7F3D0; padding-bottom: 8px;">
-                                                    Décisions Majeures Adoptées
-                                                </td>
-                                            </tr>
-                                            <tr><td style="line-height: 25px; height: 25px;">&nbsp;</td></tr>
-                                            <tr>
-                                                <td>
-                                                    {% for item in params.adopted %}
-                                                    <table width="100%" border="0" cellspacing="0" cellpadding="0" style="margin-bottom: 25px; border-bottom: 1px solid #F3F4F6;">
-                                                        <tr>
-                                                            <td style="padding-bottom: 25px; text-align: left; vertical-align: top;">
-                                                                <h3 style="margin: 0 0 10px 0; font-size: 20px; color: #111827; font-weight: 700; line-height: 1.3;">{{ item.title }}</h3>
-
-                                                                <div style="margin: 0 0 15px 0; line-height: 1;">
-                                                                    <span style="display: inline-block; background-color: #E0F2FE; color: #0369A1; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; text-transform: uppercase; margin-right: 6px; margin-bottom: 4px; vertical-align: middle;">{{ item.tag }}</span>
-                                                                    {% if item.has_budget %}
-                                                                    <span style="display: inline-block; background-color: #D1FAE5; color: #065F46; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; margin-bottom: 4px; vertical-align: middle;">💰 {{ item.budget }} €</span>
-                                                                    {% endif %}
-                                                                </div>
-
-                                                                <div style="font-size: 16px; color: #4B5563; line-height: 1.6; margin: 0;">
-                                                                    <strong style="color: #111827;">Pourquoi ?</strong> {{ item.context }}
-                                                                    {% if item.impact %}<br><br>
-                                                                    <strong style="color: #111827;">Concrètement :</strong> {{ item.impact }}{% endif %}
                                                                 </div>
                                                             </td>
                                                         </tr>

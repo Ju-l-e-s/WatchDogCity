@@ -27,7 +27,8 @@ var errAlreadyClaimed = errors.New("council already claimed for validation")
 // ── Input event ───────────────────────────────────────────────────────────────
 
 type ValidatorEvent struct {
-	CouncilID string `json:"council_id"`
+	CouncilID         string `json:"council_id"`
+	RefreshNewsletter bool   `json:"refresh_newsletter,omitempty"`
 }
 
 // ── Interfaces ────────────────────────────────────────────────────────────────
@@ -111,6 +112,9 @@ type deliberationRec struct {
 
 func (h *ValidatorHandler) HandleRequest(ctx context.Context, event ValidatorEvent) error {
 	councilID := event.CouncilID
+	if event.RefreshNewsletter {
+		return h.refreshApprovedNewsletter(ctx, councilID)
+	}
 
 	// Atomic claim: PENDING → VALIDATING. Fails closed if council is in any
 	// other state (already validated, already validating, or terminal).
@@ -162,6 +166,63 @@ func (h *ValidatorHandler) HandleRequest(ctx context.Context, event ValidatorEve
 		return nil
 	}
 	return h.handleApproved(ctx, council, deliberationViews, verdict)
+}
+
+// refreshApprovedNewsletter reruns the same QC and newsletter generator for an
+// already approved, unsent council. It preserves APPROVED and never invokes the
+// Publisher or Notifier; a separate Notifier run can use the refreshed params.
+func (h *ValidatorHandler) refreshApprovedNewsletter(ctx context.Context, councilID string) error {
+	council, err := h.fetchCouncil(ctx, councilID)
+	if err != nil {
+		return fmt.Errorf("fetch council %s: %w", councilID, err)
+	}
+	if council.QcStatus != "APPROVED" || council.Category != "Conseil municipal" {
+		return fmt.Errorf("newsletter refresh requires an APPROVED Conseil municipal")
+	}
+	delibs, err := h.fetchDeliberations(ctx, councilID)
+	if err != nil {
+		return fmt.Errorf("fetch deliberations for %s: %w", councilID, err)
+	}
+	baseline, err := h.computeBaseline(ctx)
+	if err != nil {
+		log.Printf("warn: compute baseline failed, running without z-score: %v", err)
+		baseline = shared.Baseline{}
+	}
+	views := toDeliberationViews(delibs)
+	view := shared.CouncilView{
+		CouncilID: councilID, TotalPdfs: int64(council.TotalPdfs),
+		ProcessedPdfs: int64(council.ProcessedPdfs), Date: council.Date,
+	}
+	violations := append(shared.ValidateDeterministic(view, views),
+		shared.ValidateStatistical(view, views, baseline, h.cfg)...)
+	if shared.Decide(violations).Status != "APPROVED" {
+		return fmt.Errorf("newsletter refresh blocked by QC for %s", councilID)
+	}
+	params, err := h.generateNewsletterParams(ctx, council, views)
+	if err != nil {
+		return err
+	}
+	paramsJSON, err := json.Marshal(params)
+	if err != nil {
+		return fmt.Errorf("marshal newsletter params for %s: %w", councilID, err)
+	}
+	_, err = h.ddb.UpdateItem(ctx, &dynamodb.UpdateItemInput{
+		TableName: aws.String(h.councilsTable),
+		Key: map[string]types.AttributeValue{
+			"council_id": &types.AttributeValueMemberS{Value: councilID},
+		},
+		UpdateExpression:    aws.String("SET newsletter_params_json = :params"),
+		ConditionExpression: aws.String("qc_status = :approved AND attribute_not_exists(newsletter_sent_at)"),
+		ExpressionAttributeValues: map[string]types.AttributeValue{
+			":params":   &types.AttributeValueMemberS{Value: string(paramsJSON)},
+			":approved": &types.AttributeValueMemberS{Value: "APPROVED"},
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("store refreshed newsletter for %s: %w", councilID, err)
+	}
+	log.Printf("newsletter params refreshed from approved council %s", councilID)
+	return nil
 }
 
 // claimValidating atomically transitions qc_status PENDING → VALIDATING and
@@ -237,19 +298,9 @@ func (h *ValidatorHandler) handleApproved(
 	delibs []shared.DeliberationView,
 	verdict shared.Verdict,
 ) error {
-	cold := toColdDelibs(delibs)
-
-	nextMeeting := h.fetchNextMeeting(ctx)
-	totalCouncils, totalDelibs := h.fetchGlobalStats(ctx)
-
-	params, err := shared.GenerateNewsletterParams(
-		ctx, h.geminiDeps,
-		council.Title, council.Date,
-		cold,
-		nextMeeting, totalCouncils, totalDelibs,
-	)
+	params, err := h.generateNewsletterParams(ctx, council, delibs)
 	if err != nil {
-		return fmt.Errorf("generate newsletter params for %s: %w", council.CouncilID, err)
+		return err
 	}
 
 	paramsJSON, _ := json.Marshal(params)
@@ -311,6 +362,17 @@ func (h *ValidatorHandler) handleApproved(
 		log.Printf("  (%d WARN violations logged, not blocking)", len(verdict.Violations))
 	}
 	return nil
+}
+
+func (h *ValidatorHandler) generateNewsletterParams(ctx context.Context, council *councilRec, delibs []shared.DeliberationView) (*shared.NewsletterParams, error) {
+	nextMeeting := h.fetchNextMeeting(ctx)
+	totalCouncils, totalDelibs := h.fetchGlobalStats(ctx)
+	params, err := shared.GenerateNewsletterParams(ctx, h.geminiDeps,
+		council.Title, council.Date, toColdDelibs(delibs), nextMeeting, totalCouncils, totalDelibs)
+	if err != nil {
+		return nil, fmt.Errorf("generate newsletter params for %s: %w", council.CouncilID, err)
+	}
+	return params, nil
 }
 
 // invokePublisher fires the Publisher Lambda asynchronously so it regenerates
@@ -556,10 +618,10 @@ func toDeliberationViews(recs []deliberationRec) []shared.DeliberationView {
 			}
 		}
 		views[i] = shared.DeliberationView{
-			ID:      r.ID,
-			Title:   r.Title,
+			ID:       r.ID,
+			Title:    r.Title,
 			TopicTag: r.TopicTag,
-			Summary: r.Summary,
+			Summary:  r.Summary,
 			AnalysisData: shared.QcAnalysisData{
 				Contexte: r.AnalysisData.Contexte,
 				Decision: r.AnalysisData.Decision,

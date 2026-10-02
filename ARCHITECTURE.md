@@ -42,6 +42,8 @@ Validator Lambda (Go, ARM64) — Le "QC Gateway" & Générateur Deprivé
             ├─ Sauvegarde les newsletter_params et passe le statut du conseil à APPROVED.
             └─ Invoque le Publisher puis le Notifier (de manière asynchrone).
 
+Pour rééditer une newsletter d'un conseil déjà approuvé et encore non envoyé, l'événement manuel `{"council_id":"…","refresh_newsletter":true}` relance les contrôles QC et la génération Gemini depuis les délibérations stockées. Il remplace seulement `newsletter_params_json` si le conseil est toujours `APPROVED` et sans `newsletter_sent_at` ; il ne déclenche ni publication ni envoi. Le Notifier utilise ensuite ces paramètres pour son envoi test. Si un brouillon de production existe déjà, il faut également actualiser son contenu et ses paramètres avant tout envoi manuel : la réutilisation d'un brouillon existant ne le reconstruit pas.
+
 Publisher Lambda (Go, ARM64)
     ├─ Scanne uniquement les conseils et délibérations avec qc_status = APPROVED.
     ├─ Génère le fichier public data.json et le déploie sur le bucket S3.

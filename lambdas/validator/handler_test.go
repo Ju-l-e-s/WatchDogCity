@@ -914,6 +914,23 @@ func TestToDeliberationViews_WithBreakdown(t *testing.T) {
 
 // ── HandleRequest table-driven tests ─────────────────────────────────────────
 
+func TestRefreshNewsletterRequiresApprovedCouncil(t *testing.T) {
+	c := okCouncilRec()
+	ddb := &mockDDB{
+		getItemFn: func(ctx context.Context, in *dynamodb.GetItemInput, opts ...func(*dynamodb.Options)) (*dynamodb.GetItemOutput, error) {
+			return &dynamodb.GetItemOutput{Item: marshalCouncil(c)}, nil
+		},
+	}
+	h := makeHandler(ddb, &mockLambda{}, &mockSQS{})
+	err := h.HandleRequest(context.Background(), ValidatorEvent{CouncilID: c.CouncilID, RefreshNewsletter: true})
+	if err == nil || !strings.Contains(err.Error(), "APPROVED Conseil municipal") {
+		t.Fatalf("expected approved-council guard, got %v", err)
+	}
+	if len(ddb.updateItemCalls) != 0 {
+		t.Fatal("refresh changed the council before approval")
+	}
+}
+
 func TestHandleRequest(t *testing.T) {
 	tests := []struct {
 		name          string

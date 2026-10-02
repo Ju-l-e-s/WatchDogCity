@@ -476,7 +476,9 @@ func GenerateNewsletterParams(
 				Temperature:      ptrFloat32(0),
 				ResponseMIMEType: "application/json",
 				ResponseSchema:   newsletterSchema,
-				MaxOutputTokens:  8192,
+				// A full council can include dozens of selected items plus model
+				// reasoning tokens. An 8192-token cap intermittently truncated JSON.
+				MaxOutputTokens:  32768,
 			},
 		)
 	}, 4)

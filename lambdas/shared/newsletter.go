@@ -326,8 +326,8 @@ func buildColdNewsletterPrompt(
     {
       "source_id": "copie exacte de l'ID de la délibération fournie",
       "title": "Reformulation neutre et factuelle du titre fourni ; pas d'accroche, pas d'adjectif évaluatif",
-      "context": "Neutre en 2 à 3 phrases maximum. Explique le besoin et le contexte en te basant sur le titre et le résumé (Résumé) fournis ci-dessous. Ne rajoute rien.",
-      "impact": "Explique l'impact pratique et concret pour les habitants en 2 à 3 phrases maximum, en te basant sur le champ 'Impact' fourni. Reste factuel. Si le champ 'Impact' d'origine vaut 'Néant' ou est vide, laisse ce champ vide.",
+      "context": "Neutre en 2 à 3 phrases maximum. Décris la décision votée et son contexte à partir des champs fournis. Réserve ses effets concrets distincts au champ impact.",
+      "impact": "Si le champ 'Impact' d'origine documente un effet concret pour les habitants, décris cet effet en 1 à 2 phrases, sans répéter le contexte ni la décision. Sinon, laisse ce champ vide. N'invente aucun effet.",
       "budget": "X € (LAISSER VIDE '' SI IMPACT NUL)",
       "has_budget": true,
       "vote_details": "Y votes contre"
@@ -338,8 +338,8 @@ func buildColdNewsletterPrompt(
       "source_id": "copie exacte de l'ID de la délibération fournie",
       "tag": "Administration, Sport, Budget, Sécurité, Environnement, Mobilité, Social, Culture, Urbanisme ou Éducation",
       "title": "Titre vulgarisé",
-      "context": "2 à 3 phrases maximum. Explication factuelle du besoin en te basant sur le titre et le résumé (Résumé) fournis ci-dessous.",
-      "impact": "Explique l'impact pratique et concret pour les habitants en 2 à 3 phrases maximum, en te basant sur le champ 'Impact' fourni. Reste factuel. Si le champ 'Impact' d'origine vaut 'Néant' ou est vide, laisse ce champ vide.",
+      "context": "2 à 3 phrases maximum. Commence par la décision votée, puis explique le besoin ou le contexte factuel : c'est le 'Pourquoi ?'. Ne répète pas l'effet pratique réservé au champ impact.",
+      "impact": "Décris en 1 à 2 phrases la mesure pratique ou chiffrée distincte pour les habitants : c'est le 'Concrètement'. Appuie-toi sur le champ 'Impact' fourni sans répéter la décision ou le contexte. Si aucun effet distinct n'est documenté, laisse ce champ vide.",
       "budget": "X € (LAISSER VIDE '' SI IMPACT NUL)",
       "has_budget": true
     }
@@ -360,7 +360,9 @@ func buildColdNewsletterPrompt(
 	sb.WriteString("\n\nCONSIGNES ÉDITORIALES ET LOGIQUES :\n")
 	sb.WriteString("- PRIORITÉ ABSOLUE : Toute délibération avec des votes contre DOIT figurer dans 'tensions'. Une abstention seule peut y figurer seulement si un désaccord est explicitement documenté. Une abstention ne prouve pas qu'un débat a eu lieu.\n")
 	sb.WriteString("- TRAÇABILITÉ : Copie l'ID source de chaque délibération dans source_id. Une délibération ne doit apparaître qu'une seule fois entre les trois sections. N'invente ni ID, ni décision, ni montant.\n")
-	sb.WriteString("- ORDRE DES DÉCISIONS ADOPTÉES : Classe d'abord les décisions aux conséquences concrètes les plus larges pour les habitants. Si le VOTE DES TAUX d'imposition est présent, place-le en premier. Les deux premières décisions alimentent l'introduction : choisis des décisions distinctes. Leur première phrase de contexte doit commencer par l'acteur ('Le conseil municipal', 'La ville') et le verbe de sa décision ('approuve', 'attribue', 'autorise', 'adopte'), puis nommer l'objet sans pronom qui renvoie à une phrase précédente. Place l'explication du contexte après cette phrase.\n")
+	sb.WriteString("- ORDRE DES DÉCISIONS ADOPTÉES : Classe d'abord les décisions aux conséquences concrètes les plus larges pour les habitants. Si le VOTE DES TAUX d'imposition est présent, place-le en premier. La première phrase de contexte des décisions mises en avant doit commencer par l'acteur ('Le conseil municipal', 'La ville') et le verbe de sa décision ('approuve', 'attribue', 'autorise', 'adopte'), puis nommer l'objet sans pronom qui renvoie à une phrase précédente. Place l'explication du contexte après cette phrase.\n")
+	sb.WriteString("- POURQUOI / CONCRÈTEMENT : Dans adopted[], 'context' présente la décision et son motif ou contexte documenté ; 'impact' apporte uniquement un effet pratique ou chiffré distinct. Ne reformule pas la même mesure dans les deux champs. Si la source ne permet pas d'ajouter un effet distinct, laisse 'impact' vide.\n")
+	sb.WriteString("- IMPACT DES VOTES NON UNANIMES : Dans tensions[], renseigne 'impact' dès qu'un effet concret pour les habitants est documenté dans le champ Impact de la source. Distingue cet effet du vote et du contexte. Si aucun effet citoyen n'est documenté, laisse 'impact' vide plutôt que d'inventer ou de répéter 'context'.\n")
 	sb.WriteString("- HIÉRARCHISATION DES BUDGETS : Les délibérations adoptées avec les plus gros budgets (notamment les budgets supplémentaires, Comptes Financiers Uniques (CFU), Comptes Administratifs, etc.) DOIVENT figurer en priorité dans la section 'adopted' avec leurs détails, et non pas dans les simples résumés ('briefs').\n")
 	sb.WriteString("- VULGARISATION INDEMNITÉS : Pour les indemnités des élus, explique simplement : 'Le conseil définit légalement la rémunération des élus pour leur travail, selon un barème national basé sur la taille de la ville'.\n")
 	sb.WriteString("- INTERDICTION ABSOLUE DU JARGON COMPTABLE ET LÉGAL : Bannis tout vocabulaire administratif, technocratique ou juridique brut. Pas de codes d'imputation (ex: Chapitres budgétaires, articles comptables). Ne cite pas d'articles de loi bruts, utilise plutôt 'Conformément à la loi...'. Vulgarise systématiquement tous les acronymes ou termes techniques entre parenthèses lors de leur première apparition (ex: écrire 'CFU (le bilan financier de l'année passée)', 'CCAS (l'organisme d'action sociale de la ville)', 'AP/CP (la programmation pluriannuelle des investissements)', 'TPE (la taxe sur la publicité extérieure)', 'ZAC (zone d'aménagement concerté)', 'DSP (délégation de service public)').\n")

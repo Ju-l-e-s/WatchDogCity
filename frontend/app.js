@@ -263,19 +263,45 @@ function formatBudget(val) {
 }
 
 function renderCouncilFinanceCard(deliberations) {
-    const financial = deliberations.filter(d => Number.isFinite(Number(d.budget_impact)) && Number(d.budget_impact) > 0);
-    const count = financial.length;
-    if (!count) {
-        return '<div class="analysis-card bg-slate-50/50 border border-slate-100 rounded-2xl p-6"><span class="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">💰 Impact financier</span><div class="text-sm text-slate-600">Aucun montant chiffré dans les délibérations publiées.</div></div>';
+    const financial = deliberations
+        .filter(d => Number.isFinite(Number(d.budget_impact)) && Number(d.budget_impact) > 0)
+        .sort((a, b) => Number(b.budget_impact) - Number(a.budget_impact));
+
+    if (!financial.length) {
+        return '';
     }
-    const byTopic = new Map();
-    financial.forEach(d => byTopic.set(d.topic_tag || 'Autres', (byTopic.get(d.topic_tag || 'Autres') || 0) + 1));
-    const topics = [...byTopic.entries()].sort((a, b) => b[1] - a[1]);
-    const bar = topics.map(([topic, n]) => `<div style="width:${(n / count * 100).toFixed(2)}%;background:${COLORS[topic] || COLORS.Autres}"><span class="sr-only">${escapeHTML(topic)} : ${n} décision${n > 1 ? 's' : ''}</span></div>`).join('');
-    const legend = topics.map(([topic, n]) => `<div class="flex items-center gap-2"><span class="mr-1" style="width:10px;height:10px;border-radius:2px;background:${COLORS[topic] || COLORS.Autres}"></span><span>${n} ${escapeHTML(topic)}</span></div>`).join('');
-    const types = { 'DÉPENSE': 'Dépense', 'RECETTE': 'Recette', 'CAUTION': 'Caution' };
-    const amounts = financial.map(d => `<li class="py-2 border-b border-slate-100 last:border-0"><span class="font-semibold text-slate-900">${formatBudget(d.budget_impact)}</span> <span class="text-slate-500">${types[d.budget_type] || 'Montant mentionné'} · ${escapeHTML(d.title)}</span>${d.budget_note ? `<span class="block text-slate-500">${escapeHTML(d.budget_note)}</span>` : ''}</li>`).join('');
-    return `<div class="analysis-card bg-slate-50/50 border border-slate-100 rounded-2xl p-6"><span class="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">💰 Impact financier</span><div class="text-2xl font-black text-slate-900">${count} décision${count > 1 ? 's' : ''} chiffrée${count > 1 ? 's' : ''}</div><div class="text-xs text-slate-500 mt-1">Répartition des décisions chiffrées par thème</div><div class="flex rounded-full overflow-hidden mt-5 bg-slate-100" style="height:10px" role="img" aria-label="Répartition des décisions chiffrées par thème">${bar}</div><div class="flex flex-wrap mt-4 text-xs font-bold text-slate-500 leading-none" style="gap:20px;row-gap:12px">${legend}</div><details class="mt-5 text-sm text-slate-600"><summary class="cursor-pointer font-semibold">Voir les montants de chaque décision</summary><ul class="mt-3">${amounts}</ul></details><p class="text-xs text-slate-500 mt-4">Les montants ponctuels, annuels, conditionnels et les garanties ne forment pas un budget de séance. Leur période et leurs conditions figurent dans chaque délibération.</p></div>`;
+
+    const topFinancial = financial.slice(0, 3);
+    const typeBadges = {
+        'RECETTE': { label: 'Recette', classes: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+        'DÉPENSE': { label: 'Dépense', classes: 'bg-amber-50 text-amber-700 border-amber-200' },
+        'CAUTION': { label: 'Caution', classes: 'bg-slate-100 text-slate-700 border-slate-200' }
+    };
+
+    const items = topFinancial.map(d => {
+        const typeInfo = typeBadges[d.budget_type] || { label: 'Montant', classes: 'bg-slate-100 text-slate-700 border-slate-200' };
+        const shortTitle = (d.title || '').length > 90 ? (d.title || '').substring(0, 90) + '…' : (d.title || '');
+        return `
+            <div class="flex items-center justify-between gap-3 p-3 bg-white border border-slate-100 rounded-xl hover:border-slate-200 transition-colors">
+                <div class="min-w-0 flex items-center gap-2">
+                    <span class="shrink-0 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${typeInfo.classes}">${typeInfo.label}</span>
+                    <button type="button" onclick="scrollToAndOpenDelib('${d.id}')" class="text-xs sm:text-sm font-medium text-slate-800 hover:text-brand-600 transition-colors truncate text-left cursor-pointer" title="${escapeHTML(d.title)}">
+                        ${escapeHTML(shortTitle)}
+                    </button>
+                </div>
+                <span class="text-sm sm:text-base font-black text-slate-900 whitespace-nowrap shrink-0">${formatBudget(d.budget_impact)}</span>
+            </div>
+        `;
+    }).join('');
+
+    return `
+        <div class="analysis-card bg-slate-50/50 border border-slate-100 rounded-2xl p-6">
+            <span class="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">💰 Repères financiers de la séance</span>
+            <div class="space-y-2.5">
+                ${items}
+            </div>
+        </div>
+    `;
 }
 
 // ── Topic Filter Dropdown ──

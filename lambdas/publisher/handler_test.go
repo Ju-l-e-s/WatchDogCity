@@ -154,14 +154,66 @@ func TestBuildDataJSON_OmitsMisleadingCouncilAggregates(t *testing.T) {
 	assert.JSONEq(t, `{}`, string(raw))
 }
 
-func TestBuildDataJSON_BudgetZeroWhenNoDeliberations(t *testing.T) {
+func TestBuildDataJSON_SkipsEmptyApprovedCouncil(t *testing.T) {
 	councils := []CouncilRecord{{
 		CouncilID: "c1",
 		Analysis:  CouncilAnalysis{BudgetImpact: 500_000},
 	}}
 	data, err := buildDataJSON(context.Background(), nil, councils, map[string][]DeliberationRecord{})
 	require.NoError(t, err)
-	assert.Equal(t, int64(0), data.Councils[0].Analysis.BudgetImpact)
+	assert.Empty(t, data.Councils)
+}
+
+func TestBuildDataJSON_CompletenessGatePreservesLegacy(t *testing.T) {
+	councils := []CouncilRecord{
+		{CouncilID: "new-complete", TotalPDFs: 2, Processed: 2, CompletenessVersion: 1},
+		{CouncilID: "new-missing", TotalPDFs: 2, Processed: 2, CompletenessVersion: 1},
+		{CouncilID: "new-overcounted", TotalPDFs: 1, Processed: 3, CompletenessVersion: 1},
+		{CouncilID: "legacy-incomplete", TotalPDFs: 3, Processed: 3},
+	}
+	delibs := map[string][]DeliberationRecord{
+		"new-complete":      {{ID: "a", FactCheckModel: "gemini-2.5-pro", FactCheckedAt: "2026-10-03T10:00:00Z"}, {ID: "b", FactCheckModel: "gemini-2.5-pro", FactCheckedAt: "2026-10-03T10:00:00Z"}},
+		"new-missing":       {{ID: "c"}},
+		"new-overcounted":   {{ID: "d"}},
+		"legacy-incomplete": {{ID: "e"}},
+	}
+	data, err := buildDataJSON(context.Background(), nil, councils, delibs)
+	require.NoError(t, err)
+	require.Len(t, data.Councils, 2)
+	assert.Equal(t, "new-complete", data.Councils[0].CouncilID)
+	assert.Equal(t, "legacy-incomplete", data.Councils[1].CouncilID)
+}
+
+func TestBuildDataJSON_ManifestRejectsAnnexAndUncountedPDF(t *testing.T) {
+	councils := []CouncilRecord{
+		{CouncilID: "complete", TotalPDFs: 2, Processed: 2, CompletenessVersion: 2, ExpectedPDFIDs: []string{"D01.pdf", "D02.pdf"}},
+		{CouncilID: "annex", TotalPDFs: 2, Processed: 2, CompletenessVersion: 2, ExpectedPDFIDs: []string{"D01.pdf", "D02.pdf"}},
+		{CouncilID: "uncounted", TotalPDFs: 2, Processed: 2, CompletenessVersion: 2, ExpectedPDFIDs: []string{"D01.pdf", "D02.pdf"}},
+	}
+	verified := func(id string) DeliberationRecord {
+		return DeliberationRecord{ID: id, PDFURL: "https://example.test/" + id, Counted: true, FactCheckModel: "gemini-2.5-pro", FactCheckedAt: "2026-10-03T10:00:00Z"}
+	}
+	annex := verified("Maquette.pdf")
+	uncounted := verified("D02.pdf")
+	uncounted.Counted = false
+	delibs := map[string][]DeliberationRecord{
+		"complete":  {verified("D01.pdf"), verified("D02.pdf")},
+		"annex":     {verified("D01.pdf"), annex},
+		"uncounted": {verified("D01.pdf"), uncounted},
+	}
+	data, err := buildDataJSON(context.Background(), nil, councils, delibs)
+	require.NoError(t, err)
+	require.Len(t, data.Councils, 1)
+	assert.Equal(t, "complete", data.Councils[0].CouncilID)
+}
+
+func TestBuildDataJSON_PublishesOptionalBudgetNote(t *testing.T) {
+	data, err := buildDataJSON(context.Background(), nil, []CouncilRecord{{CouncilID: "legacy"}}, map[string][]DeliberationRecord{
+		"legacy": {{ID: "D01.pdf", BudgetNote: "Redevance annuelle, montant minimum."}},
+	})
+	require.NoError(t, err)
+	require.Len(t, data.Councils, 1)
+	assert.Equal(t, "Redevance annuelle, montant minimum.", data.Councils[0].Deliberations[0].BudgetNote)
 }
 
 // --- HasVote detection ---

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -67,14 +68,16 @@ type ValidatorHandler struct {
 // ── DynamoDB record types ─────────────────────────────────────────────────────
 
 type councilRec struct {
-	CouncilID     string `dynamodbav:"council_id"`
-	Title         string `dynamodbav:"title"`
-	Category      string `dynamodbav:"category"`
-	Date          string `dynamodbav:"date"`
-	TotalPdfs     int    `dynamodbav:"total_pdfs"`
-	ProcessedPdfs int    `dynamodbav:"processed_pdfs"`
-	QcStatus      string `dynamodbav:"qc_status"`
-	QcAttempts    int    `dynamodbav:"qc_attempts"`
+	CouncilID           string   `dynamodbav:"council_id"`
+	Title               string   `dynamodbav:"title"`
+	Category            string   `dynamodbav:"category"`
+	Date                string   `dynamodbav:"date"`
+	TotalPdfs           int      `dynamodbav:"total_pdfs"`
+	ProcessedPdfs       int      `dynamodbav:"processed_pdfs"`
+	QcStatus            string   `dynamodbav:"qc_status"`
+	QcAttempts          int      `dynamodbav:"qc_attempts"`
+	ExpectedPDFIDs      []string `dynamodbav:"expected_pdf_ids"`
+	CompletenessVersion int      `dynamodbav:"qc_completeness_version"`
 }
 
 type analysisDataRec struct {
@@ -91,6 +94,9 @@ type budgetBreakdownRec struct {
 
 type deliberationRec struct {
 	ID              string               `dynamodbav:"id"`
+	Counted         bool                 `dynamodbav:"counted"`
+	FactCheckModel  string               `dynamodbav:"fact_check_model"`
+	FactCheckedAt   string               `dynamodbav:"fact_checked_at"`
 	Title           string               `dynamodbav:"title"`
 	TopicTag        string               `dynamodbav:"topic_tag"`
 	PDFURL          string               `dynamodbav:"pdf_url"`
@@ -98,6 +104,7 @@ type deliberationRec struct {
 	AnalysisData    analysisDataRec      `dynamodbav:"analysis_data"`
 	BudgetImpact    int64                `dynamodbav:"budget_impact"`
 	BudgetType      string               `dynamodbav:"budget_type"`
+	BudgetNote      string               `dynamodbav:"budget_note"`
 	BudgetBreakdown []budgetBreakdownRec `dynamodbav:"budget_breakdown"`
 	ClimateImpact   string               `dynamodbav:"climate_impact"`
 	HasVote         bool                 `dynamodbav:"has_vote"`
@@ -144,10 +151,12 @@ func (h *ValidatorHandler) HandleRequest(ctx context.Context, event ValidatorEve
 	}
 
 	councilView := shared.CouncilView{
-		CouncilID:     councilID,
-		TotalPdfs:     int64(council.TotalPdfs),
-		ProcessedPdfs: int64(council.ProcessedPdfs),
-		Date:          council.Date,
+		CouncilID:        councilID,
+		TotalPdfs:        int64(council.TotalPdfs),
+		ProcessedPdfs:    int64(council.ProcessedPdfs),
+		Date:             council.Date,
+		ExpectedPDFIDs:   council.ExpectedPDFIDs,
+		RequireFactCheck: true,
 	}
 	deliberationViews := toDeliberationViews(delibs)
 
@@ -161,11 +170,25 @@ func (h *ValidatorHandler) HandleRequest(ctx context.Context, event ValidatorEve
 		if err := h.handleQuarantine(ctx, councilID, verdict); err != nil {
 			return err
 		}
-		// Self-heal: re-enqueue PDFs for re-analysis if under retry cap.
-		h.maybeHeal(ctx, council, delibs)
+		// Re-analyzing only the PDFs already stored cannot recover a missing
+		// source ID. Keep the council quarantined for a source-manifest rescan.
+		if !hasCompletenessViolation(verdict) {
+			h.maybeHeal(ctx, council, delibs)
+		}
 		return nil
 	}
 	return h.handleApproved(ctx, council, deliberationViews, verdict)
+}
+
+func hasCompletenessViolation(verdict shared.Verdict) bool {
+	for _, violation := range verdict.Violations {
+		if violation.Rule == "S7_INCOMPLETE_COUNCIL" ||
+			strings.HasPrefix(violation.Rule, "S8_") ||
+			violation.Rule == "S9_MISSING_FACT_CHECK" {
+			return true
+		}
+	}
+	return false
 }
 
 // refreshApprovedNewsletter reruns the same QC and newsletter generator for an
@@ -192,6 +215,8 @@ func (h *ValidatorHandler) refreshApprovedNewsletter(ctx context.Context, counci
 	view := shared.CouncilView{
 		CouncilID: councilID, TotalPdfs: int64(council.TotalPdfs),
 		ProcessedPdfs: int64(council.ProcessedPdfs), Date: council.Date,
+		ExpectedPDFIDs:   council.ExpectedPDFIDs,
+		RequireFactCheck: council.CompletenessVersion >= 1,
 	}
 	violations := append(shared.ValidateDeterministic(view, views),
 		shared.ValidateStatistical(view, views, baseline, h.cfg)...)
@@ -300,10 +325,37 @@ func (h *ValidatorHandler) handleApproved(
 ) error {
 	params, err := h.generateNewsletterParams(ctx, council, delibs)
 	if err != nil {
+		var factErr *shared.NewsletterFactCheckError
+		if errors.As(err, &factErr) {
+			violations := make([]shared.Violation, 0, len(factErr.Issues))
+			for _, issue := range factErr.Issues {
+				violations = append(violations, shared.Violation{
+					Rule: "N1_UNSUPPORTED_NEWSLETTER_CLAIM", Severity: shared.SeverityHigh,
+					Field: issue.Location, Detail: issue.Claim + " — " + issue.Reason,
+				})
+			}
+			if len(violations) == 0 {
+				violations = append(violations, shared.Violation{
+					Rule: "N1_INCONCLUSIVE_NEWSLETTER_FACT_CHECK", Severity: shared.SeverityHigh,
+					Detail: "La vérification factuelle n'a pas rendu de verdict exploitable.",
+				})
+			}
+			return h.handleQuarantine(ctx, council.CouncilID, shared.Decide(violations))
+		}
+		// A transport or generation failure is transient. Release the claim so
+		// Lambda's asynchronous retry can run the full gate again. No publication
+		// or notification has happened yet.
+		if releaseErr := h.releaseValidating(ctx, council.CouncilID); releaseErr != nil {
+			return fmt.Errorf("generate newsletter: %w; release validation claim: %v", err, releaseErr)
+		}
 		return err
 	}
 
 	paramsJSON, _ := json.Marshal(params)
+	completenessVersion := 1
+	if council.ExpectedPDFIDs != nil {
+		completenessVersion = 2
+	}
 	ts := time.Now().UTC().Format(time.RFC3339)
 
 	// Pre-compute Néant rate and budget total for future baseline queries.
@@ -327,6 +379,7 @@ func (h *ValidatorHandler) handleApproved(
 		},
 		UpdateExpression: aws.String(
 			"SET qc_status = :a, qc_validated_at = :ts, newsletter_params_json = :p" +
+				", qc_completeness_version = :cv" +
 				", qc_neant_rate = :nr, qc_budget_total = :bt",
 		),
 		ConditionExpression: aws.String("qc_status = :validating"),
@@ -334,6 +387,7 @@ func (h *ValidatorHandler) handleApproved(
 			":a":          &types.AttributeValueMemberS{Value: "APPROVED"},
 			":ts":         &types.AttributeValueMemberS{Value: ts},
 			":p":          &types.AttributeValueMemberS{Value: string(paramsJSON)},
+			":cv":         &types.AttributeValueMemberN{Value: strconv.Itoa(completenessVersion)},
 			":nr":         &types.AttributeValueMemberN{Value: fmt.Sprintf("%.6f", neantRate)},
 			":bt":         &types.AttributeValueMemberN{Value: strconv.FormatInt(budgetTotal, 10)},
 			":validating": &types.AttributeValueMemberS{Value: "VALIDATING"},
@@ -362,6 +416,22 @@ func (h *ValidatorHandler) handleApproved(
 		log.Printf("  (%d WARN violations logged, not blocking)", len(verdict.Violations))
 	}
 	return nil
+}
+
+func (h *ValidatorHandler) releaseValidating(ctx context.Context, councilID string) error {
+	_, err := h.ddb.UpdateItem(ctx, &dynamodb.UpdateItemInput{
+		TableName: aws.String(h.councilsTable),
+		Key: map[string]types.AttributeValue{
+			"council_id": &types.AttributeValueMemberS{Value: councilID},
+		},
+		UpdateExpression:    aws.String("SET qc_status = :pending"),
+		ConditionExpression: aws.String("qc_status = :validating"),
+		ExpressionAttributeValues: map[string]types.AttributeValue{
+			":pending":    &types.AttributeValueMemberS{Value: "PENDING"},
+			":validating": &types.AttributeValueMemberS{Value: "VALIDATING"},
+		},
+	})
+	return err
 }
 
 func (h *ValidatorHandler) generateNewsletterParams(ctx context.Context, council *councilRec, delibs []shared.DeliberationView) (*shared.NewsletterParams, error) {
@@ -618,10 +688,14 @@ func toDeliberationViews(recs []deliberationRec) []shared.DeliberationView {
 			}
 		}
 		views[i] = shared.DeliberationView{
-			ID:       r.ID,
-			Title:    r.Title,
-			TopicTag: r.TopicTag,
-			Summary:  r.Summary,
+			ID:             r.ID,
+			PDFURL:         r.PDFURL,
+			Counted:        r.Counted,
+			FactCheckModel: r.FactCheckModel,
+			FactCheckedAt:  r.FactCheckedAt,
+			Title:          r.Title,
+			TopicTag:       r.TopicTag,
+			Summary:        r.Summary,
 			AnalysisData: shared.QcAnalysisData{
 				Contexte: r.AnalysisData.Contexte,
 				Decision: r.AnalysisData.Decision,
@@ -629,6 +703,7 @@ func toDeliberationViews(recs []deliberationRec) []shared.DeliberationView {
 			},
 			BudgetImpact:    r.BudgetImpact,
 			BudgetType:      r.BudgetType,
+			BudgetNote:      r.BudgetNote,
 			BudgetBreakdown: breakdown,
 			ClimateImpact:   r.ClimateImpact,
 			HasVote:         r.HasVote,
@@ -661,12 +736,18 @@ func toColdDelibs(delibs []shared.DeliberationView) []shared.ColdDeliberation {
 		if d.AnalysisData.Impacts != nil {
 			impactsVal = *d.AnalysisData.Impacts
 		}
+		decisionVal := ""
+		if d.AnalysisData.Decision != nil {
+			decisionVal = *d.AnalysisData.Decision
+		}
 
 		cold[i] = shared.ColdDeliberation{
+			ID:              d.ID,
 			Title:           d.Title,
 			TopicTag:        d.TopicTag,
 			BudgetImpact:    d.BudgetImpact,
 			BudgetType:      d.BudgetType,
+			BudgetNote:      d.BudgetNote,
 			HasVote:         d.HasVote,
 			Pour:            d.VotePour,
 			Contre:          d.VoteContre,
@@ -675,6 +756,7 @@ func toColdDelibs(delibs []shared.DeliberationView) []shared.ColdDeliberation {
 			IsSubstantial:   d.IsSubstantial || d.BudgetImpact >= 5000,
 			HasDisagreement: hasDisagreement,
 			Summary:         d.Summary,
+			Decision:        decisionVal,
 			Impacts:         impactsVal,
 		}
 	}

@@ -185,6 +185,9 @@ func (d *notifierDeps) handle(ctx context.Context, event NotifierEvent) error {
 			return fmt.Errorf("generate newsletter params: %w", err)
 		}
 	}
+	if params.FactCheckVersion < 1 {
+		return fmt.Errorf("council %s newsletter params have not passed the fact check; refresh them with Validator", event.CouncilID)
+	}
 
 	// Two-phase claim/commit:
 	//   1. claimPending sets newsletter_pending_at conditionally — exactly one
@@ -272,6 +275,9 @@ func (d *notifierDeps) handleTest(ctx context.Context, event NotifierEvent) erro
 	var params shared.NewsletterParams
 	if err := json.Unmarshal([]byte(council.NewsletterParamsJSON), &params); err != nil || strings.TrimSpace(params.EmailSubject) == "" {
 		return fmt.Errorf("test council has no valid stored newsletter_params_json")
+	}
+	if params.FactCheckVersion < 1 {
+		return fmt.Errorf("test council newsletter params have not passed the fact check")
 	}
 	var nonce [16]byte
 	if _, err := rand.Read(nonce[:]); err != nil {
@@ -620,10 +626,16 @@ func (d *notifierDeps) sendCampaign(ctx context.Context, params *NewsletterParam
 	case existingID != 0 && (status == "sent" || status == "queued" || status == "in_process" || status == "scheduled"):
 		log.Printf("Brevo campaign %d (%q) already %s — skipping send", existingID, name, status)
 		return existingID, nil
-	case existingID != 0:
-		// A leftover draft from an aborted run: reuse it instead of creating a duplicate.
-		log.Printf("reusing existing Brevo campaign %d (%q, status %q)", existingID, name, status)
+	case existingID != 0 && status == "draft":
+		// Brevo does not rebuild an existing draft from current params. Update it
+		// explicitly before sending a preview or leaving it ready for review.
+		if err := d.updateDraftCampaign(ctx, existingID, params); err != nil {
+			return 0, fmt.Errorf("refresh Brevo draft %d: %w", existingID, err)
+		}
+		log.Printf("refreshed existing Brevo draft %d (%q)", existingID, name)
 		campaignID = existingID
+	case existingID != 0:
+		return 0, fmt.Errorf("Brevo campaign %d has uneditable status %q", existingID, status)
 	default:
 		createScheduledAt := scheduledAt
 		if !d.autoSendEnabled {
@@ -655,6 +667,45 @@ func (d *notifierDeps) sendCampaign(ctx context.Context, params *NewsletterParam
 
 	log.Printf("Brevo campaign %d dispatched", campaignID)
 	return campaignID, nil
+}
+
+func (d *notifierDeps) updateDraftCampaign(ctx context.Context, campaignID int, params *NewsletterParams) error {
+	paramsJSON, err := json.Marshal(params)
+	if err != nil {
+		return fmt.Errorf("marshal newsletter params: %w", err)
+	}
+	var paramsMap map[string]interface{}
+	if err := json.Unmarshal(paramsJSON, &paramsMap); err != nil {
+		return fmt.Errorf("convert newsletter params: %w", err)
+	}
+	payload, err := json.Marshal(map[string]interface{}{
+		"subject": params.EmailSubject,
+		"params":  paramsMap,
+		"recipients": map[string]interface{}{
+			"listIds": []int{d.brevoListID},
+		},
+	})
+	if err != nil {
+		return err
+	}
+	url := fmt.Sprintf("%s/emailCampaigns/%d", brevoBaseURL, campaignID)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, url, bytes.NewReader(payload))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("api-key", d.brevoKey)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("accept", "application/json")
+	resp, err := d.httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
+		return fmt.Errorf("Brevo update status %d: %s", resp.StatusCode, body)
+	}
+	return nil
 }
 
 func (d *notifierDeps) sendTest(ctx context.Context, campaignID int, email string) error {

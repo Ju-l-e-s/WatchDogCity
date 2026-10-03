@@ -418,6 +418,68 @@ func TestS1_EmptyCouncil(t *testing.T) {
 	}
 }
 
+func TestS7_CouncilCompleteness(t *testing.T) {
+	cfg := DefaultQcConfig()
+	delibs := []DeliberationView{okDelib("a"), okDelib("b")}
+	tests := []struct {
+		name          string
+		council       CouncilView
+		wantViolation bool
+	}{
+		{"complete", CouncilView{TotalPdfs: 2, ProcessedPdfs: 2}, false},
+		{"missing row despite full counter", CouncilView{TotalPdfs: 3, ProcessedPdfs: 3}, true},
+		{"incomplete counter", CouncilView{TotalPdfs: 2, ProcessedPdfs: 1}, true},
+		{"overcounted counter", CouncilView{TotalPdfs: 2, ProcessedPdfs: 3}, true},
+		{"missing expected total", CouncilView{TotalPdfs: 0, ProcessedPdfs: 0}, true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			viols := ValidateStatistical(tc.council, delibs, Baseline{}, cfg)
+			got := hasRuleAndSev(viols, "S7_INCOMPLETE_COUNCIL", SeverityHigh)
+			if got != tc.wantViolation {
+				t.Errorf("S7 present=%t, want %t: %v", got, tc.wantViolation, viols)
+			}
+		})
+	}
+}
+
+func TestS8_ManifestRejectsSubstitutedPDFDespiteMatchingCounts(t *testing.T) {
+	council := CouncilView{
+		TotalPdfs: 2, ProcessedPdfs: 2,
+		ExpectedPDFIDs:   []string{"D01.pdf", "D02.pdf"},
+		RequireFactCheck: true,
+	}
+	first := okDelib("D01.pdf")
+	first.PDFURL = "https://example.test/D01.pdf"
+	first.Counted = true
+	first.FactCheckModel = "gemini-2.5-pro"
+	first.FactCheckedAt = "2026-10-03T10:00:00Z"
+	second := okDelib("D02.pdf")
+	second.PDFURL = "https://example.test/D02.pdf"
+	second.Counted = true
+	second.FactCheckModel = first.FactCheckModel
+	second.FactCheckedAt = first.FactCheckedAt
+
+	if got := ValidateStatistical(council, []DeliberationView{first, second}, Baseline{}, DefaultQcConfig()); hasRule(got, "S8_PDF_MANIFEST_MISMATCH") || hasRule(got, "S9_MISSING_FACT_CHECK") {
+		t.Fatalf("complete, verified manifest rejected: %v", got)
+	}
+	annex := second
+	annex.ID = "D04-Maquette.pdf"
+	annex.PDFURL = "https://example.test/D04-Maquette.pdf"
+	if got := ValidateStatistical(council, []DeliberationView{first, annex}, Baseline{}, DefaultQcConfig()); !hasRuleAndSev(got, "S8_PDF_MANIFEST_MISMATCH", SeverityHigh) {
+		t.Fatalf("substituted annex passed despite matching count: %v", got)
+	}
+	second.Counted = false
+	if got := ValidateStatistical(council, []DeliberationView{first, second}, Baseline{}, DefaultQcConfig()); !hasRuleAndSev(got, "S8_PDF_MANIFEST_MISMATCH", SeverityHigh) {
+		t.Fatalf("uncounted PDF passed: %v", got)
+	}
+	second.Counted = true
+	second.FactCheckModel = ""
+	if got := ValidateStatistical(council, []DeliberationView{first, second}, Baseline{}, DefaultQcConfig()); !hasRuleAndSev(got, "S9_MISSING_FACT_CHECK", SeverityHigh) {
+		t.Fatalf("missing fact-check provenance passed: %v", got)
+	}
+}
+
 // ── S2: Néant absolute ceiling ────────────────────────────────────────────────
 
 func TestS2_Pass(t *testing.T) {

@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"slices"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -83,7 +85,11 @@ type orchestrator struct {
 //
 // "date" is a DynamoDB reserved word — it must be aliased via
 // ExpressionAttributeNames.
-func buildCouncilUpdateInput(table string, c CouncilListing, totalPDFs, processedCount int, now time.Time) *dynamodb.UpdateItemInput {
+func buildCouncilUpdateInput(table string, c CouncilListing, expectedIDs []string, processedCount int, now time.Time) *dynamodb.UpdateItemInput {
+	ids := make([]types.AttributeValue, len(expectedIDs))
+	for i, id := range expectedIDs {
+		ids[i] = &types.AttributeValueMemberS{Value: id}
+	}
 	return &dynamodb.UpdateItemInput{
 		TableName: aws.String(table),
 		Key: map[string]types.AttributeValue{
@@ -91,7 +97,7 @@ func buildCouncilUpdateInput(table string, c CouncilListing, totalPDFs, processe
 		},
 		UpdateExpression: aws.String(
 			"SET title = :t, summary = :s, category = :c, #date = :d, " +
-				"source_url = :u, total_pdfs = :tp, " +
+				"source_url = :u, total_pdfs = :tp, expected_pdf_ids = :ids, " +
 				"processed_pdfs = if_not_exists(processed_pdfs, :pp), " +
 				"created_at = if_not_exists(created_at, :ca)",
 		),
@@ -99,16 +105,34 @@ func buildCouncilUpdateInput(table string, c CouncilListing, totalPDFs, processe
 			"#date": "date",
 		},
 		ExpressionAttributeValues: map[string]types.AttributeValue{
-			":t":  &types.AttributeValueMemberS{Value: c.Title},
-			":s":  &types.AttributeValueMemberS{Value: c.Summary},
-			":c":  &types.AttributeValueMemberS{Value: c.Category},
-			":d":  &types.AttributeValueMemberS{Value: c.Date},
-			":u":  &types.AttributeValueMemberS{Value: c.URL},
-			":tp": &types.AttributeValueMemberN{Value: strconv.Itoa(totalPDFs)},
-			":pp": &types.AttributeValueMemberN{Value: strconv.Itoa(processedCount)},
-			":ca": &types.AttributeValueMemberS{Value: now.Format(time.RFC3339)},
+			":t":   &types.AttributeValueMemberS{Value: c.Title},
+			":s":   &types.AttributeValueMemberS{Value: c.Summary},
+			":c":   &types.AttributeValueMemberS{Value: c.Category},
+			":d":   &types.AttributeValueMemberS{Value: c.Date},
+			":u":   &types.AttributeValueMemberS{Value: c.URL},
+			":tp":  &types.AttributeValueMemberN{Value: strconv.Itoa(len(expectedIDs))},
+			":ids": &types.AttributeValueMemberL{Value: ids},
+			":pp":  &types.AttributeValueMemberN{Value: strconv.Itoa(processedCount)},
+			":ca":  &types.AttributeValueMemberS{Value: now.Format(time.RFC3339)},
 		},
 	}
+}
+
+// PDF IDs are the Worker/DynamoDB keys. A duplicate basename on one source
+// page would make exact completeness impossible, so fail before queueing.
+func expectedPDFIDs(pdfs []PDFItem) ([]string, error) {
+	ids := make([]string, 0, len(pdfs))
+	seen := make(map[string]bool, len(pdfs))
+	for _, pdf := range pdfs {
+		id := deliberationID(pdf.URL)
+		if id == "" || seen[id] {
+			return nil, fmt.Errorf("duplicate or empty PDF ID %q", id)
+		}
+		seen[id] = true
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	return ids, nil
 }
 
 func (o *orchestrator) getCouncilWithRetry(ctx context.Context, councilID string) (*dynamodb.GetItemOutput, error) {
@@ -172,8 +196,40 @@ func (o *orchestrator) handle(ctx context.Context, event OrchestratorEvent) erro
 			}
 
 			if processed >= total && total > 0 {
-				log.Printf("council %s already processed, updating summary only", council.CouncilID)
-				_, _ = o.ddb.UpdateItem(ctx, &dynamodb.UpdateItemInput{
+				// Councils approved with a source manifest must still be compared
+				// with the municipality on later runs. A newly added or replaced PDF
+				// needs a controlled revalidation, not silent omission.
+				if rawManifest, hasManifest := existing.Item["expected_pdf_ids"]; hasManifest {
+					stored, ok := rawManifest.(*types.AttributeValueMemberL)
+					if !ok {
+						errs = append(errs, fmt.Errorf("council %s: invalid stored PDF manifest", council.CouncilID))
+						continue
+					}
+					storedIDs := make([]string, 0, len(stored.Value))
+					for _, value := range stored.Value {
+						id, ok := value.(*types.AttributeValueMemberS)
+						if !ok || id.Value == "" {
+							errs = append(errs, fmt.Errorf("council %s: invalid stored PDF ID", council.CouncilID))
+							storedIDs = nil
+							break
+						}
+						storedIDs = append(storedIDs, id.Value)
+					}
+					if storedIDs == nil {
+						continue
+					}
+					pdfs, scrapeErr := o.scraper.ScrapePDFLinks(ctx, council.URL)
+					if scrapeErr != nil {
+						errs = append(errs, fmt.Errorf("council %s: recheck source PDFs: %w", council.CouncilID, scrapeErr))
+						continue
+					}
+					currentIDs, manifestErr := expectedPDFIDs(pdfs)
+					if manifestErr != nil || !slices.Equal(currentIDs, storedIDs) {
+						errs = append(errs, fmt.Errorf("council %s: municipality PDF manifest changed (%d stored, %d current): %v", council.CouncilID, len(storedIDs), len(currentIDs), manifestErr))
+						continue
+					}
+				}
+				update := &dynamodb.UpdateItemInput{
 					TableName: aws.String(o.councilsTable),
 					Key: map[string]types.AttributeValue{
 						"council_id": &types.AttributeValueMemberS{Value: council.CouncilID},
@@ -182,7 +238,17 @@ func (o *orchestrator) handle(ctx context.Context, event OrchestratorEvent) erro
 					ExpressionAttributeValues: map[string]types.AttributeValue{
 						":s": &types.AttributeValueMemberS{Value: council.Summary},
 					},
-				})
+				}
+				if council.DateFromTitle {
+					update.UpdateExpression = aws.String("SET summary = :s, #date = :d, title = :t")
+					update.ExpressionAttributeNames = map[string]string{"#date": "date"}
+					update.ExpressionAttributeValues[":d"] = &types.AttributeValueMemberS{Value: council.Date}
+					update.ExpressionAttributeValues[":t"] = &types.AttributeValueMemberS{Value: council.Title}
+				}
+				if _, err := o.ddb.UpdateItem(ctx, update); err != nil {
+					log.Printf("error updating processed council %s: %v", council.CouncilID, err)
+					errs = append(errs, fmt.Errorf("council %s: %w", council.CouncilID, err))
+				}
 				continue
 			}
 			log.Printf("council %s is incomplete (%d/%d), forcing rescan", council.CouncilID, processed, total)
@@ -195,6 +261,12 @@ func (o *orchestrator) handle(ctx context.Context, event OrchestratorEvent) erro
 		}
 		if len(pdfs) == 0 {
 			log.Printf("no PDFs found for council %s", council.CouncilID)
+			continue
+		}
+		expectedIDs, err := expectedPDFIDs(pdfs)
+		if err != nil {
+			log.Printf("invalid PDF IDs for council %s: %v", council.CouncilID, err)
+			errs = append(errs, fmt.Errorf("council %s: %w", council.CouncilID, err))
 			continue
 		}
 
@@ -222,7 +294,7 @@ func (o *orchestrator) handle(ctx context.Context, event OrchestratorEvent) erro
 			)
 		}
 
-		input := buildCouncilUpdateInput(o.councilsTable, council, len(pdfs), len(processedSet), time.Now().UTC())
+		input := buildCouncilUpdateInput(o.councilsTable, council, expectedIDs, len(processedSet), time.Now().UTC())
 		if _, err := o.ddb.UpdateItem(ctx, input); err != nil {
 			log.Printf("error processing council %s: %v", council.CouncilID, err)
 			errs = append(errs, fmt.Errorf("council %s: %w", council.CouncilID, err))

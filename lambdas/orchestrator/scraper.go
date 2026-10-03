@@ -16,12 +16,13 @@ import (
 )
 
 type CouncilListing struct {
-	CouncilID string
-	Title     string
-	Category  string
-	Date      string
-	URL       string
-	Summary   string
+	CouncilID     string
+	Title         string
+	Category      string
+	Date          string
+	DateFromTitle bool
+	URL           string
+	Summary       string
 }
 
 type PDFItem struct {
@@ -70,6 +71,7 @@ func (sc *Scraper) ScrapeCouncilList(ctx context.Context) ([]CouncilListing, err
 		// The municipality can publish a title with the wrong year. A council
 		// cannot take place after its deliberations have been published.
 		sessionDate, correctedTitle := councilDateAndTitle(title, pubDate)
+		dateFromTitle := sessionDate != ""
 		if sessionDate == "" {
 			sessionDate = pubDate
 		}
@@ -78,12 +80,13 @@ func (sc *Scraper) ScrapeCouncilList(ctx context.Context) ([]CouncilListing, err
 			return
 		}
 		listings = append(listings, CouncilListing{
-			CouncilID: url,
-			Title:     correctedTitle,
-			Category:  normalizeCategory(category, title),
-			Date:      sessionDate,
-			URL:       url,
-			Summary:   strings.Replace(summary, title, correctedTitle, 1),
+			CouncilID:     url,
+			Title:         correctedTitle,
+			Category:      normalizeCategory(category, title),
+			Date:          sessionDate,
+			DateFromTitle: dateFromTitle,
+			URL:           url,
+			Summary:       strings.Replace(summary, title, correctedTitle, 1),
 		})
 	})
 	return listings, nil
@@ -101,7 +104,7 @@ func (sc *Scraper) ScrapePDFLinks(ctx context.Context, councilURL string) ([]PDF
 		link := s.Find("a.telecharger-item__link")
 		href, exists := link.Attr("href")
 
-		if exists && strings.HasSuffix(strings.ToLower(href), ".pdf") {
+		if exists && strings.HasSuffix(strings.ToLower(href), ".pdf") && isDeliberationPDFTitle(title) {
 			items = append(items, PDFItem{
 				Title: title,
 				URL:   href,
@@ -133,11 +136,25 @@ func (sc *Scraper) ScrapePDFLinks(ctx context.Context, councilURL string) ([]PDF
 	return items, nil
 }
 
+// Agenda and budget annexes are source documents, not separate voted
+// deliberations. Their PDFs must not replace a missing decision in the
+// expected-ID manifest or be counted in the newsletter.
+func isDeliberationPDFTitle(title string) bool {
+	label := strings.ToLower(strings.TrimSpace(title))
+	if strings.HasPrefix(label, "ordre du jour") || strings.HasPrefix(label, "odj ") {
+		return false
+	}
+	return !(strings.Contains(label, "maquette") && strings.Contains(label, "budget"))
+}
+
 func councilDateAndTitle(title, published string) (string, string) {
 	session := parseDateFromTitle(title)
 	publicationDate, pubErr := time.Parse("2006-01-02", published)
 	sessionDate, sessionErr := time.Parse("2006-01-02", session)
-	if pubErr != nil || sessionErr != nil || !sessionDate.After(publicationDate) {
+	if sessionErr != nil {
+		return "", title
+	}
+	if pubErr != nil || !sessionDate.After(publicationDate) {
 		return session, title
 	}
 	for _, year := range []int{publicationDate.Year(), publicationDate.Year() - 1} {
@@ -149,7 +166,9 @@ func councilDateAndTitle(title, published string) (string, string) {
 		log.Printf("warn: council title date %s is after publication %s; using %s", session, published, candidate.Format("2006-01-02"))
 		return candidate.Format("2006-01-02"), fixed
 	}
-	return session, title
+	// No plausible year correction: use the publication date as a fallback,
+	// without treating it as a reliable session date on later rescans.
+	return "", title
 }
 
 var pdfLabelRE = regexp.MustCompile(`(?i)\bD\s*(\d{1,2})\s*[-–—]?\s*(\d{4})[_-](\d{2,3})\b`)
@@ -275,7 +294,7 @@ var frMonthMap = map[string]string{
 // Returns "" if no date can be parsed.
 func parseDateFromTitle(title string) string {
 	// Match "du <day> <month> <year>" or "le <day> <month> <year>"
-	re := regexp.MustCompile(`(?i)(?:du|le)\s+(\d{1,2})\s+([a-zéû]+)\s+(\d{4})`)
+	re := regexp.MustCompile(`(?i)(?:du|le)\s+(\d{1,2})(?:er|ᵉʳ)?\s+([a-zéû]+)\s+(\d{4})`)
 	m := re.FindStringSubmatch(strings.ToLower(title))
 	if m == nil {
 		return ""
@@ -284,7 +303,14 @@ func parseDateFromTitle(title string) string {
 	if !ok {
 		return ""
 	}
-	return fmt.Sprintf("%s-%s-%02s", m[3], monthNum, m[1])
+	day, _ := strconv.Atoi(m[1])
+	month, _ := strconv.Atoi(monthNum)
+	year, _ := strconv.Atoi(m[3])
+	date := fmt.Sprintf("%04d-%02d-%02d", year, month, day)
+	if _, err := time.Parse("2006-01-02", date); err != nil {
+		return ""
+	}
+	return date
 }
 
 func normalizeCategory(cat, title string) string {

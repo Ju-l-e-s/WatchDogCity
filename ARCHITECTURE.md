@@ -42,10 +42,17 @@ Validator Lambda (Go, ARM64) — Le "QC Gateway" & Générateur Deprivé
             ├─ Sauvegarde les newsletter_params et passe le statut du conseil à APPROVED.
             └─ Invoque le Publisher puis le Notifier (de manière asynchrone).
 
-Pour rééditer une newsletter d'un conseil déjà approuvé et encore non envoyé, l'événement manuel `{"council_id":"…","refresh_newsletter":true}` relance les contrôles QC et la génération Gemini depuis les délibérations stockées. Il remplace seulement `newsletter_params_json` si le conseil est toujours `APPROVED` et sans `newsletter_sent_at` ; il ne déclenche ni publication ni envoi. Le Notifier utilise ensuite ces paramètres pour son envoi test. Si un brouillon de production existe déjà, il faut également actualiser son contenu et ses paramètres avant tout envoi manuel : la réutilisation d'un brouillon existant ne le reconstruit pas.
+Pour rééditer une newsletter d'un conseil déjà approuvé et encore non envoyé, l'événement manuel `{"council_id":"…","refresh_newsletter":true}` relance les contrôles QC et la génération Gemini depuis les délibérations stockées. Il remplace seulement `newsletter_params_json` si le conseil est toujours `APPROVED` et sans `newsletter_sent_at` ; il ne déclenche ni publication ni envoi. Le Notifier exige `fact_check_version` dans les paramètres validés, puis actualise le sujet, les paramètres et la liste du brouillon Brevo existant avant le nouvel essai. Un échec de cette actualisation bloque l'envoi.
+
+Le Worker demande une seconde lecture Gemini du PDF original et des champs extraits avant toute écriture DynamoDB. Le Validator vérifie les identifiants source de chaque rubrique de newsletter, les montants, les votes et l'introduction, puis fait relire le texte final par Gemini à partir des champs contrôlés. Une erreur de contenu peut déclencher au plus deux réécritures guidées par les constats ; chaque nouvelle version repasse tous les contrôles. Une réponse absente, invalide ou encore défavorable bloque la publication ou l'envoi concerné. Les anciens conseils n'ont pas automatiquement cette preuve de relecture PDF ; leur remise à niveau reste un chantier de backfill.
+
+À chaque passage, l'Orchestrator compare les PDF des conseils déjà traités avec leur liste source enregistrée. Un ajout, retrait ou remplacement déclenche une erreur de cycle et une alerte pour correction contrôlée ; l'Orchestrator ne modifie pas automatiquement un conseil déjà approuvé. Les anciens conseils sans liste source restent à inventorier séparément.
 
 Publisher Lambda (Go, ARM64)
-    ├─ Scanne uniquement les conseils et délibérations avec qc_status = APPROVED.
+    ├─ Publie les délibérations rattachées aux conseils avec qc_status = APPROVED.
+    ├─ Écarte les conseils vides ; pour les nouvelles approbations marquées par la QC Gateway,
+    │  revérifie que le nombre de délibérations et le compteur traité égalent total_pdfs.
+    │  Les anciens conseils incomplets restent visibles en attendant un backfill contrôlé.
     ├─ Génère le fichier public data.json et le déploie sur le bucket S3.
     └─ Déclenche une invalidation de cache CloudFront chirurgicale.
 
@@ -112,6 +119,9 @@ Le module de validation de la QC Gateway s'assure qu'aucun résumé incohérent 
 | **S4** | Effondrement des Catégories | **WARN** | Toutes les délibérations partagent exactement le même thème (`topic_tag`) pour un conseil de ≥ 4 délibérations. |
 | **S5** | Aberration Budgétaire | **HIGH** | Une délibération unique affiche un impact > 500 000 000 EUR. |
 | **S6** | Plausibilité des Votants | **HIGH** | La somme (Pour + Contre + Abstention) dépasse 60 votants (la mairie de Bègles comptant ~35-39 élus). |
+| **S7** | Complétude des PDF traités | **HIGH** | `total_pdfs` est nul, `processed_pdfs` diffère de `total_pdfs`, ou le nombre de délibérations stockées diffère de `total_pdfs`. Ce contrôle ne vérifie pas que la liste des PDF source ne contient que des délibérations. |
+| **S8** | Concordance avec la liste source | **HIGH** | Les identifiants PDF attendus, les URL et les lignes effectivement comptées doivent correspondre exactement. Les ordres du jour et les annexes budgétaires sont exclus de cette liste. |
+| **S9** | Provenance du contrôle PDF | **HIGH** | Chaque délibération d'un nouveau conseil doit porter le modèle et la date du contrôle factuel du PDF. |
 
 ---
 

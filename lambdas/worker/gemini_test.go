@@ -64,6 +64,12 @@ func TestParseGeminiResponseInvalidJSON(t *testing.T) {
 	assert.Error(t, err)
 }
 
+func TestParseGeminiResponseBudgetNote(t *testing.T) {
+	r, err := parseGeminiResponse(`{"title":"Cession","summary":"Cession approuvée.","budget_impact":696000,"budget_type":"RECETTE","budget_note":"Recette ponctuelle de 696 000 € TTC, cession autorisée ; vente non encore attestée."}`)
+	require.NoError(t, err)
+	assert.Equal(t, "Recette ponctuelle de 696 000 € TTC, cession autorisée ; vente non encore attestée.", r.BudgetNote)
+}
+
 // --- Float sanitization regression (obs 299) ---
 
 func TestParseGeminiResponse_BudgetImpactFloat(t *testing.T) {
@@ -123,6 +129,7 @@ func validResultFixture() *GeminiResult {
 		IsSubstantial: true,
 		BudgetImpact:  10000,
 		BudgetType:    "DÉPENSE",
+		BudgetNote:    "Dépense ponctuelle votée de 10 000 €.",
 		ClimateImpact: "neutre",
 		KeyPoints:     []string{"k"},
 	}
@@ -165,6 +172,13 @@ func TestValidateGeminiResult_AucunWithImpact(t *testing.T) {
 	err := validateGeminiResult(r)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "AUCUN")
+}
+
+func TestValidateGeminiResult_BudgetNoteRequiredForNonZeroAmount(t *testing.T) {
+	r := validResultFixture()
+	r.BudgetNote = ""
+	err := validateGeminiResult(r)
+	assert.ErrorContains(t, err, "budget_note")
 }
 
 func TestValidateGeminiResult_BreakdownInvalidTopic(t *testing.T) {

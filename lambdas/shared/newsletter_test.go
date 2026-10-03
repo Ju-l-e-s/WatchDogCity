@@ -1,6 +1,7 @@
 package shared
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -72,5 +73,61 @@ func TestFinalizeNewsletterParamsOverridesModelFacts(t *testing.T) {
 	}
 	if params.MainIssue != "La ville attribue 30 000 euros à l'association SAGE. Elle reçoit un financement pour la plantation d'arbres." {
 		t.Fatalf("main issue does not lead with adopted decisions: %q", params.MainIssue)
+	}
+}
+
+func TestDeterministicMainIssueSelectsDecisionsAfterBackground(t *testing.T) {
+	params := &NewsletterParams{Adopted: []AdoptedItem{
+		{Context: "L'association gère trois établissements et fait face à des difficultés financières. Le conseil lui attribue une subvention exceptionnelle de 30 000 €."},
+		{Context: "Des travaux ont été réalisés en 2024-2025. Le conseil approuve une convention de financement avec Bordeaux Métropole."},
+	}}
+	got := deterministicMainIssue(params)
+	if !strings.HasPrefix(got, "Le conseil lui attribue une subvention") || !strings.Contains(got, "Le conseil approuve une convention") || strings.Contains(got, "fait face") {
+		t.Fatalf("introduction must lead with two decisions, got %q", got)
+	}
+}
+
+func TestNewsletterIntroRequiresStandaloneDecisionSentences(t *testing.T) {
+	params := &NewsletterParams{Adopted: []AdoptedItem{
+		{Context: "L'association SAGE gère 64 places d'accueil. Le conseil lui attribue 30 000 €."},
+		{Context: "Le conseil approuve une convention de financement pour des travaux déjà réalisés."},
+	}}
+	if err := validateNewsletterIntro(params); err == nil {
+		t.Fatal("background sentence was accepted as introduction")
+	}
+	params.Adopted[0].Context = "Le conseil attribue une subvention de 30 000 € à l'association SAGE. Cette aide vise le maintien de 64 places."
+	if err := validateNewsletterIntro(params); err != nil {
+		t.Fatalf("standalone decisions rejected: %v", err)
+	}
+}
+
+func TestFinalizeNewsletterParamsHidesUnqualifiedRecurringAmount(t *testing.T) {
+	cold := []ColdDeliberation{{
+		Title: "Restaurant au Chapitô", BudgetImpact: 12264, BudgetType: "RECETTE",
+		Summary: "Une redevance annuelle fixe de 10 200 euros, une part variable de 5 % et un forfait mensuel de 172 euros sont prévus.",
+	}}
+	params := &NewsletterParams{Adopted: []AdoptedItem{{
+		Title: "Restaurant au Chapitô", Context: "La ville autorise un restaurant pour trois ans.", Budget: "12264", HasBudget: true,
+	}}}
+	finalizeNewsletterParams(params, "2026-09-28", cold, computeColdNewsletterStats(cold), "", 0, 0)
+	if params.Adopted[0].HasBudget || params.Adopted[0].Budget != "" {
+		t.Fatalf("unqualified annual amount remains visible: %+v", params.Adopted[0])
+	}
+	params.Adopted[0].Budget = "12264"
+	params.Adopted[0].Context = "La ville percevra au moins 12 264 euros par an, plus une part variable."
+	finalizeNewsletterParams(params, "2026-09-28", cold, computeColdNewsletterStats(cold), "", 0, 0)
+	if !params.Adopted[0].HasBudget || params.Adopted[0].Budget != "12 264" {
+		t.Fatalf("qualified annual amount was hidden: %+v", params.Adopted[0])
+	}
+}
+
+func TestSourceAmountQualifiedRequiresCapInCopy(t *testing.T) {
+	cold := []ColdDeliberation{{ID: "D18.pdf", BudgetImpact: 1200,
+		BudgetNote: "Aide de 40 € par foyer, soit 1 200 € au maximum."}}
+	if sourceAmountQualified("D18.pdf", "1 200", "La ville verse 1 200 euros.", cold) {
+		t.Fatal("uncertain ceiling presented as a fixed expense")
+	}
+	if !sourceAmountQualified("D18.pdf", "1 200", "La dépense atteindra au maximum 1 200 euros.", cold) {
+		t.Fatal("qualified ceiling was rejected")
 	}
 }

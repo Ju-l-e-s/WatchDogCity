@@ -11,6 +11,7 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-lambda-go/lambdacontext"
@@ -30,15 +31,17 @@ type PublisherEvent struct {
 }
 
 type CouncilRecord struct {
-	CouncilID string          `dynamodbav:"council_id"`
-	Category  string          `dynamodbav:"category"`
-	Date      string          `dynamodbav:"date"`
-	Title     string          `dynamodbav:"title"`
-	Summary   string          `dynamodbav:"summary"`
-	SourceURL string          `dynamodbav:"source_url"`
-	TotalPDFs int             `dynamodbav:"total_pdfs"`
-	Processed int             `dynamodbav:"processed_pdfs"`
-	Analysis  CouncilAnalysis `dynamodbav:"analysis"`
+	CouncilID           string          `dynamodbav:"council_id"`
+	Category            string          `dynamodbav:"category"`
+	Date                string          `dynamodbav:"date"`
+	Title               string          `dynamodbav:"title"`
+	Summary             string          `dynamodbav:"summary"`
+	SourceURL           string          `dynamodbav:"source_url"`
+	TotalPDFs           int             `dynamodbav:"total_pdfs"`
+	Processed           int             `dynamodbav:"processed_pdfs"`
+	CompletenessVersion int             `dynamodbav:"qc_completeness_version"`
+	ExpectedPDFIDs      []string        `dynamodbav:"expected_pdf_ids"`
+	Analysis            CouncilAnalysis `dynamodbav:"analysis"`
 }
 
 type CouncilAnalysis struct {
@@ -58,6 +61,9 @@ type BudgetBreakdownItem struct {
 
 type DeliberationRecord struct {
 	ID              string                `dynamodbav:"id"`
+	Counted         bool                  `dynamodbav:"counted"`
+	FactCheckModel  string                `dynamodbav:"fact_check_model"`
+	FactCheckedAt   string                `dynamodbav:"fact_checked_at"`
 	CouncilID       string                `dynamodbav:"council_id"`
 	Title           string                `dynamodbav:"title"`
 	TopicTag        string                `dynamodbav:"topic_tag"`
@@ -68,6 +74,7 @@ type DeliberationRecord struct {
 	AnalysisData    AnalysisData          `dynamodbav:"analysis_data"`
 	BudgetImpact    int64                 `dynamodbav:"budget_impact"`
 	BudgetType      string                `dynamodbav:"budget_type"`
+	BudgetNote      string                `dynamodbav:"budget_note"`
 	BudgetBreakdown []BudgetBreakdownItem `dynamodbav:"budget_breakdown"`
 	HasVote         bool                  `dynamodbav:"has_vote"`
 	VotePour        *int                  `dynamodbav:"vote_pour"`
@@ -107,6 +114,7 @@ type DeliberationOutput struct {
 	AnalysisData    AnalysisData          `json:"analysis_data"`
 	BudgetImpact    int64                 `json:"budget_impact"`
 	BudgetType      string                `json:"budget_type"`
+	BudgetNote      string                `json:"budget_note,omitempty"`
 	BudgetBreakdown []BudgetBreakdownItem `json:"budget_breakdown"`
 	Vote            VoteCount             `json:"vote"`
 	Disagreements   *string               `json:"disagreements"`
@@ -134,6 +142,28 @@ func buildDataJSON(ctx context.Context, ddb *dynamodb.Client, councils []Council
 		NextCouncilDate: fetchNextCouncilDate(ctx, ddb),
 	}
 	for _, c := range councils {
+		councilDelibs := delibs[c.CouncilID]
+		// Historical APPROVED rows can be incomplete; keep their published
+		// deliberations for now, but never publish an empty shell. Councils
+		// approved under the new completeness gate must still be complete at
+		// publication time.
+		if len(councilDelibs) == 0 {
+			log.Printf("skipping empty approved council %s", c.CouncilID)
+			continue
+		}
+		if c.CompletenessVersion >= 1 &&
+			(c.TotalPDFs <= 0 || c.Processed != c.TotalPDFs || len(councilDelibs) != c.TotalPDFs) {
+			log.Printf("skipping incomplete approved council %s: total_pdfs=%d processed_pdfs=%d deliberations=%d", c.CouncilID, c.TotalPDFs, c.Processed, len(councilDelibs))
+			continue
+		}
+		if c.CompletenessVersion >= 1 && !hasFactCheckProvenance(councilDelibs) {
+			log.Printf("skipping approved council %s with unverified deliberations", c.CouncilID)
+			continue
+		}
+		if c.CompletenessVersion >= 2 && !matchesPDFManifest(c.ExpectedPDFIDs, councilDelibs) {
+			log.Printf("skipping approved council %s with PDF manifest mismatch", c.CouncilID)
+			continue
+		}
 		// Council aggregates stored by older versions mix receipts and expenses,
 		// and can describe non-unanimous votes as consensus. Deliberation-level
 		// amounts and vote counts are the published source for these displays.
@@ -148,7 +178,7 @@ func buildDataJSON(ctx context.Context, ddb *dynamodb.Client, councils []Council
 			SourceURL: c.SourceURL,
 			Analysis:  analysis,
 		}
-		for _, d := range delibs[c.CouncilID] {
+		for _, d := range councilDelibs {
 			co.Deliberations = append(co.Deliberations, DeliberationOutput{
 				ID:              d.ID,
 				Title:           d.Title,
@@ -160,6 +190,7 @@ func buildDataJSON(ctx context.Context, ddb *dynamodb.Client, councils []Council
 				AnalysisData:    d.AnalysisData,
 				BudgetImpact:    d.BudgetImpact,
 				BudgetType:      d.BudgetType,
+				BudgetNote:      d.BudgetNote,
 				BudgetBreakdown: d.BudgetBreakdown,
 				Vote: VoteCount{
 					HasVote:    d.HasVote || d.VotePour != nil || d.VoteContre != nil || d.VoteAbstention != nil,
@@ -173,6 +204,35 @@ func buildDataJSON(ctx context.Context, ddb *dynamodb.Client, councils []Council
 		out.Councils = append(out.Councils, co)
 	}
 	return out, nil
+}
+
+func hasFactCheckProvenance(delibs []DeliberationRecord) bool {
+	for _, d := range delibs {
+		if strings.TrimSpace(d.FactCheckModel) == "" || strings.TrimSpace(d.FactCheckedAt) == "" {
+			return false
+		}
+	}
+	return true
+}
+
+func matchesPDFManifest(expected []string, delibs []DeliberationRecord) bool {
+	if len(expected) == 0 || len(expected) != len(delibs) {
+		return false
+	}
+	ids := make(map[string]bool, len(expected))
+	for _, id := range expected {
+		if id == "" || ids[id] {
+			return false
+		}
+		ids[id] = true
+	}
+	for _, d := range delibs {
+		if !ids[d.ID] || !d.Counted || !strings.HasSuffix(d.PDFURL, "/"+d.ID) {
+			return false
+		}
+		delete(ids, d.ID)
+	}
+	return true
 }
 
 func fetchNextCouncilDate(ctx context.Context, ddb *dynamodb.Client) string {

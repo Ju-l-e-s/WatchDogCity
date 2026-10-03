@@ -506,20 +506,11 @@ class WatchdogStack(Stack):
             prune=False,
         )
 
-        # 3. Déploiement des Données (data.json) : Invalidation Système
-        deploy_data = s3_deploy.BucketDeployment(
-            self, "DeployDataJson",
-            sources=[s3_deploy.Source.asset("../frontend", exclude=["*", "!data.json"])],
-            destination_bucket=website_bucket,
-            distribution=distribution,
-            distribution_paths=["/data.json"],
-            cache_control=[s3_deploy.CacheControl.from_string("no-cache, no-store, must-revalidate")],
-            prune=False,
-        )
-
-        # Chaînage des déploiements pour assurer l'ordre
+        # data.json belongs solely to Publisher. Removing the former
+        # DeployDataJson resource retains its existing S3 object: CDK
+        # BucketDeployment.retain_on_delete defaults to True, and both
+        # remaining deployments use prune=False and exclude data.json.
         deploy_config.node.add_dependency(deploy_website)
-        deploy_data.node.add_dependency(deploy_config)
 
         # ── Monitoring & Dashboard ────────────────────────────────────────
         dashboard = cloudwatch.Dashboard(self, "WatchdogDashboard", dashboard_name="Watchdog-Begles-Health")

@@ -57,7 +57,7 @@ jobs:
           set -euo pipefail
           # Block any deploy if critical assets are missing or empty.
           # Prevents the "destructive sync of an empty dir" failure mode.
-          for f in frontend/index.html frontend/app.js frontend/style.css frontend/merci.html frontend/data.json; do
+          for f in frontend/index.html frontend/app.js frontend/style.css frontend/merci.html; do
             if [ ! -s "$f" ]; then
               echo "::error file=$f::missing or empty — aborting deploy"
               exit 1
@@ -98,3 +98,18 @@ jobs:
           AUTO_SEND_ENABLED: ${{ vars.AUTO_SEND_ENABLED || 'false' }}
           ACM_CERTIFICATE_ARN: ${{ secrets.ACM_CERTIFICATE_ARN }}
           DOMAIN_NAME: 'lobservatoiredebegles.fr'
+
+      - name: Verify Publisher data.json remains in S3
+        run: |
+          set -euo pipefail
+          bucket=$(python -c 'import json; print(json.load(open("cdk/cities/begles.json"))["aws"]["existing_s3_bucket"])')
+          size=$(aws s3api head-object --bucket "$bucket" --key data.json --query ContentLength --output text)
+          if [ "$size" -le 0 ]; then
+            echo "::error::Publisher data.json is empty after deployment"
+            exit 1
+          fi
+          echo "Publisher data.json remains present in S3 ($size bytes)."
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: eu-west-3

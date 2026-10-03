@@ -37,6 +37,7 @@ type DeliberationOutput struct {
 	IsSubstantial bool   `json:"is_substantial"`
 	BudgetImpact  int64  `json:"budget_impact"`
 	BudgetType    string `json:"budget_type"`
+	BudgetNote    string `json:"budget_note"`
 	Vote          struct {
 		HasVote    bool `json:"has_vote"`
 		Pour       *int `json:"pour"`
@@ -46,7 +47,8 @@ type DeliberationOutput struct {
 	Disagreements *string `json:"disagreements"`
 	ClimateImpact string  `json:"climate_impact"`
 	AnalysisData  struct {
-		Impacts *string `json:"impacts"`
+		Decision *string `json:"decision"`
+		Impacts  *string `json:"impacts"`
 	} `json:"analysis_data"`
 }
 
@@ -154,12 +156,18 @@ func runNewsletter(args []string) error {
 		if d.AnalysisData.Impacts != nil {
 			impactsVal = *d.AnalysisData.Impacts
 		}
+		decisionVal := ""
+		if d.AnalysisData.Decision != nil {
+			decisionVal = *d.AnalysisData.Decision
+		}
 
 		coldDelibs = append(coldDelibs, shared.ColdDeliberation{
+			ID:              d.ID,
 			Title:           d.Title,
 			TopicTag:        d.TopicTag,
 			BudgetImpact:    d.BudgetImpact,
 			BudgetType:      budgetType,
+			BudgetNote:      d.BudgetNote,
 			HasVote:         d.Vote.HasVote,
 			Pour:            d.Vote.Pour,
 			Contre:          d.Vote.Contre,
@@ -168,6 +176,7 @@ func runNewsletter(args []string) error {
 			IsSubstantial:   d.IsSubstantial || d.BudgetImpact >= 5000,
 			HasDisagreement: hasDisagreement || contre > 0 || abst > 0,
 			Summary:         d.Summary,
+			Decision:        decisionVal,
 			Impacts:         impactsVal,
 		})
 	}
@@ -188,7 +197,7 @@ func runNewsletter(args []string) error {
 	fmt.Println("⏳ Génération des paramètres de la newsletter en cours...")
 
 	// 6. Call GenerateNewsletterParams
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 6*time.Minute)
 	defer cancel()
 
 	start := time.Now()

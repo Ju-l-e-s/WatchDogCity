@@ -99,9 +99,22 @@ func TestScrapeCouncilListCorrectsFutureYearFromPublication(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, listings, 1)
 	assert.Equal(t, "2026-09-28", listings[0].Date)
+	assert.True(t, listings[0].DateFromTitle)
 	assert.Equal(t, "Délibérations du conseil municipal du 28 septembre 2026", listings[0].Title)
 	assert.Contains(t, listings[0].Summary, "septembre 2026")
 	assert.Equal(t, "https://example.com/council-2028/", listings[0].CouncilID)
+}
+
+func TestParseDateFromTitle_OrdinalAndSingleDigit(t *testing.T) {
+	assert.Equal(t, "2025-07-01", parseDateFromTitle("Conseil municipal du 1ᵉʳ juillet 2025"))
+	assert.Equal(t, "2026-06-05", parseDateFromTitle("Délibérations du 5 juin 2026"))
+	assert.Equal(t, "", parseDateFromTitle("Conseil municipal du 31 février 2026"))
+}
+
+func TestIsDeliberationPDFTitle_ExcludesAttachments(t *testing.T) {
+	assert.False(t, isDeliberationPDFTitle("Ordre du jour"))
+	assert.False(t, isDeliberationPDFTitle("D04 – Maquette du Budget"))
+	assert.True(t, isDeliberationPDFTitle("D04 – Vote du budget primitif 2026"))
 }
 
 func TestScrapePDFLinksRepairsDuplicateMunicipalLink(t *testing.T) {

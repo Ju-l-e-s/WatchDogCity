@@ -30,11 +30,14 @@ func okDelibRec(id string) deliberationRec {
 	dec := "La ville approuve le projet."
 	imp := "Impact direct sur les habitants."
 	return deliberationRec{
-		ID:       id,
-		Title:    "Délibération " + id,
-		Summary:  "Résumé court.",
-		TopicTag: "Budget",
-		PDFURL:   "https://example.com/" + id + ".pdf",
+		ID:             id,
+		Counted:        true,
+		FactCheckModel: "gemini-2.5-pro",
+		FactCheckedAt:  "2026-10-03T10:00:00Z",
+		Title:          "Délibération " + id,
+		Summary:        "Résumé court.",
+		TopicTag:       "Budget",
+		PDFURL:         "https://example.com/" + id + ".pdf",
 		AnalysisData: analysisDataRec{
 			Contexte: &ctx,
 			Decision: &dec,
@@ -933,12 +936,12 @@ func TestRefreshNewsletterRequiresApprovedCouncil(t *testing.T) {
 
 func TestHandleRequest(t *testing.T) {
 	tests := []struct {
-		name          string
-		councilID     string
-		setupMocks    func() (*mockDDB, *mockLambda, *mockSQS)
-		wantErr       bool
-		errContains   string
-		validateFunc  func(t *testing.T, ddb *mockDDB, lambda *mockLambda, sqs *mockSQS)
+		name         string
+		councilID    string
+		setupMocks   func() (*mockDDB, *mockLambda, *mockSQS)
+		wantErr      bool
+		errContains  string
+		validateFunc func(t *testing.T, ddb *mockDDB, lambda *mockLambda, sqs *mockSQS)
 	}{
 		{
 			name:      "Council already VALIDATING (errAlreadyClaimed)",
@@ -1107,6 +1110,8 @@ func TestHandleRequest(t *testing.T) {
 			setupMocks: func() (*mockDDB, *mockLambda, *mockSQS) {
 				c := okCouncilRec()
 				// Valid deliberation with NO HIGH violations: impacts != Néant,
+				c.TotalPdfs = 1
+				c.ProcessedPdfs = 1
 				// valid enums, budget > 0, etc.
 				d := okDelibRec("d1")
 				d.BudgetType = "DÉPENSE"
@@ -1177,6 +1182,8 @@ func TestHandleRequest(t *testing.T) {
 
 func TestHandleRequest_QuarantineWithSelfHeal(t *testing.T) {
 	c := okCouncilRec()
+	c.TotalPdfs = 1
+	c.ProcessedPdfs = 1
 	c.QcAttempts = 1
 	d := okDelibRec("d1")
 	d.BudgetType = "AUCUN"
@@ -1253,6 +1260,15 @@ func TestHandleRequest_QuarantineWithSelfHeal(t *testing.T) {
 	}
 }
 
+func TestCompletenessViolationDisablesPartialSelfHeal(t *testing.T) {
+	if !hasCompletenessViolation(shared.Verdict{Violations: []shared.Violation{{Rule: "S8_PDF_MANIFEST_MISMATCH"}}}) {
+		t.Fatal("manifest mismatch must not re-enqueue only the known PDFs")
+	}
+	if hasCompletenessViolation(shared.Verdict{Violations: []shared.Violation{{Rule: "D2_BUDGET_AUCUN_NONZERO"}}}) {
+		t.Fatal("ordinary data violation should remain eligible for self-heal")
+	}
+}
+
 // ── handleApproved tests (isolated, testing non-Gemini branches) ─────────────
 
 func TestHandleApproved_GeminiError(t *testing.T) {
@@ -1303,18 +1319,18 @@ func TestHandleApproved_GeminiError(t *testing.T) {
 
 func TestToColdDelibs_BasicMapping(t *testing.T) {
 	dv := shared.DeliberationView{
-		Title:           "Test délib",
-		TopicTag:        "Budget",
-		BudgetImpact:    5000,
-		BudgetType:      "DÉPENSE",
-		HasVote:         true,
-		VotePour:        ptrInt(30),
-		VoteContre:      ptrInt(5),
-		VoteAbstention:  ptrInt(2),
-		ClimateImpact:   "neutre",
-		IsSubstantial:   false,
-		Summary:         "Résumé.",
-		AnalysisData:    shared.QcAnalysisData{Impacts: ptrStr("Impact fort.")},
+		Title:          "Test délib",
+		TopicTag:       "Budget",
+		BudgetImpact:   5000,
+		BudgetType:     "DÉPENSE",
+		HasVote:        true,
+		VotePour:       ptrInt(30),
+		VoteContre:     ptrInt(5),
+		VoteAbstention: ptrInt(2),
+		ClimateImpact:  "neutre",
+		IsSubstantial:  false,
+		Summary:        "Résumé.",
+		AnalysisData:   shared.QcAnalysisData{Impacts: ptrStr("Impact fort.")},
 	}
 	cold := toColdDelibs([]shared.DeliberationView{dv})
 	if len(cold) != 1 {

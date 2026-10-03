@@ -400,6 +400,23 @@ func TestSendCampaign_ReusesDraft(t *testing.T) {
 		switch {
 		case req.Method == http.MethodGet && strings.Contains(req.URL.RawQuery, "limit=50"):
 			return fakeResp{200, fmt.Sprintf(`{"campaigns":[{"id":42,"name":%q,"status":"draft"}],"count":1}`, name)}
+		case req.Method == http.MethodPut && strings.HasSuffix(req.URL.Path, "/emailCampaigns/42"):
+			var body struct {
+				Subject string `json:"subject"`
+				Params  struct {
+					EmailSubject string `json:"email_subject"`
+				} `json:"params"`
+				Recipients struct {
+					ListIDs []int `json:"listIds"`
+				} `json:"recipients"`
+			}
+			if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
+				t.Fatal(err)
+			}
+			if body.Subject != "Sujet corrigé" || body.Params.EmailSubject != "Sujet corrigé" || len(body.Recipients.ListIDs) != 1 || body.Recipients.ListIDs[0] != 2 {
+				t.Errorf("draft was not refreshed with checked production content: %+v", body)
+			}
+			return fakeResp{204, ""}
 		case req.Method == http.MethodGet && strings.HasSuffix(req.URL.Path, "/emailCampaigns/42"):
 			return fakeResp{200, `{"status":"draft"}`}
 		case isSendTestPOST(req):
@@ -409,13 +426,16 @@ func TestSendCampaign_ReusesDraft(t *testing.T) {
 		}
 		return fakeResp{200, "{}"}
 	}}
-	d := &notifierDeps{httpClient: h, brevoKey: "k", testEmail: "owner@example.com", autoSendEnabled: true}
+	d := &notifierDeps{httpClient: h, brevoKey: "k", brevoListID: 2, testEmail: "owner@example.com", autoSendEnabled: true}
 
-	if _, err := d.sendCampaign(context.Background(), &NewsletterParams{}, councilID, councilDate, nil); err != nil {
+	if _, err := d.sendCampaign(context.Background(), &NewsletterParams{EmailSubject: "Sujet corrigé"}, councilID, councilDate, nil); err != nil {
 		t.Fatalf("sendCampaign: %v", err)
 	}
 	if n := h.count(isCreatePOST); n != 0 {
 		t.Errorf("expected 0 create POSTs (draft reused), got %d", n)
+	}
+	if n := h.count(func(req *http.Request) bool { return req.Method == http.MethodPut }); n != 1 {
+		t.Errorf("expected one draft refresh, got %d", n)
 	}
 	if n := h.count(isSendNowPOST); n != 1 {
 		t.Errorf("expected exactly 1 sendNow POST, got %d", n)
@@ -444,6 +464,46 @@ func TestTriggerSend_SkipsIfAlreadyQueued(t *testing.T) {
 	}
 }
 
+func TestSendCampaign_DraftRefreshFailureBlocksDelivery(t *testing.T) {
+	name := "Newsletter-council-7-2026-05-19"
+	h := &fakeHTTP{route: func(req *http.Request) fakeResp {
+		if req.Method == http.MethodGet && req.URL.Path == "/v3/emailCampaigns" {
+			return fakeResp{200, fmt.Sprintf(`{"campaigns":[{"id":42,"name":%q,"status":"draft"}]}`, name)}
+		}
+		if req.Method == http.MethodPut && strings.HasSuffix(req.URL.Path, "/emailCampaigns/42") {
+			return fakeResp{400, `{"message":"invalid params"}`}
+		}
+		return fakeResp{500, "unexpected request"}
+	}}
+	d := &notifierDeps{httpClient: h, brevoKey: "k", brevoListID: 2}
+	_, err := d.sendCampaign(context.Background(), &NewsletterParams{EmailSubject: "Sujet corrigé"}, "council-7", "2026-05-19", nil)
+	if err == nil || !strings.Contains(err.Error(), "refresh Brevo draft") {
+		t.Fatalf("expected draft refresh error, got %v", err)
+	}
+	if h.count(isSendNowPOST) != 0 || h.count(isSendTestPOST) != 0 {
+		t.Fatal("delivered a stale draft after failed refresh")
+	}
+}
+
+func TestHandleTest_RejectsUncheckedStoredParams(t *testing.T) {
+	ddb := &fakeDDB{getResponse: func(_ *dynamodb.GetItemInput) (*dynamodb.GetItemOutput, error) {
+		return &dynamodb.GetItemOutput{Item: map[string]types.AttributeValue{
+			"qc_status":              &types.AttributeValueMemberS{Value: "APPROVED"},
+			"category":               &types.AttributeValueMemberS{Value: "Conseil municipal"},
+			"newsletter_params_json": &types.AttributeValueMemberS{Value: `{"email_subject":"Unchecked"}`},
+		}}, nil
+	}}
+	h := &fakeHTTP{}
+	d := &notifierDeps{ddb: ddb, httpClient: h, councilsTable: "councils-test"}
+	listID := 3
+	if err := d.handle(context.Background(), NotifierEvent{CouncilID: "council-1", TestListID: &listID}); err == nil || !strings.Contains(err.Error(), "fact check") {
+		t.Fatalf("expected fact-check gate, got %v", err)
+	}
+	if len(h.requests) != 0 {
+		t.Fatal("Brevo was called for unchecked content")
+	}
+}
+
 func TestHandle_SkipsMetadata(t *testing.T) {
 	d := &notifierDeps{} // All fields nil/zero-value
 	err := d.handle(context.Background(), NotifierEvent{
@@ -464,7 +524,7 @@ func TestHandleTest_UsesApprovedStoredContentAndIsolatedCampaign(t *testing.T) {
 			"category":               &types.AttributeValueMemberS{Value: "Conseil municipal"},
 			"qc_status":              &types.AttributeValueMemberS{Value: "APPROVED"},
 			"date":                   &types.AttributeValueMemberS{Value: "2026-06-22"},
-			"newsletter_params_json": &types.AttributeValueMemberS{Value: `{"email_subject":"Sujet validé"}`},
+			"newsletter_params_json": &types.AttributeValueMemberS{Value: `{"email_subject":"Sujet validé","fact_check_version":1}`},
 		}}, nil
 	}}
 	var names []string
@@ -567,7 +627,7 @@ func TestHandle_PreviewAndAutomaticSend(t *testing.T) {
 					"council_id":             &types.AttributeValueMemberS{Value: "council-1"},
 					"qc_status":              &types.AttributeValueMemberS{Value: "APPROVED"},
 					"date":                   &types.AttributeValueMemberS{Value: "2026-06-22"},
-					"newsletter_params_json": &types.AttributeValueMemberS{Value: `{"email_subject":"Sujet validé"}`},
+					"newsletter_params_json": &types.AttributeValueMemberS{Value: `{"email_subject":"Sujet validé","fact_check_version":1}`},
 				}}, nil
 			}}
 			var calls []string

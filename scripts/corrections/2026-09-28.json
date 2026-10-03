@@ -1,0 +1,378 @@
+{
+  "council_id": "https://www.mairie-begles.fr/d%C3%A9lib%C3%A9rations/deliberations-du-conseil-municipal-du-28-septembre-2028/",
+  "semantics": "expected est la valeur du snapshot public ; vérifier l’ancienne valeur DDB avant toute mise à jour. budget_note expected=null signifie champ absent du snapshot public, à vérifier en DDB.",
+  "entries": [
+    {
+      "id": "D02-2026_092.pdf",
+      "pdf_url": "https://www.mairie-begles.fr/app/uploads/2026/10/D02-2026_092.pdf",
+      "pdf_pages": "2-3",
+      "changes": {
+        "summary": {
+          "expected": "La délibération porte sur la convention d'entente intercommunale pour la création, le développement et la gestion d'une Carte Jeune partagée entre plusieurs communes de la métropole. Cette carte gratuite vise à faciliter l'accès des jeunes de 0 à 25 ans à la culture, au sport et aux loisirs. La Ville de Bordeaux assure la gestion administrative et opérationnelle du dispositif, et les charges sont mutualisées entre les communes participantes. Bègles, qui a adhéré au dispositif en 2022, doit désigner ses représentants au sein de la conférence intercommunale (COPIL) chargée du suivi.",
+          "replacement": "Le Conseil municipal a désigné Jonathan Mothe comme représentant titulaire et Caroll Fons comme suppléante de Bègles au sein de la conférence intercommunale chargée du suivi de la Carte Jeune. Cette carte gratuite, partagée entre plusieurs communes, facilite l'accès des jeunes de 0 à 25 ans à la culture, au sport et aux loisirs. Bègles adhère au dispositif depuis 2022."
+        }
+      },
+      "note": "Le PDF acte la désignation ; le résumé initial la présentait encore comme une action à venir."
+    },
+    {
+      "id": "D03-2026_093.pdf",
+      "pdf_url": "https://www.mairie-begles.fr/app/uploads/2026/10/D03-2026_093.pdf",
+      "pdf_pages": "2-3",
+      "changes": {
+        "analysis_data.impacts": {
+          "expected": "Organisation d'ateliers collectifs de diététique et d'activité physique pour les enfants et parents des trois quartiers prioritaires de Bègles. Réception d'une subvention de 400 euros pour financer le projet.",
+          "replacement": "La convention approuvée prévoit des ateliers collectifs de diététique et d'activité physique pour les enfants et les parents des quartiers prioritaires. La subvention de 400 € est accordée pour 2026, avec 240 € versables après signature et le solde après justification des actions."
+        },
+        "budget_note": {
+          "expected": null,
+          "replacement": "Subvention accordée de 400 € pour 2026 : 240 € à la signature, solde après justificatifs."
+        }
+      },
+      "note": ""
+    },
+    {
+      "id": "D04-2026_094.pdf",
+      "pdf_url": "https://www.mairie-begles.fr/app/uploads/2026/10/D04-2026_094.pdf",
+      "pdf_pages": "2-4",
+      "changes": {
+        "summary": {
+          "expected": "La Ville de Bègles attribue une subvention exceptionnelle de 30 000 euros à l'association SAGE (Service Associatif de Garde d'Enfants) pour l'année 2026. Cette aide vise à soutenir l'association, qui gère trois établissements d'accueil du jeune enfant (64 places) et fait face à des difficultés financières dues à l'augmentation de ses charges. Cette subvention complémentaire porte le soutien total de la ville à SAGE pour 2026 à 345 560 euros, assurant ainsi la pérennisation de son offre d'accueil.",
+          "replacement": "La Ville de Bègles attribue une subvention exceptionnelle de 30 000 € à l'association SAGE (Service Associatif de Garde d'Enfants) pour 2026. L'association gère trois établissements totalisant 64 places et fait face à des difficultés financières. Ce complément porte le soutien municipal prévu pour 2026 à 345 560 € et vise à contribuer au maintien de son offre d'accueil."
+        },
+        "analysis_data.impacts": {
+          "expected": "Maintien de l'offre de 64 places d'accueil du jeune enfant dans les trois établissements gérés par l'association SAGE.",
+          "replacement": "La subvention exceptionnelle vise à contribuer au maintien des 64 places d'accueil du jeune enfant dans les trois établissements gérés par l'association SAGE."
+        },
+        "budget_note": {
+          "expected": null,
+          "replacement": "Subvention exceptionnelle de 30 000 € votée pour 2026, versement prévu en novembre 2026."
+        }
+      },
+      "note": ""
+    },
+    {
+      "id": "D05-2026_095.pdf",
+      "pdf_url": "https://www.mairie-begles.fr/app/uploads/2026/10/D05-2026_095.pdf",
+      "pdf_pages": "2-3",
+      "changes": {
+        "summary": {
+          "expected": "La Ville de Bègles renouvelle sa Convention Territoriale Globale (CTG) avec la Caisse d'Allocations Familiales (CAF) de la Gironde. Cette convention vise à adapter et améliorer les services destinés aux familles de tous âges, en réponse aux évolutions démographiques, sociales, économiques et environnementales. Elle s'articule autour d'un diagnostic partagé, d'un plan d'actions pluriannuel, d'engagements financiers réciproques et d'un dispositif de gouvernance et d'évaluation structuré, afin de consolider le soutien municipal aux enfants et aux familles.",
+          "replacement": "Le Conseil municipal autorise le Maire à engager le renouvellement de la Convention Territoriale Globale avec la Caisse d'Allocations Familiales (CAF) de la Gironde. Cette convention a pour objectif d'adapter les services destinés aux familles et prévoit un diagnostic partagé, un plan d'actions, des engagements financiers et un dispositif de suivi."
+        },
+        "analysis_data.impacts": {
+          "expected": "La nouvelle Convention Territoriale Globale (CTG) permettra d'adapter l'offre d'accueil du jeune enfant, de renforcer les politiques éducatives en faveur de l'enfance et de la jeunesse, de soutenir les parents dans l'exercice de leur rôle éducatif, de faciliter l'accès aux droits et aux services, de lutter contre les inégalités sociales et territoriales, de favoriser l'inclusion et l'égalité des chances, de renforcer l'animation de la vie sociale, d'accompagner les transitions sociales, écologiques et démographiques, et de développer les coopérations entre les acteurs locaux au bénéfice des familles.",
+          "replacement": "Néant"
+        }
+      },
+      "note": ""
+    },
+    {
+      "id": "D06-2026_096.pdf",
+      "pdf_url": "https://www.mairie-begles.fr/app/uploads/2026/10/D06-2026_096.pdf",
+      "pdf_pages": "2-3",
+      "changes": {
+        "budget_note": {
+          "expected": null,
+          "replacement": "Cotisation annuelle fixe de 1 000 € au groupement d'achats, plus une part liée au volume des achats (0,7 % en 2026)."
+        }
+      },
+      "note": ""
+    },
+    {
+      "id": "D08-2026_098.pdf",
+      "pdf_url": "https://www.mairie-begles.fr/app/uploads/2026/10/D08-2026_098.pdf",
+      "pdf_pages": "2-3",
+      "changes": {
+        "analysis_data.contexte": {
+          "expected": "La Ville de Bègles s'engage activement dans l'éducation artistique et culturelle (EAC) pour les enfants et les jeunes, en s'appuyant sur ses équipements culturels comme la Bibliothèque, le musée de la Création Franche, la CitéCirque, la Maison Municipale de la Musique et le cinéma La Lanterne. Ces actions s'inscrivent dans les objectifs nationaux de l'EAC, visant la rencontre avec les œuvres et les artistes, la pratique artistique et l'acquisition de connaissances. La convention formalise et pérennise cette coopération.",
+          "replacement": "La Ville mène déjà des actions d'éducation artistique et culturelle avec ses équipements et intervenants. Le projet de convention approuvé vise à formaliser pour trois années scolaires la coopération avec l'Éducation nationale, à compter de sa signature."
+        },
+        "analysis_data.impacts": {
+          "expected": "Formalisation et pérennisation des modalités de coopération entre la Ville et l'Éducation nationale pour les activités d'éducation artistique et culturelle. Les élèves bénéficieront d'interventions culturelles dans les écoles et de déplacements sur les sites des structures culturelles de la ville (Musée de la Création Franche, Bibliothèque, CitéCirque, Maison Municipale de la Musique, Cinéma La Lanterne).",
+          "replacement": "Néant"
+        }
+      },
+      "note": ""
+    },
+    {
+      "id": "D09-2026_099.pdf",
+      "pdf_url": "https://www.mairie-begles.fr/app/uploads/2026/10/D09-2026_099.pdf",
+      "pdf_pages": "2-4",
+      "changes": {
+        "analysis_data.impacts": {
+          "expected": "Un concours d'affiche est lancé pour la Fête de la Morue.Un prix de 1 500 € est attribué au lauréat du concours d'affiche.Deux tremplins musicaux sont organisés pour les artistes locaux.Des produits dérivés de la Fête de la Morue sont mis en vente.Une campagne de partenariat et de mécénat est lancée.",
+          "replacement": "Lancement d'un concours d'affiche doté d'un prix de 1 500 €, de deux tremplins musicaux et d'une campagne de partenariat pour la Fête de la Morue 2027."
+        },
+        "budget_note": {
+          "expected": null,
+          "replacement": "Prix ponctuel de 1 500 € prévu pour le lauréat du concours d'affiche de 2027."
+        }
+      },
+      "note": ""
+    },
+    {
+      "id": "D10-2026_100.pdf",
+      "pdf_url": "https://www.mairie-begles.fr/app/uploads/2026/10/D10-2026_100.pdf",
+      "pdf_pages": "2-3",
+      "changes": {
+        "summary": {
+          "expected": "La délibération concerne l'avis de la commune de Bègles sur le projet de pacte de gouvernance de Bordeaux Métropole. Ce pacte, rendu possible par la loi du 27 décembre 2019 relative à l'engagement dans la vie locale et à la proximité de l'action publique, vise à définir les relations juridiques, financières et de fonctionnement entre la Métropole et ses communes membres. Il permet aux communes et aux maires d'intervenir dans la définition et la réalisation des projets politiques métropolitains. Le Conseil municipal de Bègles est invité à donner son avis sur ce projet avant son examen par le Conseil métropolitain en décembre 2026.",
+          "replacement": "Le Conseil municipal de Bègles a émis un avis favorable sur le projet de pacte de gouvernance de Bordeaux Métropole. Ce pacte vise à définir les relations juridiques, financières et de fonctionnement entre la Métropole et ses communes membres. Le Conseil métropolitain doit examiner le projet au plus tard en décembre 2026."
+        }
+      },
+      "note": ""
+    },
+    {
+      "id": "D12-2026_102.pdf",
+      "pdf_url": "https://www.mairie-begles.fr/app/uploads/2026/10/D12-2026_102.pdf",
+      "pdf_pages": "2-3",
+      "changes": {
+        "summary": {
+          "expected": "La ville de Bègles cède trois parcelles de terrain d'une superficie totale de 3 752 m² à la société Domofrance pour un montant de 696 000 euros toutes taxes comprises. Ce projet prévoit la construction de 27 logements, dont 8 logements locatifs sociaux (PLUS et PLAI) et 19 logements locatifs intermédiaires (LLI), ainsi que des places de stationnement. Cette opération vise à diversifier l'offre de logements sur le territoire communal et à répondre aux besoins des publics prioritaires.",
+          "replacement": "Le Conseil municipal autorise la cession à Domofrance de trois parcelles totalisant 3 752 m² pour 696 000 € TTC. Le programme présenté prévoit 27 logements, dont 8 locatifs sociaux et 19 locatifs intermédiaires, ainsi que des places de stationnement. Le Maire est autorisé à signer l'acte de vente."
+        },
+        "analysis_data.contexte": {
+          "expected": "La ville de Bègles est propriétaire de trois parcelles de terrain (AO 488, AO 514, AO 513) situées au 40 avenue Salvador Allende, d'une superficie totale de 3 752 m². Ces terrains s'inscrivent dans le périmètre du site du Parc des Sœurs et sont destinés à un programme de logements sociaux. Le projet prévoit la démolition des bâtis existants pour permettre la réalisation d'une nouvelle construction.",
+          "replacement": "La Ville de Bègles possède trois parcelles cadastrées AO 488, AO 514 et AO 513 avenue Salvador Allende, d'une superficie totale de 3 752 m². Leur cession est envisagée pour un programme de 27 logements porté par Domofrance. Le projet prévoit la démolition des bâtiments existants."
+        },
+        "analysis_data.impacts": {
+          "expected": "Construction de 27 nouveaux logements (8 sociaux et 19 intermédiaires). Démolition des bâtiments existants sur le site. Création de places de stationnement aériennes associées.",
+          "replacement": "Le programme présenté comprend la construction de 27 logements (8 sociaux et 19 intermédiaires), la démolition des bâtiments existants et des places de stationnement. La délibération autorise la cession des terrains pour ce projet."
+        },
+        "budget_note": {
+          "expected": null,
+          "replacement": "Recette ponctuelle de 696 000 € TTC prévue par une cession autorisée ; acte de vente et encaissement non attestés."
+        }
+      },
+      "note": ""
+    },
+    {
+      "id": "D13-2026_103.pdf",
+      "pdf_url": "https://www.mairie-begles.fr/app/uploads/2026/10/D13-2026_103.pdf",
+      "pdf_pages": "2-3",
+      "changes": {
+        "summary": {
+          "expected": "La Ville de Bègles cède gratuitement 980 m² de terrains à Bordeaux Métropole. Ces parcelles, issues des sections cadastrales BM n° 36 et BN n° 50, sont destinées à la réalisation d'une piste cyclable continue entre Bègles et Villenave-d'Ornon, ainsi qu'à l'aménagement d'espaces paysagers ouverts au public. Tous les frais liés à cette opération seront pris en charge par Bordeaux Métropole.",
+          "replacement": "Le Conseil municipal approuve la cession gratuite à Bordeaux Métropole de deux emprises foncières totalisant 980 m². Elles sont destinées au prolongement de la piste cyclable Blériot entre Bègles et Villenave-d'Ornon et à des aménagements paysagers ouverts au public. Les frais de cette cession seront pris en charge par Bordeaux Métropole."
+        },
+        "analysis_data.impacts": {
+          "expected": "Les emprises de 980 m² cédées à Bordeaux Métropole sont destinées à une piste cyclable continue entre Bègles et Villenave-d'Ornon et à des aménagements paysagers ouverts au public.",
+          "replacement": "Les deux emprises dont la cession est approuvée totalisent 980 m². Elles sont destinées à la continuité de la piste cyclable Blériot et à des aménagements paysagers ouverts au public ; le document ne répartit pas cette surface entre les deux usages."
+        }
+      },
+      "note": ""
+    },
+    {
+      "id": "D14-2026_104.pdf",
+      "pdf_url": "https://www.mairie-begles.fr/app/uploads/2026/10/D14-2026_104.pdf",
+      "pdf_pages": "2-3",
+      "changes": {
+        "summary": {
+          "expected": "La Ville de Bègles cède à Domofrance une emprise de 10 m² de la parcelle cadastrée AT n° 432, actuellement intégrée au jardin de la résidence Domofrance, pour un euro symbolique. Cette opération vise à régulariser la situation foncière et tous les frais associés seront pris en charge par Domofrance.",
+          "replacement": "Le Conseil municipal approuve la cession à Domofrance, pour un euro symbolique, d'une emprise d'environ 10 m² actuellement intégrée au jardin de sa résidence. Cette cession vise à régulariser la situation foncière. Le Maire est autorisé à signer l'acte et Domofrance prendra en charge les frais associés."
+        },
+        "analysis_data.impacts": {
+          "expected": "La propriété d'une parcelle de 10 m² de terrain est transférée de la Ville de Bègles à Domofrance. Domofrance prendra en charge l'entretien de cet espace vert.",
+          "replacement": "La cession approuvée vise à régulariser l'occupation actuelle d'une emprise d'environ 10 m² par le jardin de la résidence Domofrance."
+        },
+        "budget_note": {
+          "expected": null,
+          "replacement": "Prix de cession ponctuel d'un euro symbolique ; acte de vente autorisé, non attesté comme signé."
+        }
+      },
+      "note": ""
+    },
+    {
+      "id": "D15-2026_105.pdf",
+      "pdf_url": "https://www.mairie-begles.fr/app/uploads/2026/10/D15-2026_105.pdf",
+      "pdf_pages": "2-3",
+      "changes": {
+        "summary": {
+          "expected": "La Ville de Bègles renouvelle pour trois ans la convention de mise à disposition de locaux situés au 21 avenue Jeanne d'Arc à la Fédération des Musulmans de Gironde. L'association versera une redevance mensuelle de 550 euros, révisable annuellement. Cette convention encadre l'utilisation des locaux pour les activités de l'association, notamment l'exercice du culte musulman, dans le respect des principes républicains et des règles de sécurité.",
+          "replacement": "Le Conseil municipal approuve une nouvelle convention de mise à disposition, pour trois ans, de locaux communaux situés avenue Jeanne d'Arc à la Fédération des Musulmans de Gironde. La redevance prévue est de 550 € par mois, révisable chaque année. Le Maire est autorisé à signer la convention."
+        },
+        "analysis_data.impacts": {
+          "expected": "La Fédération des Musulmans de Gironde continue d'utiliser 134 m² de locaux intérieurs et 100 m² d'espace extérieur pour ses activités. La Ville de Bègles percevra une recette annuelle de 6 600 euros.",
+          "replacement": "La Fédération utilise déjà les locaux communaux. La nouvelle convention approuvée prévoit la poursuite de cette occupation, avec une redevance de 550 € par mois à compter de sa prise d'effet."
+        },
+        "budget_note": {
+          "expected": null,
+          "replacement": "Redevance de 550 €/mois, soit 6 600 €/an, révisable ; nouvelle convention approuvée, signature autorisée."
+        }
+      },
+      "note": ""
+    },
+    {
+      "id": "D16-2026_106.pdf",
+      "pdf_url": "https://www.mairie-begles.fr/app/uploads/2026/10/D16-2026_106.pdf",
+      "pdf_pages": "2-4",
+      "changes": {
+        "summary": {
+          "expected": "La Ville de Bègles renouvelle le bail de ses locaux situés au bâtiment n° 23 des Terres Neuves, occupés par le Centre d'Information et d'Orientation (CIO) de Bègles, relevant du Ministère de l'Éducation Nationale. Le nouveau bail, d'une durée de neuf ans (du 1er septembre 2026 au 31 août 2035), fixe un loyer annuel de 34 000 euros, non assujetti à la TVA (Taxe sur la valeur ajoutée). La Ville continuera d'avancer les frais de ménage, qui seront remboursés par l'État. Aucune caution n'est demandée.",
+          "replacement": "Le Conseil municipal approuve le renouvellement du bail des locaux du Centre d'Information et d'Orientation (CIO) de Bègles. Le projet de bail court du 1er septembre 2026 au 31 août 2035 et prévoit un loyer de 34 000 € par an, hors charges récupérables. Le Maire est autorisé à le signer."
+        },
+        "analysis_data.impacts": {
+          "expected": "Le Centre d'Information et d'Orientation (CIO) de Bègles continuera d'opérer dans les mêmes locaux, assurant la continuité de ses services d'information et d'orientation pour les usagers.",
+          "replacement": "Le bail approuvé vise à permettre au Centre d'Information et d'Orientation de Bègles de poursuivre ses activités dans les mêmes locaux. Sa signature est autorisée par la délibération."
+        },
+        "budget_note": {
+          "expected": null,
+          "replacement": "Loyer de 34 000 €/an hors charges récupérables, pour un bail de neuf ans approuvé par le Conseil."
+        }
+      },
+      "note": ""
+    },
+    {
+      "id": "D17-2026_107.pdf",
+      "pdf_url": "https://www.mairie-begles.fr/app/uploads/2026/10/D17-2026_107.pdf",
+      "pdf_pages": "2-3",
+      "changes": {
+        "analysis_data.impacts": {
+          "expected": "Ouverture d'un espace de restauration de 107 m² et d'un local privatif de 46 m² au sein du Chapitô. Mise à disposition d'une terrasse extérieure pour l'activité de restauration. Création d'une offre de restauration (brasserie, salon de thé, café) pour les habitants et usagers du quartier.",
+          "replacement": "La convention approuvée porte sur l'exploitation d'une zone de restauration de 107 m², d'un local privatif de 46 m² et d'une terrasse au Chapitô."
+        },
+        "budget_note": {
+          "expected": null,
+          "replacement": "Flux annuels prévus : 10 200 € de redevance fixe et 172 €/mois de forfait fluides (12 264 € au total), plus 5 % du chiffre d'affaires HT."
+        }
+      },
+      "note": ""
+    },
+    {
+      "id": "D18-2026_108.pdf",
+      "pdf_url": "https://www.mairie-begles.fr/app/uploads/2026/10/D18-2026_108.pdf",
+      "pdf_pages": "2-3",
+      "changes": {
+        "budget_note": {
+          "expected": null,
+          "replacement": "Aide de 40 € par foyer fiscal, limitée aux 30 premiers ménages en 2026, soit 1 200 € au maximum."
+        }
+      },
+      "note": ""
+    },
+    {
+      "id": "D20-2026_110.pdf",
+      "pdf_url": "https://www.mairie-begles.fr/app/uploads/2026/10/D20-2026_110.pdf",
+      "pdf_pages": "2-3",
+      "changes": {
+        "summary": {
+          "expected": "La Ville de Bègles adopte de nouvelles conventions pour la protection sociale complémentaire (santé et prévoyance) de ses agents. Ces conventions, proposées par le Centre de Gestion de la Gironde (CDG33) après un appel d'offres, visent à assurer une couverture continue et améliorée pour les employés municipaux.",
+          "replacement": "Le Conseil municipal adhère à de nouvelles conventions de protection sociale complémentaire pour ses agents, qui prendront effet le 1er janvier 2027. La participation municipale prévue est limitée à 20 € par agent et par mois pour la santé et fixée à 15 € par agent et par mois pour la prévoyance."
+        },
+        "analysis_data.impacts": {
+          "expected": "La ville apportera un soutien financier à la mutuelle santé et à la prévoyance de ses agents. Pour la santé, la contribution sera de 50% du montant de la cotisation de la garantie minimale, majorée de 10 euros par enfant, dans la limite de 20 euros par agent et par mois (gratuité à partir du troisième enfant). Pour la prévoyance, la contribution sera de 15 euros par agent et par mois. Cette mesure vise à renforcer la protection sociale et le pouvoir d'achat des employés municipaux.",
+          "replacement": "À compter du 1er janvier 2027, la Ville participera à la mutuelle santé de ses agents dans la limite de 20 € par agent et par mois, et à leur prévoyance à hauteur de 15 € par agent et par mois, selon les conditions votées."
+        }
+      },
+      "note": ""
+    },
+    {
+      "id": "D22-2026_112.pdf",
+      "pdf_url": "https://www.mairie-begles.fr/app/uploads/2026/10/D22-2026_112.pdf",
+      "pdf_pages": "2-3",
+      "changes": {
+        "summary": {
+          "expected": "La Ville de Bègles sollicite une subvention de 25 211 euros auprès de Bordeaux Métropole pour le projet LIFE-Biodiver'Cité et Résilience (BCR). Ce projet vise à réduire la pollution lumineuse et à préserver la biodiversité en modifiant 174 points lumineux sur le territoire de la commune.",
+          "replacement": "Le Conseil municipal autorise une demande de subvention de 25 211 € auprès de Bordeaux Métropole pour le projet LIFE-BCR. Les interventions sur 174 points lumineux situés à Bègles ont déjà été réalisées afin de réduire la pollution lumineuse ; la délibération ne constate pas le versement de la subvention."
+        },
+        "analysis_data.contexte": {
+          "expected": "Le projet LIFE-Biodiver'Cité et Résilience (BCR), piloté par Bordeaux Métropole, prévoit la modification de 1 500 points lumineux, dont 174 situés à Bègles. Ces travaux visent à réduire l'impact de la pollution lumineuse sur la biodiversité et les habitants par le remplacement d'ampoules et de luminaires, ainsi que l'installation d'éclairages intelligents. Une convention précédente, datant du 1er avril 2025, avait déjà autorisé Bordeaux Métropole à réaliser ces travaux en tant que maître d'ouvrage.",
+          "replacement": "Dans le cadre du projet LIFE-BCR piloté par Bordeaux Métropole, des interventions ont déjà été réalisées sur 1 500 points lumineux, dont 174 à Bègles. La Ville autorise maintenant une demande de subvention de 25 211 € auprès de la Métropole pour contribuer au financement de l'opération."
+        },
+        "analysis_data.impacts": {
+          "expected": "Modification de 174 points lumineux sur le territoire de Bègles, incluant le changement d'ampoules et de luminaires, et la mise en place d'éclairages intelligents.",
+          "replacement": "Des ampoules et des luminaires ont été remplacés et des éclairages intelligents installés sur 174 points lumineux à Bègles, dans le cadre de travaux déjà réalisés."
+        },
+        "budget_note": {
+          "expected": null,
+          "replacement": "Subvention de 25 211 € demandée pour des travaux déjà réalisés ; attribution et versement non attestés."
+        }
+      },
+      "note": ""
+    },
+    {
+      "id": "D23-2026_113.pdf",
+      "pdf_url": "https://www.mairie-begles.fr/app/uploads/2026/10/D23-2026_113.pdf",
+      "pdf_pages": "2,5-6",
+      "changes": {
+        "summary": {
+          "expected": "Le Conseil municipal de Bègles a approuvé une convention de financement avec Bordeaux Métropole, recevant une subvention de 23 792 euros. Ce fonds est destiné à soutenir les projets de plantation d'arbres et d'arbustes pour les années 2024-2025, notamment au Parc des Sœurs de la Charité et à l'école maternelle La Ferrade, dans le cadre du programme \"1 Million d'arbres\".",
+          "replacement": "Le Conseil municipal approuve une convention de financement avec Bordeaux Métropole pour des travaux de plantation réalisés en 2024-2025 au Parc des Sœurs de la Charité et à l'école maternelle La Ferrade. La subvention d'investissement prévue est plafonnée à 23 792 € et son versement dépend de la présentation de justificatifs."
+        },
+        "analysis_data.impacts": {
+          "expected": "Plantation de 495 arbres et arbustes sur deux sites. Renaturation de la cour de l'école maternelle La Ferrade (355 m²) avec création d'îlots de fraîcheur, déminéralisation des pieds d'arbres, installation de mobilier en bois pour les rencontres et pauses, et aménagement de nouvelles zones de jeux avec des revêtements perméables. Aménagement du Parc des Sœurs de la Charité pour créer un parc à forte valeur écologique et pédagogique, incluant la conservation et le renforcement des espaces boisés, l'enrichissement du verger en jardin-forêt nourricier, la mise en place d'un éco-pâturage et la replantation des lisières pour renforcer les continuités écologiques.",
+          "replacement": "La convention concerne des travaux déjà réalisés sur les deux sites et indique que 495 arbres ont été plantés. Elle décrit la renaturation de la cour de l'école maternelle La Ferrade et l'aménagement du Parc des Sœurs de la Charité."
+        },
+        "budget_note": {
+          "expected": null,
+          "replacement": "Subvention d'investissement maximale de 23 792 € pour des travaux de 2024-2025 ; versement après justificatifs, montant final ajustable."
+        }
+      },
+      "note": ""
+    },
+    {
+      "id": "D24-2026_114.pdf",
+      "pdf_url": "https://www.mairie-begles.fr/app/uploads/2026/10/D24-2026_114.pdf",
+      "pdf_pages": "2-3",
+      "changes": {
+        "summary": {
+          "expected": "Le conseil municipal de Bègles a décidé d'annuler une facture de 118,55 € émise à une résidente, Mme EL ASSILY, pour la capture de son chat. L'animal avait été transporté par la SACPA (Société d'Aménagement et de Construction du Pays d'Auge), prestataire de la ville pour la gestion des animaux errants, mais il a été jugé qu'il ne répondait pas aux critères légaux d'un chat en état de divagation, rendant la facturation injustifiée.",
+          "replacement": "Le Conseil municipal décide d'annuler une facture de 118,55 € adressée à une habitante pour le transport de son chat par la SACPA, prestataire chargé des animaux errants. L'animal ne répondait pas aux critères légaux de divagation, ce qui rendait la facturation injustifiée."
+        },
+        "analysis_data.contexte": {
+          "expected": "Le maire de Bègles est responsable de la gestion des animaux errants sur le territoire communal, en vertu de ses pouvoirs de police. La ville a confié la mission de capture et de transport de ces animaux à la SACPA (Société d'Aménagement et de Construction du Pays d'Auge), qui les conduit ensuite à la SPA (Société Protectrice des Animaux) de Mérignac. Dans le cas présent, un chat appartenant à Mme EL ASSILY a été transporté par la SACPA après avoir été déposé chez un vétérinaire. Cependant, il a été constaté que l'animal ne répondait pas aux critères légaux d'un chat errant (il était identifié et se trouvait à moins de 1000 mètres de son domicile), rendant la facturation de 118,55 € injustifiée.",
+          "replacement": "La Ville a confié à la SACPA la capture et le transport des animaux errants. Le chat concerné, identifié et trouvé à moins de 1 000 mètres du domicile de sa propriétaire, ne remplissait pas les critères légaux d'errance. Le Conseil décide donc une remise gracieuse de la facture de 118,55 €."
+        },
+        "budget_note": {
+          "expected": null,
+          "replacement": "Annulation ponctuelle d'une créance de 118,55 € jugée injustifiée."
+        }
+      },
+      "note": ""
+    },
+    {
+      "id": "D25-2026_115.pdf",
+      "pdf_url": "https://www.mairie-begles.fr/app/uploads/2026/10/D25-2026_115.pdf",
+      "pdf_pages": "2",
+      "changes": {},
+      "note": "Aucune correction site requise ; corriger seulement la formulation newsletter."
+    },
+    {
+      "id": "D26-2026_116.pdf",
+      "pdf_url": "https://www.mairie-begles.fr/app/uploads/2026/10/D26-2026_116.pdf",
+      "pdf_pages": "2-3",
+      "changes": {
+        "budget_note": {
+          "expected": null,
+          "replacement": "Régularisation comptable en 2026 de 31 247,48 € de créances anciennes non recouvrées, sans nouveau décaissement de ce montant."
+        }
+      },
+      "note": ""
+    },
+    {
+      "id": "D27-2026_117.pdf",
+      "pdf_url": "https://www.mairie-begles.fr/app/uploads/2026/10/D27-2026_117.pdf",
+      "pdf_pages": "2-3",
+      "changes": {
+        "budget_note": {
+          "expected": null,
+          "replacement": "Charge comptable ponctuelle de 2 221,08 € liée à des travaux d'urgence réalisés en 2016-2017 et non recouvrés."
+        }
+      },
+      "note": ""
+    },
+    {
+      "id": "D28-2026_118.pdf",
+      "pdf_url": "https://www.mairie-begles.fr/app/uploads/2026/10/D28-2026_118.pdf",
+      "pdf_pages": "2-3",
+      "changes": {
+        "budget_note": {
+          "expected": null,
+          "replacement": "Recette comptable ponctuelle de 865,08 € correspondant à des retenues de garantie non restituées ; titre autorisé."
+        }
+      },
+      "note": ""
+    }
+  ],
+  "source_snapshot_generated_at": "2026-10-02T22:20:36Z"
+}

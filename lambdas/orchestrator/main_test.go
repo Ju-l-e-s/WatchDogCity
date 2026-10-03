@@ -19,6 +19,7 @@ import (
 type mockDDB struct {
 	getItemFn   func(ctx context.Context, in *dynamodb.GetItemInput, opts ...func(*dynamodb.Options)) (*dynamodb.GetItemOutput, error)
 	updateCount int
+	updates     []*dynamodb.UpdateItemInput
 }
 
 func (m *mockDDB) GetItem(ctx context.Context, in *dynamodb.GetItemInput, opts ...func(*dynamodb.Options)) (*dynamodb.GetItemOutput, error) {
@@ -27,7 +28,73 @@ func (m *mockDDB) GetItem(ctx context.Context, in *dynamodb.GetItemInput, opts .
 
 func (m *mockDDB) UpdateItem(ctx context.Context, in *dynamodb.UpdateItemInput, opts ...func(*dynamodb.Options)) (*dynamodb.UpdateItemOutput, error) {
 	m.updateCount++
+	m.updates = append(m.updates, in)
 	return &dynamodb.UpdateItemOutput{}, nil
+}
+
+func TestExpectedPDFIDsRejectsFilenameCollision(t *testing.T) {
+	ids, err := expectedPDFIDs([]PDFItem{
+		{URL: "https://example.test/a/D02.pdf"},
+		{URL: "https://example.test/a/D01.pdf"},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, []string{"D01.pdf", "D02.pdf"}, ids)
+	_, err = expectedPDFIDs([]PDFItem{
+		{URL: "https://example.test/a/D01.pdf"},
+		{URL: "https://example.test/b/D01.pdf"},
+	})
+	require.Error(t, err)
+}
+
+func TestProcessedCouncilCorrectsReliableSessionDate(t *testing.T) {
+	db := &mockDDB{getItemFn: func(_ context.Context, in *dynamodb.GetItemInput, _ ...func(*dynamodb.Options)) (*dynamodb.GetItemOutput, error) {
+		if in.Key["council_id"].(*types.AttributeValueMemberS).Value == "metadata#next_council" {
+			return &dynamodb.GetItemOutput{}, nil
+		}
+		return &dynamodb.GetItemOutput{Item: map[string]types.AttributeValue{
+			"processed_pdfs": &types.AttributeValueMemberN{Value: "2"},
+			"total_pdfs":     &types.AttributeValueMemberN{Value: "2"},
+		}}, nil
+	}}
+	o := &orchestrator{
+		ddb: db, scraper: &mockScraper{councils: []CouncilListing{{
+			CouncilID: "c1", Date: "2025-12-16", Title: "Conseil du 16 décembre 2025",
+			Summary: "Publié le 18 décembre", DateFromTitle: true,
+		}}}, councilsTable: "councils",
+	}
+	require.NoError(t, o.handle(context.Background(), OrchestratorEvent{}))
+	require.Len(t, db.updates, 1)
+	assert.Contains(t, *db.updates[0].UpdateExpression, "#date = :d")
+	assert.Equal(t, "2025-12-16", db.updates[0].ExpressionAttributeValues[":d"].(*types.AttributeValueMemberS).Value)
+}
+
+func TestProcessedCouncilDetectsMunicipalityPDFDrift(t *testing.T) {
+	db := &mockDDB{getItemFn: func(_ context.Context, in *dynamodb.GetItemInput, _ ...func(*dynamodb.Options)) (*dynamodb.GetItemOutput, error) {
+		if in.Key["council_id"].(*types.AttributeValueMemberS).Value == "metadata#next_council" {
+			return &dynamodb.GetItemOutput{}, nil
+		}
+		return &dynamodb.GetItemOutput{Item: map[string]types.AttributeValue{
+			"processed_pdfs": &types.AttributeValueMemberN{Value: "2"},
+			"total_pdfs":     &types.AttributeValueMemberN{Value: "2"},
+			"expected_pdf_ids": &types.AttributeValueMemberL{Value: []types.AttributeValue{
+				&types.AttributeValueMemberS{Value: "D01.pdf"},
+				&types.AttributeValueMemberS{Value: "D02.pdf"},
+			}},
+		}}, nil
+	}}
+	url := "https://example.test/c1"
+	o := &orchestrator{
+		ddb: db, councilsTable: "councils", scraper: &mockScraper{
+			councils: []CouncilListing{{CouncilID: "c1", URL: url}},
+			pdfs: map[string][]PDFItem{url: {
+				{URL: "https://example.test/D01.pdf"},
+				{URL: "https://example.test/D03.pdf"},
+			}},
+		},
+	}
+	err := o.handle(context.Background(), OrchestratorEvent{})
+	require.ErrorContains(t, err, "1 council(s) failed")
+	assert.Empty(t, db.updates, "source drift must not silently update an approved council")
 }
 
 func (m *mockDDB) PutItem(ctx context.Context, in *dynamodb.PutItemInput, opts ...func(*dynamodb.Options)) (*dynamodb.PutItemOutput, error) {
@@ -84,7 +151,7 @@ func TestBuildCouncilUpdateInput_FirstDiscovery(t *testing.T) {
 		Summary:   "Ordre du jour résumé",
 	}
 
-	in := buildCouncilUpdateInput("councils-test", c, 4, 0, now)
+	in := buildCouncilUpdateInput("councils-test", c, []string{"D01.pdf", "D02.pdf", "D03.pdf", "D04.pdf"}, 0, now)
 
 	require.NotNil(t, in.TableName)
 	assert.Equal(t, "councils-test", *in.TableName)
@@ -96,6 +163,7 @@ func TestBuildCouncilUpdateInput_FirstDiscovery(t *testing.T) {
 		"created_at must never be overwritten")
 	assert.Contains(t, expr, "total_pdfs = :tp",
 		"total_pdfs must follow the live scrape value")
+	assert.Contains(t, expr, "expected_pdf_ids = :ids")
 	assert.Contains(t, expr, "#date = :d", "'date' is reserved and must be aliased")
 	assert.Equal(t, "date", in.ExpressionAttributeNames["#date"])
 
@@ -103,6 +171,7 @@ func TestBuildCouncilUpdateInput_FirstDiscovery(t *testing.T) {
 		in.Key["council_id"].(*types.AttributeValueMemberS).Value)
 	assert.Equal(t, "0", in.ExpressionAttributeValues[":pp"].(*types.AttributeValueMemberN).Value)
 	assert.Equal(t, "4", in.ExpressionAttributeValues[":tp"].(*types.AttributeValueMemberN).Value)
+	assert.Len(t, in.ExpressionAttributeValues[":ids"].(*types.AttributeValueMemberL).Value, 4)
 	assert.Equal(t, now.Format(time.RFC3339),
 		in.ExpressionAttributeValues[":ca"].(*types.AttributeValueMemberS).Value)
 	assert.Equal(t, c.Title, in.ExpressionAttributeValues[":t"].(*types.AttributeValueMemberS).Value)
@@ -121,7 +190,7 @@ func TestBuildCouncilUpdateInput_RescanPreservesCounter(t *testing.T) {
 	in := buildCouncilUpdateInput(
 		"councils-test",
 		CouncilListing{CouncilID: "council-rescan"},
-		5,
+		[]string{"a", "b", "c", "d", "e"},
 		3,
 		time.Date(2026, 5, 19, 18, 0, 0, 0, time.UTC),
 	)
@@ -141,7 +210,7 @@ func TestBuildCouncilUpdateInput_AllowsShrinkingTotal(t *testing.T) {
 	in := buildCouncilUpdateInput(
 		"councils-test",
 		CouncilListing{CouncilID: "council-shrink"},
-		2,
+		[]string{"a", "b"},
 		3,
 		time.Now(),
 	)

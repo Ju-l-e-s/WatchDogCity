@@ -263,43 +263,19 @@ function formatBudget(val) {
 }
 
 function renderCouncilFinanceCard(deliberations) {
-    const groups = new Map();
-    const types = {
-        'DÉPENSE': 'Dépenses',
-        'RECETTE': 'Recettes',
-        'CAUTION': 'Cautions',
-    };
-    let count = 0;
-    for (const d of deliberations) {
-        const amount = Number(d.budget_impact);
-        if (!Number.isFinite(amount) || amount <= 0) continue;
-        count++;
-        const type = types[d.budget_type] || 'Nature non renseignée';
-        const topic = d.topic_tag || 'Autres';
-        if (!groups.has(type)) groups.set(type, { total: 0, topics: new Map() });
-        const group = groups.get(type);
-        group.total += amount;
-        group.topics.set(topic, (group.topics.get(topic) || 0) + amount);
+    const financial = deliberations.filter(d => Number.isFinite(Number(d.budget_impact)) && Number(d.budget_impact) > 0);
+    const count = financial.length;
+    if (!count) {
+        return '<div class="analysis-card bg-slate-50/50 border border-slate-100 rounded-2xl p-6"><span class="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">💰 Impact financier</span><div class="text-sm text-slate-600">Aucun montant chiffré dans les délibérations publiées.</div></div>';
     }
-
-    let details = '';
-    for (const type of ['Dépenses', 'Recettes', 'Cautions', 'Nature non renseignée']) {
-        const group = groups.get(type);
-        if (!group) continue;
-        const topics = [...group.topics.entries()].sort((a, b) => b[1] - a[1]);
-        const bar = topics.map(([topic, amount]) => {
-            const pct = amount / group.total * 100;
-            const label = escapeHTML(topic).replace(/"/g, '&quot;');
-            return `<div style="width:${pct.toFixed(2)}%;background:${COLORS[topic] || COLORS.Autres}" title="${label} : ${formatBudget(amount)}"><span class="sr-only">${label} : ${pct.toFixed(1)} %</span></div>`;
-        }).join('');
-        const legend = topics.map(([topic, amount]) => {
-            const pct = amount / group.total * 100;
-            return `<div class="flex items-center gap-2"><span class="mr-1" style="width:10px;height:10px;border-radius:2px;background:${COLORS[topic] || COLORS.Autres}"></span><span>${pct.toFixed(1)} % ${escapeHTML(topic)} · ${formatBudget(amount)}</span></div>`;
-        }).join('');
-        details += `<div class="mt-5 first:mt-0"><div class="text-xs font-bold text-slate-500 uppercase tracking-wider">${type}</div><div class="text-2xl font-black text-slate-900">${formatBudget(group.total)}</div><div class="flex rounded-full overflow-hidden mt-3 bg-slate-100" style="height:10px" role="img" aria-label="Répartition des montants ${type.toLowerCase()} par thème">${bar}</div><div class="flex flex-wrap mt-3 text-xs font-bold text-slate-500 leading-none" style="gap:20px;row-gap:12px">${legend}</div></div>`;
-    }
-
-    return `<div class="analysis-card bg-slate-50/50 border border-slate-100 rounded-2xl p-6"><span class="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">💰 Montants financiers cités</span>${count ? `${details}<p class="text-xs text-slate-500 mt-5">${count} délibération${count > 1 ? 's' : ''} chiffrée${count > 1 ? 's' : ''}. Les montants sont regroupés par nature et par thème. Une même opération peut figurer dans plusieurs décisions : ces sommes ne sont pas un budget de séance.</p>` : '<div class="text-sm text-slate-600">Aucun montant chiffré dans les délibérations publiées.</div>'}</div>`;
+    const byTopic = new Map();
+    financial.forEach(d => byTopic.set(d.topic_tag || 'Autres', (byTopic.get(d.topic_tag || 'Autres') || 0) + 1));
+    const topics = [...byTopic.entries()].sort((a, b) => b[1] - a[1]);
+    const bar = topics.map(([topic, n]) => `<div style="width:${(n / count * 100).toFixed(2)}%;background:${COLORS[topic] || COLORS.Autres}"><span class="sr-only">${escapeHTML(topic)} : ${n} décision${n > 1 ? 's' : ''}</span></div>`).join('');
+    const legend = topics.map(([topic, n]) => `<div class="flex items-center gap-2"><span class="mr-1" style="width:10px;height:10px;border-radius:2px;background:${COLORS[topic] || COLORS.Autres}"></span><span>${n} ${escapeHTML(topic)}</span></div>`).join('');
+    const types = { 'DÉPENSE': 'Dépense', 'RECETTE': 'Recette', 'CAUTION': 'Caution' };
+    const amounts = financial.map(d => `<li class="py-2 border-b border-slate-100 last:border-0"><span class="font-semibold text-slate-900">${formatBudget(d.budget_impact)}</span> <span class="text-slate-500">${types[d.budget_type] || 'Montant mentionné'} · ${escapeHTML(d.title)}</span>${d.budget_note ? `<span class="block text-slate-500">${escapeHTML(d.budget_note)}</span>` : ''}</li>`).join('');
+    return `<div class="analysis-card bg-slate-50/50 border border-slate-100 rounded-2xl p-6"><span class="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">💰 Impact financier</span><div class="text-2xl font-black text-slate-900">${count} décision${count > 1 ? 's' : ''} chiffrée${count > 1 ? 's' : ''}</div><div class="text-xs text-slate-500 mt-1">Répartition des décisions chiffrées par thème</div><div class="flex rounded-full overflow-hidden mt-5 bg-slate-100" style="height:10px" role="img" aria-label="Répartition des décisions chiffrées par thème">${bar}</div><div class="flex flex-wrap mt-4 text-xs font-bold text-slate-500 leading-none" style="gap:20px;row-gap:12px">${legend}</div><details class="mt-5 text-sm text-slate-600"><summary class="cursor-pointer font-semibold">Voir les montants de chaque décision</summary><ul class="mt-3">${amounts}</ul></details><p class="text-xs text-slate-500 mt-4">Les montants ponctuels, annuels, conditionnels et les garanties ne forment pas un budget de séance. Leur période et leurs conditions figurent dans chaque délibération.</p></div>`;
 }
 
 // ── Topic Filter Dropdown ──
@@ -648,6 +624,7 @@ function renderDeliberationRow(e) {
                         <span>${formatBudget(e.budget_impact)}</span>
                         ${typeHtml}
                     </div>
+                    ${e.budget_note ? `<p class="text-xs text-slate-600 mt-2">${escapeHTML(e.budget_note)}</p>` : ''}
                 </div>
             `;
         }

@@ -3,6 +3,7 @@ package shared
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -14,15 +15,15 @@ import (
 
 // ── Sensory-deprived deliberation view ───────────────────────────────────────
 
-// ColdDeliberation is the whitelist of fields the newsletter-generation LLM
-// may see. Prose fields (Summary, AnalysisData.*) are deliberately absent:
-// every sentence the model writes must be deducible from these structured
-// facts alone. Never add prose fields here.
+// ColdDeliberation is the whitelist of facts the newsletter-generation LLM
+// may see. Summary and Impacts have already passed the PDF fact check.
 type ColdDeliberation struct {
+	ID              string // source PDF identifier, stable within the council
 	Title           string // verbatim factual identifier; may be lightly cleaned, NO new facts
 	TopicTag        string // enum
 	BudgetImpact    int64
 	BudgetType      string // enum
+	BudgetNote      string // source-grounded period, components and conditions
 	HasVote         bool
 	Pour            *int
 	Contre          *int
@@ -31,6 +32,7 @@ type ColdDeliberation struct {
 	IsSubstantial   bool
 	HasDisagreement bool   // derived from Disagreements != nil && != ""; pass the bool, not the prose
 	Summary         string // Factual summary from worker
+	Decision        string // What the council actually approved or authorized
 	Impacts         string // Factual citizen impacts from worker
 }
 
@@ -43,6 +45,7 @@ type GeminiDeps struct {
 // ── Newsletter param types (exact Brevo template schema) ──────────────────────
 
 type NewsletterParams struct {
+	FactCheckVersion     int           `json:"fact_check_version"`
 	EmailSubject         string        `json:"email_subject"`
 	CouncilTitle         string        `json:"council_title"`
 	CouncilDate          string        `json:"council_date"`
@@ -63,6 +66,7 @@ type NewsletterParams struct {
 }
 
 type TensionItem struct {
+	SourceID    string `json:"source_id"`
 	Title       string `json:"title"`
 	Context     string `json:"context"`
 	Impact      string `json:"impact"`
@@ -72,6 +76,7 @@ type TensionItem struct {
 }
 
 type AdoptedItem struct {
+	SourceID  string `json:"source_id"`
 	Tag       string `json:"tag"`
 	Title     string `json:"title"`
 	Context   string `json:"context"`
@@ -81,8 +86,9 @@ type AdoptedItem struct {
 }
 
 type BriefItem struct {
-	Tag     string `json:"tag"`
-	Summary string `json:"summary"`
+	SourceID string `json:"source_id"`
+	Tag      string `json:"tag"`
+	Summary  string `json:"summary"`
 }
 
 // ── Hardcoded site constants ───────────────────────────────────────────────────
@@ -225,6 +231,7 @@ var newsletterSchema = &genai.Schema{
 			Items: &genai.Schema{
 				Type: genai.TypeObject,
 				Properties: map[string]*genai.Schema{
+					"source_id":    {Type: genai.TypeString},
 					"title":        {Type: genai.TypeString},
 					"context":      {Type: genai.TypeString},
 					"impact":       {Type: genai.TypeString},
@@ -232,8 +239,8 @@ var newsletterSchema = &genai.Schema{
 					"has_budget":   {Type: genai.TypeBoolean},
 					"vote_details": {Type: genai.TypeString},
 				},
-				PropertyOrdering: []string{"title", "context", "impact", "budget", "has_budget", "vote_details"},
-				Required:         []string{"title", "context", "impact"},
+				PropertyOrdering: []string{"source_id", "title", "context", "impact", "budget", "has_budget", "vote_details"},
+				Required:         []string{"source_id", "title", "context", "impact"},
 			},
 		},
 		"adopted": {
@@ -241,6 +248,7 @@ var newsletterSchema = &genai.Schema{
 			Items: &genai.Schema{
 				Type: genai.TypeObject,
 				Properties: map[string]*genai.Schema{
+					"source_id":  {Type: genai.TypeString},
 					"tag":        {Type: genai.TypeString, Format: "enum", Enum: TopicTags},
 					"title":      {Type: genai.TypeString},
 					"context":    {Type: genai.TypeString},
@@ -248,8 +256,8 @@ var newsletterSchema = &genai.Schema{
 					"budget":     {Type: genai.TypeString},
 					"has_budget": {Type: genai.TypeBoolean},
 				},
-				PropertyOrdering: []string{"tag", "title", "context", "impact", "budget", "has_budget"},
-				Required:         []string{"tag", "title", "context", "impact"},
+				PropertyOrdering: []string{"source_id", "tag", "title", "context", "impact", "budget", "has_budget"},
+				Required:         []string{"source_id", "tag", "title", "context", "impact"},
 			},
 		},
 		"briefs": {
@@ -257,11 +265,12 @@ var newsletterSchema = &genai.Schema{
 			Items: &genai.Schema{
 				Type: genai.TypeObject,
 				Properties: map[string]*genai.Schema{
-					"tag":     {Type: genai.TypeString, Format: "enum", Enum: TopicTags},
-					"summary": {Type: genai.TypeString},
+					"source_id": {Type: genai.TypeString},
+					"tag":       {Type: genai.TypeString, Format: "enum", Enum: TopicTags},
+					"summary":   {Type: genai.TypeString},
 				},
-				PropertyOrdering: []string{"tag", "summary"},
-				Required:         []string{"tag", "summary"},
+				PropertyOrdering: []string{"source_id", "tag", "summary"},
+				Required:         []string{"source_id", "tag", "summary"},
 			},
 		},
 		"next_meeting":   {Type: genai.TypeString},
@@ -315,6 +324,7 @@ func buildColdNewsletterPrompt(
   "total_delibs_in_council": 0,
   "tensions": [
     {
+      "source_id": "copie exacte de l'ID de la délibération fournie",
       "title": "Reformulation neutre et factuelle du titre fourni ; pas d'accroche, pas d'adjectif évaluatif",
       "context": "Neutre en 2 à 3 phrases maximum. Explique le besoin et le contexte en te basant sur le titre et le résumé (Résumé) fournis ci-dessous. Ne rajoute rien.",
       "impact": "Explique l'impact pratique et concret pour les habitants en 2 à 3 phrases maximum, en te basant sur le champ 'Impact' fourni. Reste factuel. Si le champ 'Impact' d'origine vaut 'Néant' ou est vide, laisse ce champ vide.",
@@ -325,6 +335,7 @@ func buildColdNewsletterPrompt(
   ],
   "adopted": [
     {
+      "source_id": "copie exacte de l'ID de la délibération fournie",
       "tag": "Administration, Sport, Budget, Sécurité, Environnement, Mobilité, Social, Culture, Urbanisme ou Éducation",
       "title": "Titre vulgarisé",
       "context": "2 à 3 phrases maximum. Explication factuelle du besoin en te basant sur le titre et le résumé (Résumé) fournis ci-dessous.",
@@ -335,6 +346,7 @@ func buildColdNewsletterPrompt(
   ],
   "briefs": [
     {
+      "source_id": "copie exacte de l'ID de la délibération fournie",
       "tag": "Catégorie exacte",
       "summary": "Résumé ultra-court (1 à 2 phrases). Factuel, neutre. Déduis uniquement des faits structurés."
     }
@@ -347,7 +359,8 @@ func buildColdNewsletterPrompt(
 
 	sb.WriteString("\n\nCONSIGNES ÉDITORIALES ET LOGIQUES :\n")
 	sb.WriteString("- PRIORITÉ ABSOLUE : Toute délibération avec des votes contre DOIT figurer dans 'tensions'. Une abstention seule peut y figurer seulement si un désaccord est explicitement documenté. Une abstention ne prouve pas qu'un débat a eu lieu.\n")
-	sb.WriteString("- ORDRE DES DÉCISIONS ADOPTÉES : Classe d'abord les décisions aux conséquences concrètes les plus larges pour les habitants. Si le VOTE DES TAUX d'imposition est présent, place-le en premier. Les deux premières décisions alimentent l'introduction : choisis des décisions distinctes et rédige leur première phrase de contexte de façon courte, précise et autonome.\n")
+	sb.WriteString("- TRAÇABILITÉ : Copie l'ID source de chaque délibération dans source_id. Une délibération ne doit apparaître qu'une seule fois entre les trois sections. N'invente ni ID, ni décision, ni montant.\n")
+	sb.WriteString("- ORDRE DES DÉCISIONS ADOPTÉES : Classe d'abord les décisions aux conséquences concrètes les plus larges pour les habitants. Si le VOTE DES TAUX d'imposition est présent, place-le en premier. Les deux premières décisions alimentent l'introduction : choisis des décisions distinctes. Leur première phrase de contexte doit commencer par l'acteur ('Le conseil municipal', 'La ville') et le verbe de sa décision ('approuve', 'attribue', 'autorise', 'adopte'), puis nommer l'objet sans pronom qui renvoie à une phrase précédente. Place l'explication du contexte après cette phrase.\n")
 	sb.WriteString("- HIÉRARCHISATION DES BUDGETS : Les délibérations adoptées avec les plus gros budgets (notamment les budgets supplémentaires, Comptes Financiers Uniques (CFU), Comptes Administratifs, etc.) DOIVENT figurer en priorité dans la section 'adopted' avec leurs détails, et non pas dans les simples résumés ('briefs').\n")
 	sb.WriteString("- VULGARISATION INDEMNITÉS : Pour les indemnités des élus, explique simplement : 'Le conseil définit légalement la rémunération des élus pour leur travail, selon un barème national basé sur la taille de la ville'.\n")
 	sb.WriteString("- INTERDICTION ABSOLUE DU JARGON COMPTABLE ET LÉGAL : Bannis tout vocabulaire administratif, technocratique ou juridique brut. Pas de codes d'imputation (ex: Chapitres budgétaires, articles comptables). Ne cite pas d'articles de loi bruts, utilise plutôt 'Conformément à la loi...'. Vulgarise systématiquement tous les acronymes ou termes techniques entre parenthèses lors de leur première apparition (ex: écrire 'CFU (le bilan financier de l'année passée)', 'CCAS (l'organisme d'action sociale de la ville)', 'AP/CP (la programmation pluriannuelle des investissements)', 'TPE (la taxe sur la publicité extérieure)', 'ZAC (zone d'aménagement concerté)', 'DSP (délégation de service public)').\n")
@@ -359,6 +372,10 @@ func buildColdNewsletterPrompt(
 	sb.WriteString("- ANCRAGE STRICT : N'ajoute AUCUNE information qui n'est pas présente dans les données structurées d'entrée. Zéro fait géographique, historique ou éditorial externe.\n")
 	sb.WriteString("- PARTS ET SOUS-ENSEMBLES : Si un projet comprend plusieurs catégories (par exemple logements sociaux et logements intermédiaires), conserve les quantités de chaque catégorie ; ne présente jamais l'ensemble comme appartenant à une seule catégorie.\n")
 	sb.WriteString("- PORTÉE DES CHIFFRES : Un total (par exemple une surface de terrains cédés pour une piste cyclable et des espaces paysagers) ne décrit pas automatiquement la taille de chacune de ses composantes. N'attribue une quantité à une composante que si les champs d'entrée l'indiquent explicitement et sans contradiction.\n")
+	sb.WriteString("- MONTANTS RÉCURRENTS : Si une recette ou une dépense est annuelle ou mensuelle, indique explicitement sa période dans le contexte de la décision. Si une recette comporte une part fixe et une part variable, explique cette distinction ; ne présente pas le montant de base comme le total définitif.\n")
+	sb.WriteString("- STADE DES FAITS : Distingue un projet, une demande, une autorisation du conseil, une convention signée, un paiement reçu et des travaux réalisés. Un vote qui autorise une vente ou une signature ne prouve pas que l'acte est signé ; une subvention approuvée ne prouve pas qu'elle est versée. Ne transforme pas une finalité ('pour maintenir 64 places') en résultat acquis.\n")
+	sb.WriteString("- FORMULATION DU STADE : Si le Conseil a seulement approuvé une cession, un projet de bail ou une convention et autorisé sa signature, écris 'le conseil approuve la cession/le projet de bail/la convention' ou 'les terrains dont la cession est approuvée'. Conserve le mot 'projet' si la source l'emploie. N'écris pas 'terrains cédés', 'le bail est renouvelé' ou 'la convention est signée/reconduite' sans preuve de réalisation dans la source. Applique cette règle aussi aux brefs.\n")
+	sb.WriteString("- CHRONOLOGIE : Conserve les dates d'effet et les périodes indiquées dans la source. Des travaux décrits comme déjà réalisés ne doivent jamais être annoncés au futur. Évite le futur affirmatif pour un projet simplement prévu ou autorisé.\n")
 	sb.WriteString("- INTERDICTION FORMELLE : N'ajoute JAMAIS de liens HTML ou de texte 'En savoir plus' dans les champs context ou impact.\n")
 	sb.WriteString("- CATÉGORISATION STRICTE : Police et Vidéoprotection → Sécurité. Clubs sportifs → Sport.\n")
 	sb.WriteString("- AFFICHAGE CONDITIONNEL : Ne mentionne pas de budget ('0 €') si l'impact est nul. Laisse le champ budget vide.\n")
@@ -419,9 +436,9 @@ func buildColdNewsletterPrompt(
 		if d.Pour != nil {
 			pour = *d.Pour
 		}
-		fmt.Fprintf(&sb, "- Titre: %s\n  Tag: %s | Budget: %d€ | Type: %s | Vote: %d/%d/%d (pour/contre/abst)\n  Résumé: %s\n  Impact: %s\n\n",
-			d.Title, d.TopicTag, d.BudgetImpact, d.BudgetType,
-			pour, contre, abst, d.Summary, d.Impacts)
+		fmt.Fprintf(&sb, "- ID: %s\n  Titre: %s\n  Tag: %s | Budget: %d€ | Type: %s | Note financière: %s | Vote: %d/%d/%d (pour/contre/abst)\n  Décision votée: %s\n  Résumé: %s\n  Impact: %s\n\n",
+			d.ID, d.Title, d.TopicTag, d.BudgetImpact, d.BudgetType, d.BudgetNote,
+			pour, contre, abst, d.Decision, d.Summary, d.Impacts)
 	}
 	if len(tensions) == 0 {
 		sb.WriteString("(néant)\n")
@@ -430,8 +447,8 @@ func buildColdNewsletterPrompt(
 	sb.WriteString("\nDÉLIBÉRATIONS ADOPTÉES SIGNIFICATIVES (A FILTRER POUR adopted[] et briefs[]) :\n")
 	significant := append(major, local...)
 	for _, d := range significant {
-		fmt.Fprintf(&sb, "- Titre: %s\n  Tag: %s | Budget: %d€ | Type: %s\n  Résumé: %s\n  Impact: %s\n\n",
-			d.Title, d.TopicTag, d.BudgetImpact, d.BudgetType, d.Summary, d.Impacts)
+		fmt.Fprintf(&sb, "- ID: %s\n  Titre: %s\n  Tag: %s | Budget: %d€ | Type: %s | Note financière: %s\n  Décision votée: %s\n  Résumé: %s\n  Impact: %s\n\n",
+			d.ID, d.Title, d.TopicTag, d.BudgetImpact, d.BudgetType, d.BudgetNote, d.Decision, d.Summary, d.Impacts)
 	}
 	if len(significant) == 0 {
 		sb.WriteString("(néant)\n")
@@ -465,40 +482,94 @@ func GenerateNewsletterParams(
 		return nil, fmt.Errorf("create gemini client: %w", err)
 	}
 
-	resp, err := CallGeminiWithRetry(ctx, func(ctx context.Context) (*genai.GenerateContentResponse, error) {
-		return client.Models.GenerateContent(
-			ctx,
-			deps.Model,
-			[]*genai.Content{{
-				Role:  "user",
-				Parts: []*genai.Part{{Text: prompt}},
-			}},
-			&genai.GenerateContentConfig{
-				Temperature:      ptrFloat32(0),
-				ResponseMIMEType: "application/json",
-				ResponseSchema:   newsletterSchema,
-				// A full council can include dozens of selected items plus model
-				// reasoning tokens. An 8192-token cap intermittently truncated JSON.
-				MaxOutputTokens: 32768,
-			},
-		)
-	}, 4)
-	if err != nil {
-		return nil, fmt.Errorf("gemini generate: %w", err)
+	for attempt := 0; attempt < 3; attempt++ {
+		resp, err := CallGeminiWithRetry(ctx, func(ctx context.Context) (*genai.GenerateContentResponse, error) {
+			return client.Models.GenerateContent(
+				ctx,
+				deps.Model,
+				[]*genai.Content{{
+					Role:  "user",
+					Parts: []*genai.Part{{Text: prompt}},
+				}},
+				&genai.GenerateContentConfig{
+					Temperature:      ptrFloat32(0),
+					ResponseMIMEType: "application/json",
+					ResponseSchema:   newsletterSchema,
+					// A full council can include dozens of selected items plus model
+					// reasoning tokens. An 8192-token cap intermittently truncated JSON.
+					MaxOutputTokens: 32768,
+				},
+			)
+		}, 4)
+		if err != nil {
+			return nil, fmt.Errorf("gemini generate: %w", err)
+		}
+		if len(resp.Candidates) == 0 || resp.Candidates[0].Content == nil || len(resp.Candidates[0].Content.Parts) == 0 {
+			return nil, fmt.Errorf("gemini returned empty response")
+		}
+		params, err := ParseNewsletterParams(resp.Candidates[0].Content.Parts[0].Text)
+		if err == nil {
+			err = validateNewsletterSourceLinks(params, cold)
+		}
+		if err == nil {
+			err = validateNewsletterIntro(params)
+		}
+		if err == nil {
+			finalizeNewsletterParams(params, councilDate, cold, stats, nextMeeting, totalCouncils, totalDelibs)
+			err = VerifyNewsletterFacts(ctx, deps, cold, params)
+		}
+		if err == nil {
+			params.FactCheckVersion = 1
+			return params, nil
+		}
+		var factErr *NewsletterFactCheckError
+		if attempt == 2 || !errors.As(err, &factErr) || len(factErr.Issues) == 0 {
+			return nil, err
+		}
+		// A content error can be repaired once with precise feedback. Every
+		// candidate still passes the same source-link and fact-check gates.
+		var feedback strings.Builder
+		feedback.WriteString("\n\nCORRECTIONS OBLIGATOIRES AVANT PUBLICATION :\n")
+		for i, issue := range factErr.Issues {
+			if i == 6 {
+				break
+			}
+			fmt.Fprintf(&feedback, "- %s : %s — %s\n", issue.Location, issue.Claim, issue.Reason)
+		}
+		feedback.WriteString("Réécris la newsletter depuis les données sources et corrige toutes ces affirmations. Conserve les identifiants source.\n")
+		prompt += feedback.String()
 	}
-	if len(resp.Candidates) == 0 ||
-		resp.Candidates[0].Content == nil ||
-		len(resp.Candidates[0].Content.Parts) == 0 {
-		return nil, fmt.Errorf("gemini returned empty response")
-	}
+	return nil, fmt.Errorf("newsletter generation exhausted fact-check attempts")
+}
 
-	raw := resp.Candidates[0].Content.Parts[0].Text
-	params, err := ParseNewsletterParams(raw)
-	if err != nil {
-		return nil, err
+// The introduction is assembled from the first sentence of the first two
+// adopted items. Require those sentences to name the decision and its actor,
+// so a background sentence cannot become the newsletter's headline.
+func validateNewsletterIntro(params *NewsletterParams) error {
+	for i, item := range params.Adopted {
+		if i == 2 {
+			break
+		}
+		first := strings.TrimSpace(strings.SplitN(item.Context, ". ", 2)[0])
+		lower := strings.ToLower(first)
+		actor := strings.HasPrefix(lower, "le conseil ") || strings.HasPrefix(lower, "la ville ") ||
+			strings.HasPrefix(lower, "le maire ") || strings.HasPrefix(lower, "une subvention ") ||
+			strings.HasPrefix(lower, "un financement ")
+		action := strings.Contains(lower, "approuv") || strings.Contains(lower, "attribu") ||
+			strings.Contains(lower, "accord") || strings.Contains(lower, "autoris") ||
+			strings.Contains(lower, "décid") || strings.Contains(lower, "adopt") ||
+			strings.Contains(lower, "vote") || strings.Contains(lower, "met en place") ||
+			strings.Contains(lower, "cré") || strings.Contains(lower, "lanc") ||
+			strings.Contains(lower, "financ") || strings.Contains(lower, "instaur") ||
+			strings.Contains(lower, "fixe")
+		if !actor || !action {
+			return &NewsletterFactCheckError{Issues: []NewsletterFactIssue{{
+				Location: fmt.Sprintf("adopted[%d].context", i), Claim: first,
+				Reason: "La première phrase doit commencer par une décision autonome du conseil ou de la ville, avec son acteur et son action ; place le contexte ensuite.",
+			}}}
+		}
 	}
-	finalizeNewsletterParams(params, councilDate, cold, stats, nextMeeting, totalCouncils, totalDelibs)
-	return params, nil
+	return nil
 }
 
 // finalizeNewsletterParams keeps factual fields outside the model's control.
@@ -553,12 +624,36 @@ func finalizeNewsletterParams(params *NewsletterParams, councilDate string,
 		params.Tensions[i].HasBudget = params.Tensions[i].Budget != ""
 		params.Tensions[i].Context = stripLinks(params.Tensions[i].Context)
 		params.Tensions[i].Impact = stripLinks(params.Tensions[i].Impact)
+		if params.Tensions[i].HasBudget && !sourceAmountQualified(params.Tensions[i].SourceID, params.Tensions[i].Budget, params.Tensions[i].Context+" "+params.Tensions[i].Impact, cold) {
+			params.Tensions[i].Budget = ""
+			params.Tensions[i].HasBudget = false
+		}
+		for _, d := range cold {
+			if d.ID == "" || d.ID != params.Tensions[i].SourceID {
+				continue
+			}
+			parts := []string{}
+			if d.Contre != nil && *d.Contre > 0 {
+				parts = append(parts, fmt.Sprintf("%d vote%s contre", *d.Contre, plural(*d.Contre)))
+			}
+			if d.Abstention != nil && *d.Abstention > 0 {
+				parts = append(parts, fmt.Sprintf("%d abstention%s", *d.Abstention, plural(*d.Abstention)))
+			}
+			params.Tensions[i].VoteDetails = strings.Join(parts, ", ")
+			break
+		}
 	}
 	for i := range params.Adopted {
 		params.Adopted[i].Budget = formatBudgetStr(params.Adopted[i].Budget)
 		params.Adopted[i].HasBudget = params.Adopted[i].Budget != ""
 		params.Adopted[i].Context = stripLinks(params.Adopted[i].Context)
 		params.Adopted[i].Impact = stripLinks(params.Adopted[i].Impact)
+		// A bare number is misleading for recurring rents and fees. When the
+		// model omits the period or a variable part, hide the amount badge.
+		if params.Adopted[i].HasBudget && !sourceAmountQualified(params.Adopted[i].SourceID, params.Adopted[i].Budget, params.Adopted[i].Context+" "+params.Adopted[i].Impact, cold) {
+			params.Adopted[i].Budget = ""
+			params.Adopted[i].HasBudget = false
+		}
 	}
 	for i := range params.Briefs {
 		params.Briefs[i].Summary = stripLinks(params.Briefs[i].Summary)
@@ -567,9 +662,44 @@ func finalizeNewsletterParams(params *NewsletterParams, councilDate string,
 
 }
 
-// deterministicMainIssue reuses the first factual sentence of two selected
-// adopted decisions. This keeps the introduction focused on decisions without
-// letting a model invent a new headline or mixing votes with financial amounts.
+func mentionsBudgetPeriod(s string) bool {
+	s = strings.ToLower(s)
+	return strings.Contains(s, "annuel") || strings.Contains(s, "mensuel") ||
+		strings.Contains(s, "par an") || strings.Contains(s, "par mois")
+}
+
+func sourceAmountQualified(sourceID, budget, copyText string, cold []ColdDeliberation) bool {
+	amount, err := strconv.ParseInt(strings.ReplaceAll(budget, " ", ""), 10, 64)
+	if err != nil {
+		return true
+	}
+	copyText = strings.ToLower(copyText)
+	for _, d := range cold {
+		if sourceID != "" && d.ID != sourceID {
+			continue
+		}
+		if d.BudgetImpact != amount {
+			continue
+		}
+		sourceInfo := strings.ToLower(d.Summary + " " + d.BudgetNote)
+		if mentionsBudgetPeriod(sourceInfo) && !mentionsBudgetPeriod(copyText) {
+			return false
+		}
+		if strings.Contains(sourceInfo, "variable") && !strings.Contains(copyText, "variable") {
+			return false
+		}
+		budgetNote := strings.ToLower(d.BudgetNote)
+		if (strings.Contains(budgetNote, "maxim") || strings.Contains(budgetNote, "plafond")) &&
+			!(strings.Contains(copyText, "maxim") || strings.Contains(copyText, "plafond") || strings.Contains(copyText, "jusqu'à")) {
+			return false
+		}
+	}
+	return true
+}
+
+// deterministicMainIssue reuses a sentence describing the council's action
+// from each of the first two adopted decisions. A context paragraph may start
+// with background information, which makes a weak or misleading introduction.
 func deterministicMainIssue(params *NewsletterParams) string {
 	var sentences []string
 	for _, item := range params.Adopted {
@@ -577,17 +707,26 @@ func deterministicMainIssue(params *NewsletterParams) string {
 		if context == "" {
 			continue
 		}
-		if end := strings.Index(context, ". "); end >= 0 {
-			context = context[:end+1]
+		parts := strings.Split(context, ". ")
+		selected := strings.TrimSpace(parts[0])
+		for _, part := range parts {
+			lower := strings.ToLower(strings.TrimSpace(part))
+			if (strings.Contains(lower, "conseil") || strings.Contains(lower, "ville") || strings.Contains(lower, "maire")) &&
+				(strings.Contains(lower, "approuv") || strings.Contains(lower, "attribu") || strings.Contains(lower, "accord") ||
+					strings.Contains(lower, "autoris") || strings.Contains(lower, "décid") || strings.Contains(lower, "adopt") ||
+					strings.Contains(lower, "vote") || strings.Contains(lower, "met en place")) {
+				selected = strings.TrimSpace(part)
+				break
+			}
 		}
-		if !strings.HasSuffix(context, ".") {
-			context += "."
+		if !strings.HasSuffix(selected, ".") {
+			selected += "."
 		}
-		context = strings.Replace(context, "La Ville ", "La ville ", 1)
-		if len(sentences) == 1 && strings.HasPrefix(sentences[0], "La ville ") && strings.HasPrefix(context, "La ville ") {
-			context = "Elle " + strings.TrimPrefix(context, "La ville ")
+		selected = strings.Replace(selected, "La Ville ", "La ville ", 1)
+		if len(sentences) == 1 && strings.HasPrefix(sentences[0], "La ville ") && strings.HasPrefix(selected, "La ville ") {
+			selected = "Elle " + strings.TrimPrefix(selected, "La ville ")
 		}
-		sentences = append(sentences, context)
+		sentences = append(sentences, selected)
 		if len(sentences) == 2 {
 			break
 		}

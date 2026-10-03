@@ -16,6 +16,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func verifiedGeminiResult(title, summary string) *GeminiResult {
+	return &GeminiResult{Title: title, Summary: summary,
+		FactCheckModel: "gemini-2.5-pro", FactCheckedAt: "2026-10-03T10:00:00Z"}
+}
+
 type mockDDB struct {
 	putItemInput  *dynamodb.PutItemInput
 	putItemErr    error
@@ -74,9 +79,12 @@ func TestHandleRecord_TopicTagPersistence(t *testing.T) {
 
 	pour, contre, abs := 20, 5, 2
 	result := &GeminiResult{
-		Title:    "Budget 2026",
-		Summary:  "Le budget a été voté.",
-		TopicTag: "Budget",
+		Title:          "Budget 2026",
+		Summary:        "Le budget a été voté.",
+		TopicTag:       "Budget",
+		FactCheckModel: "gemini-2.5-pro",
+		FactCheckedAt:  "2026-10-03T10:00:00Z",
+		BudgetNote:     "Dépense ponctuelle votée de 10 000 €.",
 	}
 	result.Vote.HasVote = true
 	result.Vote.Pour = &pour
@@ -90,6 +98,9 @@ func TestHandleRecord_TopicTagPersistence(t *testing.T) {
 	item := mockD.putItemInput.Item
 	assert.Equal(t, &types.AttributeValueMemberS{Value: "Budget"}, item["topic_tag"])
 	assert.Equal(t, &types.AttributeValueMemberS{Value: "Budget 2026"}, item["title"])
+	assert.Equal(t, &types.AttributeValueMemberS{Value: "gemini-2.5-pro"}, item["fact_check_model"])
+	assert.Equal(t, &types.AttributeValueMemberS{Value: "2026-10-03T10:00:00Z"}, item["fact_checked_at"])
+	assert.Equal(t, &types.AttributeValueMemberS{Value: "Dépense ponctuelle votée de 10 000 €."}, item["budget_note"])
 }
 
 func TestHandleRecord_IdempotentDuplicate(t *testing.T) {
@@ -98,10 +109,15 @@ func TestHandleRecord_IdempotentDuplicate(t *testing.T) {
 		ddb: &mockDDB{putItemErr: condErr},
 	}
 	msg := SQSPayload{CouncilID: "conseil_municipal#2026-03-28", PDFURL: "https://example.com/D01.pdf", PDFTitle: "D01", TotalPDFs: 5}
-	err := h.handleRecord(context.Background(), msg, &GeminiResult{Title: "t", Summary: "s"})
+	err := h.handleRecord(context.Background(), msg, verifiedGeminiResult("t", "s"))
 	assert.NoError(t, err)
 }
 
+func TestHandleRecordRejectsUnverifiedResult(t *testing.T) {
+	h := &WorkerHandler{ddb: &mockDDB{}}
+	err := h.handleRecord(context.Background(), SQSPayload{PDFURL: "https://example.com/D01.pdf"}, &GeminiResult{Title: "T"})
+	require.ErrorContains(t, err, "without a passed PDF fact check")
+}
 
 func TestDeliberationID(t *testing.T) {
 	tests := []struct {
@@ -251,19 +267,23 @@ func (m *concurrentMockDDB) UpdateItem(_ context.Context, p *dynamodb.UpdateItem
 			"total_pdfs":     &types.AttributeValueMemberN{Value: strconv.Itoa(m.total)},
 		}}, nil
 	}
-	// Deliberation partial-recovery SET, guarded by attribute_not_exists(analysis_data).
+	// Deliberation partial-recovery SET, guarded by absent counted/fact check.
 	id := p.Key["id"].(*types.AttributeValueMemberS).Value
 	it := m.delibs[id]
 	if it == nil {
 		it = map[string]types.AttributeValue{}
 		m.delibs[id] = it
 	}
-	if hasAnalysisData(it) {
+	if _, counted := it["counted"]; counted {
 		return nil, &types.ConditionalCheckFailedException{}
 	}
-	it["analysis_data"] = &types.AttributeValueMemberM{Value: map[string]types.AttributeValue{
-		"contexte": &types.AttributeValueMemberS{Value: "recovered"},
-	}}
+	if _, verified := it["fact_checked_at"]; verified {
+		return nil, &types.ConditionalCheckFailedException{}
+	}
+	for name, key := range p.ExpressionAttributeNames {
+		valueKey := ":v" + strings.TrimPrefix(name, "#k")
+		it[key] = p.ExpressionAttributeValues[valueKey]
+	}
 	return &dynamodb.UpdateItemOutput{}, nil
 }
 
@@ -275,7 +295,9 @@ func TestHandleRecord_ConcurrentDuplicateCountsOnce(t *testing.T) {
 	msg := SQSPayload{CouncilID: "C1", PDFURL: "https://example.com/D01.pdf", TotalPDFs: 5}
 
 	newResult := func() *GeminiResult {
-		return &GeminiResult{Title: "T", Summary: "S", TopicTag: "Budget"}
+		r := verifiedGeminiResult("T", "S")
+		r.TopicTag = "Budget"
+		return r
 	}
 
 	var wg sync.WaitGroup
@@ -325,7 +347,7 @@ func TestHandleRecord_ConcurrentCountingAtBoundary(t *testing.T) {
 		go func(idx int, url string) {
 			defer wg.Done()
 			msg := SQSPayload{CouncilID: "C1", PDFURL: "https://example.com/" + url, TotalPDFs: 3}
-			errs[idx] = h.handleRecord(context.Background(), msg, &GeminiResult{Title: "T", Summary: "S"})
+			errs[idx] = h.handleRecord(context.Background(), msg, verifiedGeminiResult("T", "S"))
 		}(i, u)
 	}
 	wg.Wait()
@@ -359,8 +381,8 @@ func TestHandleRecord_RecoversUncountedAfterCrash(t *testing.T) {
 	msg := SQSPayload{CouncilID: "C1", PDFURL: "https://example.com/D01.pdf", TotalPDFs: 3}
 
 	// Two sequential retries: the first recovers and counts, the second is a noop.
-	require.NoError(t, h.handleRecord(context.Background(), msg, &GeminiResult{Title: "T", Summary: "S"}))
-	require.NoError(t, h.handleRecord(context.Background(), msg, &GeminiResult{Title: "T", Summary: "S"}))
+	require.NoError(t, h.handleRecord(context.Background(), msg, verifiedGeminiResult("T", "S")))
+	require.NoError(t, h.handleRecord(context.Background(), msg, verifiedGeminiResult("T", "S")))
 
 	m.mu.Lock()
 	defer m.mu.Unlock()

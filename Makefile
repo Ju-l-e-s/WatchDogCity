@@ -42,7 +42,7 @@ build-frontend:
 	cd frontend && npm run build
 
 verify-frontend:
-	@for f in frontend/index.html frontend/app.js frontend/style.css frontend/merci.html frontend/data.json; do \
+	@for f in frontend/index.html frontend/app.js frontend/style.css frontend/merci.html; do \
 		if [ ! -s "$$f" ]; then \
 			echo "ERROR: $$f is missing or empty — aborting" >&2 ; \
 			exit 1 ; \

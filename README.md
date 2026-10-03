@@ -16,7 +16,10 @@ Le projet repose sur une infrastructure **100% Serverless** sur AWS, gérée via
 
 - **Backend (Go)** : 10 fonctions Lambda : Orchestrator, Worker, Aggregator, Validator, Publisher, Notifier, BrevoCampaignWebhook, Subscriber, Confirmer et Contact.
 - **IA (Google Gemini)** : le Worker analyse les PDF avec Gemini 2.5 Flash ; l'Aggregator et le Validator utilisent Gemini 2.5 Pro selon la configuration actuelle.
-- **Contrôle éditorial** : le Validator vérifie les données avant que le Publisher publie le site et que le Notifier envoie la newsletter.
+- **Contrôle éditorial** : le Worker confronte chaque synthèse au PDF original avant stockage ; le Validator vérifie la complétude des PDF et les affirmations de la newsletter avant que le Publisher publie le site et que le Notifier prépare l'envoi. Le Publisher revérifie les nouveaux conseils approuvés ; les archives déjà approuvées nécessitent un audit et un backfill distincts.
+- **Données du site** : `data.json` en production est écrit uniquement par le Publisher. Le déploiement CDK met à jour les autres fichiers statiques et vérifie ensuite que `data.json` existe toujours dans S3.
+
+Les essais réels du fact-checking sont volontaires et consomment des appels Gemini. Après connexion AWS au profil `watchdog-admin`, `python3 scripts/localtest/run_worker_factcheck.py` vérifie un PDF officiel, `--newsletter-stage-test` vérifie le stade des décisions et `--newsletter-fixture chemin/data.json` génère une newsletter locale contrôlée sans envoi. La clé est lue depuis la configuration de la Lambda Worker et n'est pas affichée.
 - **Frontend** : site statique dont les styles sont générés avec Tailwind CSS.
 - **Stockage** : DynamoDB pour les données structurées, S3 pour le site statique et les PDF.
 - **Sécurité** : Protection Cloudflare Turnstile et WAF pour minimiser les coûts et bloquer les spams.

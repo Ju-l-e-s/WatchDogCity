@@ -101,6 +101,21 @@ func (h *WorkerHandler) HandleRequest(ctx context.Context, event events.SQSEvent
 			log.Printf("warn: record gemini success: %v", rerr)
 		}
 
+		// Reject unsupported facts before the first deliberation write or counter
+		// increment. A rejected PDF retries through SQS and ultimately reaches
+		// the DLQ, leaving the council incomplete and unavailable to publish.
+		checkCtx, checkCancel := context.WithTimeout(ctx, 90*time.Second)
+		err = verifyFactsWithGemini(checkCtx, apiKey, pdfBytes, result)
+		checkCancel()
+		if err != nil {
+			log.Printf("fact-check failed for %s: %v", msg.PDFURL, err)
+			log.Printf("METRIC: GeminiFactCheckFailure count=1 deliberation=%s", deliberationID(msg.PDFURL))
+			failures = append(failures, events.SQSBatchItemFailure{ItemIdentifier: record.MessageId})
+			continue
+		}
+		result.FactCheckModel = factCheckModel()
+		result.FactCheckedAt = time.Now().UTC().Format(time.RFC3339)
+
 		if err := h.handleRecord(ctx, msg, result); err != nil {
 			log.Printf("error handling record: %v", err)
 			failures = append(failures, events.SQSBatchItemFailure{ItemIdentifier: record.MessageId})
@@ -111,10 +126,13 @@ func (h *WorkerHandler) HandleRequest(ctx context.Context, event events.SQSEvent
 }
 
 func (h *WorkerHandler) handleRecord(ctx context.Context, msg SQSPayload, result *GeminiResult) error {
+	if result == nil || result.FactCheckModel == "" || result.FactCheckedAt == "" {
+		return fmt.Errorf("refusing to store deliberation without a passed PDF fact check")
+	}
 	id := deliberationID(msg.PDFURL)
 
 	// 1. Write to DynamoDB
-	item, err := attributevalue.MarshalMap(map[string]interface{}{
+	fields := map[string]interface{}{
 		"id":               id,
 		"council_id":       msg.CouncilID,
 		"title":            result.Title,
@@ -136,7 +154,15 @@ func (h *WorkerHandler) handleRecord(ctx context.Context, msg SQSPayload, result
 		"input_tokens":     result.InputTokens,
 		"output_tokens":    result.OutputTokens,
 		"processed_at":     time.Now().UTC().Format(time.RFC3339),
-	})
+	}
+	if result.FactCheckModel != "" && result.FactCheckedAt != "" {
+		fields["fact_check_model"] = result.FactCheckModel
+		fields["fact_checked_at"] = result.FactCheckedAt
+	}
+	if result.BudgetNote != "" {
+		fields["budget_note"] = result.BudgetNote
+	}
+	item, err := attributevalue.MarshalMap(fields)
 	if err != nil {
 		return fmt.Errorf("marshal item: %w", err)
 	}
@@ -171,11 +197,11 @@ func (h *WorkerHandler) handleRecord(ctx context.Context, msg SQSPayload, result
 			log.Printf("deliberation %s already counted, skipping", id)
 			return nil
 		}
-		// Not yet counted. If analysis is missing this is a bare/partial claim —
-		// fill the fields (guarded so a concurrent worker can't be clobbered).
-		// Either way we proceed to the counting transaction below, which is
-		// itself idempotent via attribute_not_exists(counted).
-		if !hasAnalysisData(existing.Item) {
+		// A previous worker may have written an analysis before the fact-check
+		// gate existed, then crashed before counting. Replace such an uncounted
+		// row with this PDF-verified analysis before it can be counted.
+		_, checked := existing.Item["fact_checked_at"].(*types.AttributeValueMemberS)
+		if !hasAnalysisData(existing.Item) || !checked {
 			setExpr, names, values := buildSetExpression(item, "id")
 			_, uerr := h.ddb.UpdateItem(ctx, &dynamodb.UpdateItemInput{
 				TableName: aws.String(os.Getenv("DELIBERATIONS_TABLE")),
@@ -183,12 +209,27 @@ func (h *WorkerHandler) handleRecord(ctx context.Context, msg SQSPayload, result
 					"id": &types.AttributeValueMemberS{Value: id},
 				},
 				UpdateExpression:          aws.String(setExpr),
-				ConditionExpression:       aws.String("attribute_not_exists(analysis_data)"),
+				ConditionExpression:       aws.String("attribute_not_exists(counted) AND attribute_not_exists(fact_checked_at)"),
 				ExpressionAttributeNames:  names,
 				ExpressionAttributeValues: values,
 			})
 			if uerr != nil && !errors.As(uerr, &ccfe) {
 				return fmt.Errorf("recover partial deliberation %s: %w", id, uerr)
+			}
+			if errors.As(uerr, &ccfe) {
+				latest, gerr := h.ddb.GetItem(ctx, &dynamodb.GetItemInput{
+					TableName: aws.String(os.Getenv("DELIBERATIONS_TABLE")),
+					Key: map[string]types.AttributeValue{
+						"id": &types.AttributeValueMemberS{Value: id},
+					},
+				})
+				if gerr != nil {
+					return fmt.Errorf("verify recovered deliberation %s: %w", id, gerr)
+				}
+				_, verified := latest.Item["fact_checked_at"].(*types.AttributeValueMemberS)
+				if !isCounted(latest.Item) && (!hasAnalysisData(latest.Item) || !verified) {
+					return fmt.Errorf("deliberation %s remains incomplete after recovery race", id)
+				}
 			}
 		}
 	}

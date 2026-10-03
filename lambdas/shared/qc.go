@@ -43,12 +43,17 @@ type QcAnalysisData struct {
 // Populated by the Validator Lambda from DynamoDB; never passed to any LLM.
 type DeliberationView struct {
 	ID              string
+	PDFURL          string
+	Counted         bool
+	FactCheckModel  string
+	FactCheckedAt   string
 	Title           string
 	TopicTag        string
 	Summary         string
 	AnalysisData    QcAnalysisData
 	BudgetImpact    int64
 	BudgetType      string
+	BudgetNote      string
 	BudgetBreakdown []QcBudgetBreakdownItem
 	ClimateImpact   string
 	HasVote         bool
@@ -61,10 +66,12 @@ type DeliberationView struct {
 
 // CouncilView is the minimal projection of a council row for QC checks.
 type CouncilView struct {
-	CouncilID     string
-	TotalPdfs     int64
-	ProcessedPdfs int64
-	Date          string
+	CouncilID        string
+	TotalPdfs        int64
+	ProcessedPdfs    int64
+	Date             string
+	ExpectedPDFIDs   []string
+	RequireFactCheck bool
 }
 
 // Baseline holds historical statistics computed from APPROVED councils.
@@ -372,11 +379,71 @@ func ValidateDeterministic(_ CouncilView, delibs []DeliberationView) []Violation
 	return viols
 }
 
-// ValidateStatistical runs council-level and drift-vs-baseline checks S1–S6.
+// ValidateStatistical runs council-level and drift-vs-baseline checks S1–S7.
 // Pure function — no AWS calls, no randomness.
 func ValidateStatistical(c CouncilView, delibs []DeliberationView, base Baseline, cfg QcConfig) []Violation {
 	var viols []Violation
 	n := len(delibs)
+
+	// The counter alone does not prove that every scraped PDF has a row: legacy
+	// councils have reached APPROVED with fewer rows than expected, and some
+	// counters are larger than total_pdfs. Reject either mismatch before a new
+	// council can be approved and announced.
+	if c.TotalPdfs <= 0 || c.ProcessedPdfs != c.TotalPdfs || int64(n) != c.TotalPdfs {
+		viols = append(viols, Violation{
+			Rule: "S7_INCOMPLETE_COUNCIL", Severity: SeverityHigh,
+			Detail: fmt.Sprintf("total_pdfs=%d processed_pdfs=%d deliberations=%d", c.TotalPdfs, c.ProcessedPdfs, n),
+		})
+	}
+
+	if c.ExpectedPDFIDs != nil {
+		expected := make(map[string]bool, len(c.ExpectedPDFIDs))
+		for _, id := range c.ExpectedPDFIDs {
+			if id == "" || expected[id] {
+				viols = append(viols, Violation{
+					Rule: "S8_INVALID_PDF_MANIFEST", Severity: SeverityHigh,
+					Detail: fmt.Sprintf("duplicate or empty expected PDF ID %q", id),
+				})
+			}
+			expected[id] = true
+		}
+		if len(c.ExpectedPDFIDs) != n || int64(len(c.ExpectedPDFIDs)) != c.TotalPdfs {
+			viols = append(viols, Violation{
+				Rule: "S8_PDF_MANIFEST_MISMATCH", Severity: SeverityHigh,
+				Detail: fmt.Sprintf("expected_pdf_ids=%d deliberations=%d total_pdfs=%d", len(c.ExpectedPDFIDs), n, c.TotalPdfs),
+			})
+		}
+		seen := make(map[string]bool, n)
+		for _, d := range delibs {
+			if !expected[d.ID] || seen[d.ID] || !d.Counted || !strings.HasSuffix(d.PDFURL, "/"+d.ID) {
+				viols = append(viols, Violation{
+					Rule: "S8_PDF_MANIFEST_MISMATCH", Severity: SeverityHigh,
+					DeliberationID: d.ID,
+					Detail:         "deliberation ID, PDF URL or counted flag differs from the source manifest",
+				})
+			}
+			seen[d.ID] = true
+		}
+		for _, id := range c.ExpectedPDFIDs {
+			if !seen[id] {
+				viols = append(viols, Violation{
+					Rule: "S8_PDF_MANIFEST_MISMATCH", Severity: SeverityHigh,
+					DeliberationID: id, Detail: "expected source PDF has no deliberation",
+				})
+			}
+		}
+	}
+
+	if c.RequireFactCheck {
+		for _, d := range delibs {
+			if strings.TrimSpace(d.FactCheckModel) == "" || strings.TrimSpace(d.FactCheckedAt) == "" {
+				viols = append(viols, Violation{
+					Rule: "S9_MISSING_FACT_CHECK", Severity: SeverityHigh,
+					DeliberationID: d.ID, Detail: "fact-check model or timestamp is missing",
+				})
+			}
+		}
+	}
 
 	// ── S1: Empty council ───────────────────────────────────────────────────
 	if c.ProcessedPdfs > 0 && n == 0 {

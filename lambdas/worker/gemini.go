@@ -37,6 +37,7 @@ RÈGLES IMPÉRATIVES DE TRAITEMENT :
      * "RECETTE" : La ville gagne ou collecte de l'argent (impôts, taxes, vente de biens, dotations).
      * "CAUTION" : La ville se porte garante ou cautionne un prêt (ex: Agence France Locale).
      * "AUCUN" : si et seulement si budget_impact = 0. Tout montant non nul (même faible) DOIT porter le type DÉPENSE, RECETTE ou CAUTION. Réciproquement, budget_impact = 0 impose budget_type = "AUCUN".
+   - Renseigne "budget_note" en une phrase courte lorsque budget_impact est non nul : précise si le montant est ponctuel, mensuel ou annuel, sa composition si plusieurs flux sont additionnés, et s'il est voté, demandé, conditionnel ou déjà versé. N'invente aucune période ou certitude absente du PDF. Si aucun montant n'est connu, laisse "budget_note" vide.
 
 2. TITRE ("title") :
    - Titre vulgarisé, factuel, neutre et descriptif de l'objet de la délibération. Rédige un titre simple pour un non-initié, évite le jargon technocratique.
@@ -67,6 +68,12 @@ RÈGLES IMPÉRATIVES DE TRAITEMENT :
    - Fais la différence entre une règle de procédure administrative obligatoire (ex: "Le maire a dû quitter la salle car il ne peut pas voter sur son propre bilan financier") et un véritable débat politique ou vote d'opposition.
    - Ne décris sous "disagreements" que les véritables tensions politiques, les débats de fond, ou les votes d'opposition (ex: voix contre). Si le vote s'est déroulé de façon standard sans opposition, écris : "Aucun désaccord, procédure standard."
 
+7. STADE, TEMPS ET PÉRIODE :
+   - Distingue strictement une proposition, une décision qui autorise une opération, une convention signée, un paiement reçu ou effectué, et une réalisation effective. Une autorisation ne prouve ni la signature ni l'encaissement.
+   - Respecte la chronologie du PDF : des travaux déjà réalisés, même financés aujourd'hui, ne sont pas des travaux à venir. Un objectif de maintien ou de création n'est pas un résultat déjà atteint.
+   - Conserve les dates de prise d'effet et la période des montants (annuel, mensuel, ponctuel). Ne présente pas une recette annuelle comme une somme ponctuelle et ne confonds pas une redevance avec un remboursement de frais.
+   - Applique ces règles au titre, au résumé, à la décision, aux impacts et aux points clés, sans donner un degré de certitude supérieur au document.
+
 Règles supplémentaires :
 - Le champ "budget_breakdown" est un tableau de ventilation détaillée. Laisse vide [] sauf si c'est un VOTE DU BUDGET ou des subventions à de multiples associations.
   Si renseigné : la SOMME EXACTE des "amount" DOIT être rigoureusement égale à "budget_impact" (tolérance 0).
@@ -96,6 +103,7 @@ type GeminiResult struct {
 	} `json:"analysis_data"`
 	BudgetImpact    int64                 `json:"budget_impact"`
 	BudgetType      string                `json:"budget_type"`
+	BudgetNote      string                `json:"budget_note"`
 	BudgetBreakdown []BudgetBreakdownItem `json:"budget_breakdown"`
 	ClimateImpact   string                `json:"climate_impact"`
 	KeyPoints       []string              `json:"key_points"`
@@ -110,6 +118,9 @@ type GeminiResult struct {
 	// Consumption metadata (populated post-call)
 	InputTokens  int32 `json:"input_tokens"`
 	OutputTokens int32 `json:"output_tokens"`
+	// Set only after the separate PDF fact-check has accepted the public fields.
+	FactCheckModel string `json:"-"`
+	FactCheckedAt  string `json:"-"`
 }
 
 // deliberationSchema is the authoritative output contract enforced at the
@@ -143,6 +154,7 @@ var deliberationSchema = &genai.Schema{
 			Format: "enum",
 			Enum:   validBudgetTypes,
 		},
+		"budget_note": {Type: genai.TypeString},
 		"budget_breakdown": {
 			Type: genai.TypeArray,
 			Items: &genai.Schema{
@@ -180,12 +192,12 @@ var deliberationSchema = &genai.Schema{
 	},
 	PropertyOrdering: []string{
 		"title", "summary", "topic_tag", "is_substantial", "acronyms",
-		"analysis_data", "budget_impact", "budget_type", "budget_breakdown",
+		"analysis_data", "budget_impact", "budget_type", "budget_note", "budget_breakdown",
 		"climate_impact", "key_points", "vote", "disagreements",
 	},
 	Required: []string{
 		"title", "summary", "topic_tag", "is_substantial",
-		"analysis_data", "budget_impact", "budget_type",
+		"analysis_data", "budget_impact", "budget_type", "budget_note",
 		"climate_impact", "key_points", "vote",
 	},
 }
@@ -319,6 +331,9 @@ func validateGeminiResult(r *GeminiResult) error {
 
 	if r.BudgetType == "AUCUN" && r.BudgetImpact != 0 {
 		return fmt.Errorf("budget_type=AUCUN but budget_impact=%d", r.BudgetImpact)
+	}
+	if r.BudgetImpact != 0 && strings.TrimSpace(r.BudgetNote) == "" {
+		return fmt.Errorf("budget_note required when budget_impact=%d", r.BudgetImpact)
 	}
 	if len(r.BudgetBreakdown) > 0 {
 		var sum int64

@@ -42,6 +42,7 @@ type NotifierEvent struct {
 	CouncilID        string                   `json:"council_id"`
 	TestListID       *int                     `json:"test_list_id"`
 	ReconcileOnly    bool                     `json:"reconcile_only,omitempty"`
+	DraftOnly        bool                     `json:"draft_only,omitempty"`
 	NewsletterParams *shared.NewsletterParams `json:"newsletter_params,omitempty"`
 	ScheduledAt      *string                  `json:"scheduled_at,omitempty"`
 }
@@ -131,7 +132,10 @@ func (d *notifierDeps) handle(ctx context.Context, event NotifierEvent) error {
 		log.Printf("notifier skip: council_id represents metadata (%q)", event.CouncilID)
 		return nil
 	}
-	if event.ReconcileOnly && (event.TestListID != nil || event.NewsletterParams != nil || event.ScheduledAt != nil) {
+	if event.DraftOnly && (event.TestListID != nil || event.ReconcileOnly || event.ScheduledAt != nil) {
+		return fmt.Errorf("draft_only cannot be combined with test_list_id, reconcile_only or scheduled_at")
+	}
+	if event.ReconcileOnly && (event.TestListID != nil || event.NewsletterParams != nil || event.ScheduledAt != nil || event.DraftOnly) {
 		return fmt.Errorf("reconcile_only requires only council_id")
 	}
 	if event.TestListID != nil {
@@ -148,7 +152,8 @@ func (d *notifierDeps) handle(ctx context.Context, event NotifierEvent) error {
 	if council.QCStatus != "APPROVED" || (council.Category != "" && council.Category != "Conseil municipal") {
 		return fmt.Errorf("council %s must be an APPROVED Conseil municipal", event.CouncilID)
 	}
-	if council.NewsletterCampaignID != 0 && !d.autoSendEnabled {
+	automaticDelivery := d.autoSendEnabled && !event.DraftOnly
+	if council.NewsletterCampaignID != 0 && !automaticDelivery {
 		sent, err := d.syncSentCampaign(ctx, event.CouncilID, council.NewsletterCampaignID)
 		if err != nil {
 			return err
@@ -209,7 +214,12 @@ func (d *notifierDeps) handle(ctx context.Context, event NotifierEvent) error {
 		return fmt.Errorf("claim newsletter slot: %w", err)
 	}
 
-	campaignID, err := d.sendCampaign(ctx, params, event.CouncilID, council.Date, event.ScheduledAt)
+	var campaignID int
+	if event.DraftOnly {
+		campaignID, err = d.sendCampaignDraft(ctx, params, event.CouncilID, council.Date)
+	} else {
+		campaignID, err = d.sendCampaign(ctx, params, event.CouncilID, council.Date, event.ScheduledAt)
+	}
 	if err != nil {
 		if relErr := d.releasePending(ctx, event.CouncilID); relErr != nil {
 			log.Printf("warn: failed to release pending claim for %s: %v", event.CouncilID, relErr)
@@ -221,6 +231,13 @@ func (d *notifierDeps) handle(ctx context.Context, event NotifierEvent) error {
 			log.Printf("warn: failed to release pending claim for %s: %v", event.CouncilID, relErr)
 		}
 		return fmt.Errorf("record production campaign ID: %w", err)
+	}
+	if event.DraftOnly {
+		if err := d.releasePending(ctx, event.CouncilID); err != nil {
+			return fmt.Errorf("release draft-only claim for %s: %w", event.CouncilID, err)
+		}
+		log.Printf("newsletter campaign %d kept as draft without preview or delivery", campaignID)
+		return nil
 	}
 	if !d.autoSendEnabled {
 		// A previous draft may have been sent manually between the initial
@@ -605,8 +622,20 @@ func parseNewsletterParams(raw string) (*NewsletterParams, error) {
 // ── Brevo campaign ────────────────────────────────────────────────────────────
 
 func (d *notifierDeps) sendCampaign(ctx context.Context, params *NewsletterParams, councilID, councilDate string, scheduledAt *string) (int, error) {
+	return d.sendCampaignMode(ctx, params, councilID, councilDate, scheduledAt, false)
+}
+
+func (d *notifierDeps) sendCampaignDraft(ctx context.Context, params *NewsletterParams, councilID, councilDate string) (int, error) {
+	return d.sendCampaignMode(ctx, params, councilID, councilDate, nil, true)
+}
+
+func (d *notifierDeps) sendCampaignMode(ctx context.Context, params *NewsletterParams, councilID, councilDate string, scheduledAt *string, draftOnly bool) (int, error) {
 	testEmail := strings.TrimSpace(d.testEmail)
-	if testEmail == "" && d.autoSendEnabled {
+	automaticDelivery := d.autoSendEnabled && !draftOnly
+	if draftOnly {
+		testEmail = ""
+	}
+	if testEmail == "" && automaticDelivery {
 		return 0, fmt.Errorf("BREVO_TEST_EMAIL is required when AUTO_SEND_ENABLED is true")
 	}
 	if testEmail != "" {
@@ -643,7 +672,7 @@ func (d *notifierDeps) sendCampaign(ctx context.Context, params *NewsletterParam
 		return 0, fmt.Errorf("Brevo campaign %d has uneditable status %q", existingID, status)
 	default:
 		createScheduledAt := scheduledAt
-		if !d.autoSendEnabled {
+		if !automaticDelivery {
 			createScheduledAt = nil
 		}
 		campaignID, err = d.createCampaign(ctx, params, name, idemKey, createScheduledAt)
@@ -657,7 +686,7 @@ func (d *notifierDeps) sendCampaign(ctx context.Context, params *NewsletterParam
 			return 0, fmt.Errorf("send test for campaign %d: %w", campaignID, err)
 		}
 	}
-	if !d.autoSendEnabled {
+	if !automaticDelivery {
 		log.Printf("Brevo campaign %d kept as draft for manual approval", campaignID)
 		return campaignID, nil
 	}

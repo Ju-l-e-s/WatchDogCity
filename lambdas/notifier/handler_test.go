@@ -729,6 +729,68 @@ func TestHandle_PreviewAndAutomaticSend(t *testing.T) {
 	}
 }
 
+func TestHandleDraftOnlyCreatesDraftWithoutPreviewOrDelivery(t *testing.T) {
+	ddb := &fakeDDB{getResponse: func(_ *dynamodb.GetItemInput) (*dynamodb.GetItemOutput, error) {
+		return &dynamodb.GetItemOutput{Item: map[string]types.AttributeValue{
+			"council_id":             &types.AttributeValueMemberS{Value: "council-draft"},
+			"qc_status":              &types.AttributeValueMemberS{Value: "APPROVED"},
+			"category":               &types.AttributeValueMemberS{Value: "Conseil municipal"},
+			"date":                   &types.AttributeValueMemberS{Value: "2026-11-16"},
+			"newsletter_params_json": &types.AttributeValueMemberS{Value: `{"email_subject":"Sujet validé","fact_check_version":1}`},
+		}}, nil
+	}}
+	var calls []string
+	h := &fakeHTTP{route: func(req *http.Request) fakeResp {
+		switch {
+		case req.Method == http.MethodGet && req.URL.Path == "/v3/emailCampaigns":
+			return fakeResp{200, `{"campaigns":[],"count":0}`}
+		case isCreatePOST(req):
+			var body struct {
+				Subject    string `json:"subject"`
+				Scheduled  string `json:"scheduledAt"`
+				Recipients struct {
+					ListIDs []int `json:"listIds"`
+				} `json:"recipients"`
+			}
+			if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
+				t.Fatal(err)
+			}
+			if body.Subject != "Sujet validé" || body.Scheduled != "" || len(body.Recipients.ListIDs) != 1 || body.Recipients.ListIDs[0] != 2 {
+				t.Errorf("draft payload is incorrect: %+v", body)
+			}
+			calls = append(calls, "create")
+			return fakeResp{201, `{"id":42}`}
+		case isSendTestPOST(req), isSendNowPOST(req):
+			calls = append(calls, req.URL.Path)
+			return fakeResp{204, ""}
+		default:
+			return fakeResp{500, "unexpected request"}
+		}
+	}}
+	d := &notifierDeps{
+		ddb: ddb, httpClient: h, brevoKey: "k", brevoListID: 2,
+		testEmail: "owner@example.com", autoSendEnabled: true, councilsTable: "councils-test", now: fixedClock(time.Now()),
+	}
+	if err := d.handle(context.Background(), NotifierEvent{CouncilID: "council-draft", DraftOnly: true}); err != nil {
+		t.Fatalf("draft-only handle: %v", err)
+	}
+	if fmt.Sprint(calls) != "[create]" {
+		t.Fatalf("Brevo operations = %v, want only campaign creation", calls)
+	}
+	if len(ddb.updateInputs) != 3 || *ddb.updateInputs[1].UpdateExpression != "SET newsletter_campaign_id = :id" || *ddb.updateInputs[2].UpdateExpression != "REMOVE newsletter_pending_at" {
+		t.Fatalf("DynamoDB updates do not preserve a draft-only state: %+v", ddb.updateInputs)
+	}
+}
+
+func TestHandleDraftOnlyRejectsScheduling(t *testing.T) {
+	scheduled := "2026-11-22T10:00:00Z"
+	d := &notifierDeps{}
+	err := d.handle(context.Background(), NotifierEvent{CouncilID: "council-draft", DraftOnly: true, ScheduledAt: &scheduled})
+	if err == nil || !strings.Contains(err.Error(), "draft_only cannot be combined") {
+		t.Fatalf("expected draft-only scheduling rejection, got %v", err)
+	}
+}
+
 func TestSendCampaign_RequiresTestRecipientForAutomaticSend(t *testing.T) {
 	h := &fakeHTTP{}
 	d := &notifierDeps{httpClient: h, brevoKey: "k", autoSendEnabled: true}

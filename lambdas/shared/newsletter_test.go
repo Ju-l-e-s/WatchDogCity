@@ -13,10 +13,10 @@ func TestColdNewsletterStatsReflectNonUnanimousVotes(t *testing.T) {
 		{HasVote: true, Pour: intPtr(26), Contre: intPtr(0), Abstention: intPtr(9)},
 		{HasVote: true, Pour: intPtr(35), Contre: intPtr(0), Abstention: intPtr(0)},
 	})
-	if stats.voteClimat != "VOTES AVEC OPPOSITION" {
+	if stats.voteClimat != "VOTES NON UNANIMES" {
 		t.Fatalf("voteClimat = %q", stats.voteClimat)
 	}
-	if stats.voteStats != "2 délib. non unanimes / jusqu'à 9 voix contre" {
+	if stats.voteStats != "2 délib. non unanimes / 1 avec voix contre / 1 avec abstention / jusqu'à 9 voix contre" {
 		t.Fatalf("voteStats = %q", stats.voteStats)
 	}
 }
@@ -27,7 +27,7 @@ func TestColdNewsletterStatsDistinguishAbstentionsAndMissingVotes(t *testing.T) 
 		cold []ColdDeliberation
 		want string
 	}{
-		{"abstentions", []ColdDeliberation{{HasVote: true, Pour: intPtr(26), Abstention: intPtr(9)}}, "VOTES AVEC ABSTENTIONS"},
+		{"abstentions", []ColdDeliberation{{HasVote: true, Pour: intPtr(26), Abstention: intPtr(9)}}, "VOTES NON UNANIMES"},
 		{"unanimity", []ColdDeliberation{{HasVote: true, Pour: intPtr(35), Contre: intPtr(0)}}, "VOTES UNANIMES"},
 		{"missing", []ColdDeliberation{{HasVote: true}}, "VOTES NON RENSEIGNÉS"},
 	}
@@ -37,6 +37,71 @@ func TestColdNewsletterStatsDistinguishAbstentionsAndMissingVotes(t *testing.T) 
 				t.Fatalf("voteClimat = %q, want %q", got, tc.want)
 			}
 		})
+	}
+}
+
+func TestColdNewsletterStatsReportOppositionAndAbstentionsSeparately(t *testing.T) {
+	stats := computeColdNewsletterStats([]ColdDeliberation{
+		{HasVote: true, Pour: intPtr(29), Contre: intPtr(0), Abstention: intPtr(9)},
+		{HasVote: true, Pour: intPtr(30), Contre: intPtr(9), Abstention: intPtr(0)},
+		{HasVote: true, Pour: intPtr(30), Contre: intPtr(4), Abstention: intPtr(5)},
+		// Values without HasVote must not affect the public count.
+		{Pour: intPtr(1), Contre: intPtr(40), Abstention: intPtr(1)},
+	})
+	if stats.voteClimat != "VOTES NON UNANIMES" {
+		t.Fatalf("voteClimat = %q", stats.voteClimat)
+	}
+	want := "3 délib. non unanimes / 2 avec voix contre / 2 avec abstentions / jusqu'à 9 voix contre"
+	if stats.voteStats != want {
+		t.Fatalf("voteStats = %q, want %q", stats.voteStats, want)
+	}
+}
+
+func TestColdNewsletterStatsNovemberCouncilVoteBreakdown(t *testing.T) {
+	stats := computeColdNewsletterStats([]ColdDeliberation{
+		{HasVote: true, Pour: intPtr(35), Contre: intPtr(0), Abstention: intPtr(3)},
+		{HasVote: true, Pour: intPtr(29), Contre: intPtr(0), Abstention: intPtr(9)},
+		{HasVote: true, Pour: intPtr(30), Contre: intPtr(0), Abstention: intPtr(9)},
+		{HasVote: true, Pour: intPtr(9), Contre: intPtr(30)},
+		{HasVote: true, Pour: intPtr(30), Contre: intPtr(9)},
+	})
+	if stats.voteClimat != "VOTES NON UNANIMES" {
+		t.Fatalf("voteClimat = %q", stats.voteClimat)
+	}
+	want := "5 délib. non unanimes / 2 avec voix contre / 3 avec abstentions / jusqu'à 30 voix contre"
+	if stats.voteStats != want {
+		t.Fatalf("voteStats = %q, want %q", stats.voteStats, want)
+	}
+}
+
+func TestFormatBudgetChangesKeepsAPAndCPAmountsDistinct(t *testing.T) {
+	got := formatBudgetChangesFR([]BudgetChange{
+		{Scope: "CP", Direction: "BAISSE", Label: "Prévert", Amount: 200_000, Period: "2026"},
+		{Scope: "CP", Direction: "BAISSE", Label: "Complexe sportif polyvalent", Amount: 1_000_000, Period: "2026"},
+		{Scope: "AP", Direction: "BAISSE", Label: "Prévert", Amount: 500_000},
+	})
+	for _, want := range []string{"Paiements prévus en 2026 (CP) — Prévert : baisse de 200 000 €", "Complexe sportif polyvalent : baisse de 1 000 000 €", "Enveloppe autorisée pour engager le projet sur plusieurs années (AP) — Prévert : baisse de 500 000 €"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("budget changes %q missing %q", got, want)
+		}
+	}
+}
+
+func TestFinalizeNewsletterUsesSourceBudgetChangesInsteadOfModelBudget(t *testing.T) {
+	cold := []ColdDeliberation{{ID: "D10.pdf", BudgetChanges: []BudgetChange{
+		{Scope: "CP", Direction: "BAISSE", Label: "Total des crédits de paiement", Amount: 1_200_000, Period: "2026"},
+		{Scope: "AP", Direction: "BAISSE", Label: "École Prévert", Amount: 500_000},
+	}}}
+	params := &NewsletterParams{Adopted: []AdoptedItem{{SourceID: "D10.pdf", Budget: "1200000", HasBudget: true}}}
+	finalizeNewsletterParams(params, "2026-11-16", cold, coldNewsletterStats{}, "", 1, 12)
+	budget := params.Adopted[0].Budget
+	for _, want := range []string{"Paiements prévus en 2026 (CP)", "baisse de 1 200 000 €", "Enveloppe autorisée pour engager le projet sur plusieurs années (AP)", "baisse de 500 000 €"} {
+		if !strings.Contains(budget, want) {
+			t.Fatalf("newsletter budget %q missing %q", budget, want)
+		}
+	}
+	if strings.Contains(strings.ToLower(budget), "dépense") {
+		t.Fatalf("AP/CP adjustment was mislabelled as a financial flow: %q", budget)
 	}
 }
 
@@ -65,7 +130,7 @@ func TestFinalizeNewsletterParamsOverridesModelFacts(t *testing.T) {
 	if params.BudgetTotal != "" || params.HasGlobalBudget {
 		t.Fatalf("misleading global budget remains: %+v", params)
 	}
-	if params.VoteClimat != "VOTES AVEC ABSTENTIONS" || params.VoteStats != "1 délib. non unanime" {
+	if params.VoteClimat != "VOTES NON UNANIMES" || params.VoteStats != "1 délib. non unanime / 1 avec abstention" {
 		t.Fatalf("model vote figures remain: %+v", params)
 	}
 	if params.CouncilTitle != "Conseil municipal du 28 septembre 2026" || params.CouncilDate != "28 septembre 2026" || params.TotalDelibsInCouncil != 2 || params.TotalCouncils != 10 || params.TotalDelibs != 171 {

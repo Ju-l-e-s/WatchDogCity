@@ -32,6 +32,14 @@ type QcBudgetBreakdownItem struct {
 	Amount   int64  `json:"amount"`
 }
 
+type BudgetChange struct {
+	Scope     string `json:"scope" dynamodbav:"scope"`
+	Direction string `json:"direction" dynamodbav:"direction"`
+	Label     string `json:"label" dynamodbav:"label"`
+	Amount    int64  `json:"amount" dynamodbav:"amount"`
+	Period    string `json:"period,omitempty" dynamodbav:"period,omitempty"`
+}
+
 // QcAnalysisData holds the analysis_data fields consumed by QC checks.
 type QcAnalysisData struct {
 	Contexte *string
@@ -55,6 +63,7 @@ type DeliberationView struct {
 	BudgetType      string
 	BudgetNote      string
 	BudgetBreakdown []QcBudgetBreakdownItem
+	BudgetChanges   []BudgetChange
 	ClimateImpact   string
 	HasVote         bool
 	VotePour        *int
@@ -215,6 +224,17 @@ func ValidateDeterministic(_ CouncilView, delibs []DeliberationView) []Violation
 				DeliberationID: id, Field: "budget_impact",
 				Detail: fmt.Sprintf("budget_impact=%d is negative", d.BudgetImpact),
 			})
+		}
+		for j, change := range d.BudgetChanges {
+			if (change.Scope != "AP" && change.Scope != "CP" && change.Scope != "AUTRE") ||
+				(change.Direction != "HAUSSE" && change.Direction != "BAISSE") || change.Amount <= 0 || strings.TrimSpace(change.Label) == "" {
+				viols = append(viols, Violation{Rule: "D1_BUDGET_CHANGE_INVALID", Severity: SeverityHigh, DeliberationID: id,
+					Field: fmt.Sprintf("budget_changes[%d]", j), Detail: "budget change requires a valid scope, direction, positive amount and label"})
+			}
+		}
+		if len(d.BudgetChanges) > 0 && (d.BudgetImpact != 0 || d.BudgetType != "AUCUN") {
+			viols = append(viols, Violation{Rule: "D1_BUDGET_CHANGE_CLASSIFICATION", Severity: SeverityHigh, DeliberationID: id,
+				Field: "budget_changes", Detail: "AP/CP variations must not be classified as a financial flow"})
 		}
 		for j, item := range d.BudgetBreakdown {
 			if item.Amount < 0 {

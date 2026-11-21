@@ -24,6 +24,7 @@ type ColdDeliberation struct {
 	BudgetImpact    int64
 	BudgetType      string // enum
 	BudgetNote      string // source-grounded period, components and conditions
+	BudgetChanges   []BudgetChange
 	HasVote         bool
 	Pour            *int
 	Contre          *int
@@ -139,6 +140,32 @@ func formatBudgetFR(amount int64) string {
 	return string(result)
 }
 
+func formatBudgetChangesFR(changes []BudgetChange) string {
+	parts := make([]string, 0, len(changes))
+	for _, change := range changes {
+		direction := "hausse"
+		if change.Direction == "BAISSE" {
+			direction = "baisse"
+		}
+		scope := "Montant budgétaire"
+		if change.Scope == "AP" {
+			scope = "Enveloppe autorisée pour engager le projet sur plusieurs années (AP)"
+		} else if change.Scope == "CP" {
+			period := strings.TrimSpace(change.Period)
+			if period == "" {
+				period = "la période concernée"
+			}
+			scope = "Paiements prévus en " + period + " (CP)"
+		}
+		label := strings.TrimSpace(change.Label)
+		if label != "" {
+			label = " — " + label
+		}
+		parts = append(parts, fmt.Sprintf("%s%s : %s de %s €", scope, label, direction, formatBudgetFR(change.Amount)))
+	}
+	return strings.Join(parts, "; ")
+}
+
 func plural(n int) string {
 	if n > 1 {
 		return "s"
@@ -151,11 +178,15 @@ func plural(n int) string {
 func computeColdNewsletterStats(cold []ColdDeliberation) coldNewsletterStats {
 	var s coldNewsletterStats
 	nonUnanimousCount := 0
+	oppositionCount := 0
+	abstentionCount := 0
 	maxOpposition := 0
 	hasRecordedVote := false
-	hasAbstention := false
 
 	for _, d := range cold {
+		if !d.HasVote {
+			continue
+		}
 		contre := 0
 		if d.Contre != nil {
 			contre = *d.Contre
@@ -164,27 +195,31 @@ func computeColdNewsletterStats(cold []ColdDeliberation) coldNewsletterStats {
 		if d.Abstention != nil {
 			abst = *d.Abstention
 		}
-		if d.HasVote && (d.Pour != nil || d.Contre != nil || d.Abstention != nil) {
+		if d.Pour != nil || d.Contre != nil || d.Abstention != nil {
 			hasRecordedVote = true
 		}
 		if abst > 0 {
-			hasAbstention = true
+			abstentionCount++
 		}
 
 		if contre > maxOpposition {
 			maxOpposition = contre
+		}
+		if contre > 0 {
+			oppositionCount++
 		}
 		if contre > 0 || abst > 0 {
 			nonUnanimousCount++
 		}
 	}
 
-	if maxOpposition > 0 {
-		s.voteClimat = "VOTES AVEC OPPOSITION"
-		s.climatColor = "#E11D48" // Rose 600
-	} else if hasAbstention {
-		s.voteClimat = "VOTES AVEC ABSTENTIONS"
-		s.climatColor = "#B45309" // Amber 700
+	if nonUnanimousCount > 0 {
+		s.voteClimat = "VOTES NON UNANIMES"
+		if maxOpposition > 0 {
+			s.climatColor = "#E11D48" // Rose 600
+		} else {
+			s.climatColor = "#B45309" // Amber 700
+		}
 	} else if hasRecordedVote {
 		s.voteClimat = "VOTES UNANIMES"
 		s.climatColor = "#059669" // Emerald 600
@@ -196,6 +231,12 @@ func computeColdNewsletterStats(cold []ColdDeliberation) coldNewsletterStats {
 	parts := []string{}
 	if nonUnanimousCount > 0 {
 		parts = append(parts, fmt.Sprintf("%d délib. non unanime%s", nonUnanimousCount, plural(nonUnanimousCount)))
+		if oppositionCount > 0 {
+			parts = append(parts, fmt.Sprintf("%d avec voix contre", oppositionCount))
+		}
+		if abstentionCount > 0 {
+			parts = append(parts, fmt.Sprintf("%d avec abstention%s", abstentionCount, plural(abstentionCount)))
+		}
 		if maxOpposition > 0 {
 			parts = append(parts, fmt.Sprintf("jusqu'à %d voix contre", maxOpposition))
 		}
@@ -381,6 +422,7 @@ func buildColdNewsletterPrompt(
 	sb.WriteString("- INTERDICTION FORMELLE : N'ajoute JAMAIS de liens HTML ou de texte 'En savoir plus' dans les champs context ou impact.\n")
 	sb.WriteString("- CATÉGORISATION STRICTE : Police et Vidéoprotection → Sécurité. Clubs sportifs → Sport.\n")
 	sb.WriteString("- AFFICHAGE CONDITIONNEL : Ne mentionne pas de budget ('0 €') si l'impact est nul. Laisse le champ budget vide.\n")
+	sb.WriteString("- VARIATIONS BUDGÉTAIRES : Les données distinguent l'enveloppe autorisée pour engager un projet sur plusieurs années (AP) et les paiements prévus pour une année donnée (CP). Présente ces notions en langage courant, avec la période, le libellé et chaque montant ; ce sont des ajustements de budget, pas des dépenses ou recettes. Ne fusionne pas ces lignes et n'en omets aucune.\n")
 	sb.WriteString("- STYLE : descriptif, factuel, neutre. Phrases courtes. Aucun adjectif évaluatif (excellent, ambitieux, coûteux, important, crucial…).\n\n")
 
 	fmt.Fprintf(&sb, "DONNÉES D'ENTRÉE :\n")
@@ -412,7 +454,7 @@ func buildColdNewsletterPrompt(
 			tensions = append(tensions, d)
 			continue
 		}
-		if d.IsSubstantial || d.BudgetImpact >= 5000 {
+		if d.IsSubstantial || d.BudgetImpact >= 5000 || len(d.BudgetChanges) > 0 {
 			major = append(major, d)
 			continue
 		}
@@ -438,8 +480,8 @@ func buildColdNewsletterPrompt(
 		if d.Pour != nil {
 			pour = *d.Pour
 		}
-		fmt.Fprintf(&sb, "- ID: %s\n  Titre: %s\n  Tag: %s | Budget: %d€ | Type: %s | Note financière: %s | Vote: %d/%d/%d (pour/contre/abst)\n  Décision votée: %s\n  Résumé: %s\n  Impact: %s\n\n",
-			d.ID, d.Title, d.TopicTag, d.BudgetImpact, d.BudgetType, d.BudgetNote,
+		fmt.Fprintf(&sb, "- ID: %s\n  Titre: %s\n  Tag: %s | Budget: %d€ | Type: %s | Note financière: %s | Variations AP/CP: %s | Vote: %d/%d/%d (pour/contre/abst)\n  Décision votée: %s\n  Résumé: %s\n  Impact: %s\n\n",
+			d.ID, d.Title, d.TopicTag, d.BudgetImpact, d.BudgetType, d.BudgetNote, formatBudgetChangesFR(d.BudgetChanges),
 			pour, contre, abst, d.Decision, d.Summary, d.Impacts)
 	}
 	if len(tensions) == 0 {
@@ -449,8 +491,8 @@ func buildColdNewsletterPrompt(
 	sb.WriteString("\nDÉLIBÉRATIONS ADOPTÉES SIGNIFICATIVES (A FILTRER POUR adopted[] et briefs[]) :\n")
 	significant := append(major, local...)
 	for _, d := range significant {
-		fmt.Fprintf(&sb, "- ID: %s\n  Titre: %s\n  Tag: %s | Budget: %d€ | Type: %s | Note financière: %s\n  Décision votée: %s\n  Résumé: %s\n  Impact: %s\n\n",
-			d.ID, d.Title, d.TopicTag, d.BudgetImpact, d.BudgetType, d.BudgetNote, d.Decision, d.Summary, d.Impacts)
+		fmt.Fprintf(&sb, "- ID: %s\n  Titre: %s\n  Tag: %s | Budget: %d€ | Type: %s | Note financière: %s | Variations AP/CP: %s\n  Décision votée: %s\n  Résumé: %s\n  Impact: %s\n\n",
+			d.ID, d.Title, d.TopicTag, d.BudgetImpact, d.BudgetType, d.BudgetNote, formatBudgetChangesFR(d.BudgetChanges), d.Decision, d.Summary, d.Impacts)
 	}
 	if len(significant) == 0 {
 		sb.WriteString("(néant)\n")
@@ -622,7 +664,11 @@ func finalizeNewsletterParams(params *NewsletterParams, councilDate string,
 	}
 
 	for i := range params.Tensions {
-		params.Tensions[i].Budget = formatBudgetStr(params.Tensions[i].Budget)
+		if changes := budgetChangesForID(params.Tensions[i].SourceID, cold); len(changes) > 0 {
+			params.Tensions[i].Budget = formatBudgetChangesFR(changes)
+		} else {
+			params.Tensions[i].Budget = formatBudgetStr(params.Tensions[i].Budget)
+		}
 		params.Tensions[i].HasBudget = params.Tensions[i].Budget != ""
 		params.Tensions[i].Context = stripLinks(params.Tensions[i].Context)
 		params.Tensions[i].Impact = stripLinks(params.Tensions[i].Impact)
@@ -646,7 +692,11 @@ func finalizeNewsletterParams(params *NewsletterParams, councilDate string,
 		}
 	}
 	for i := range params.Adopted {
-		params.Adopted[i].Budget = formatBudgetStr(params.Adopted[i].Budget)
+		if changes := budgetChangesForID(params.Adopted[i].SourceID, cold); len(changes) > 0 {
+			params.Adopted[i].Budget = formatBudgetChangesFR(changes)
+		} else {
+			params.Adopted[i].Budget = formatBudgetStr(params.Adopted[i].Budget)
+		}
 		params.Adopted[i].HasBudget = params.Adopted[i].Budget != ""
 		params.Adopted[i].Context = stripLinks(params.Adopted[i].Context)
 		params.Adopted[i].Impact = stripLinks(params.Adopted[i].Impact)
@@ -662,6 +712,15 @@ func finalizeNewsletterParams(params *NewsletterParams, councilDate string,
 	}
 	params.MainIssue = deterministicMainIssue(params)
 
+}
+
+func budgetChangesForID(sourceID string, cold []ColdDeliberation) []BudgetChange {
+	for _, d := range cold {
+		if d.ID == sourceID && sourceID != "" {
+			return d.BudgetChanges
+		}
+	}
+	return nil
 }
 
 func mentionsBudgetPeriod(s string) bool {

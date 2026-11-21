@@ -79,6 +79,25 @@ func TestD1_Pass(t *testing.T) {
 	}
 }
 
+func TestBudgetChangesAreSeparateFromFinancialFlows(t *testing.T) {
+	d := okDelib("D10-2026_128.pdf")
+	d.BudgetImpact = 0
+	d.BudgetType = "AUCUN"
+	d.BudgetChanges = []BudgetChange{
+		{Scope: "CP", Direction: "BAISSE", Label: "Prévert", Amount: 200_000, Period: "2026"},
+		{Scope: "CP", Direction: "BAISSE", Label: "Complexe sportif polyvalent", Amount: 1_000_000, Period: "2026"},
+		{Scope: "AP", Direction: "BAISSE", Label: "Prévert", Amount: 500_000},
+	}
+	if got := ValidateDeterministic(okCouncil(), []DeliberationView{d}); hasRule(got, "D1_BUDGET_CHANGE_CLASSIFICATION") {
+		t.Fatalf("valid AP/CP adjustments were classified as a cash flow: %v", got)
+	}
+	d.BudgetType = "DÉPENSE"
+	d.BudgetImpact = 1_200_000
+	if got := ValidateDeterministic(okCouncil(), []DeliberationView{d}); !hasRule(got, "D1_BUDGET_CHANGE_CLASSIFICATION") {
+		t.Fatalf("misclassified AP/CP adjustments passed QC: %v", got)
+	}
+}
+
 func TestD1_InvalidTopicTag(t *testing.T) {
 	d := okDelib("d1")
 	d.TopicTag = "CategorieFictive"

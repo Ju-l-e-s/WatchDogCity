@@ -93,26 +93,27 @@ type budgetBreakdownRec struct {
 }
 
 type deliberationRec struct {
-	ID              string               `dynamodbav:"id"`
-	Counted         bool                 `dynamodbav:"counted"`
-	FactCheckModel  string               `dynamodbav:"fact_check_model"`
-	FactCheckedAt   string               `dynamodbav:"fact_checked_at"`
-	Title           string               `dynamodbav:"title"`
-	TopicTag        string               `dynamodbav:"topic_tag"`
-	PDFURL          string               `dynamodbav:"pdf_url"`
-	Summary         string               `dynamodbav:"summary"`
-	AnalysisData    analysisDataRec      `dynamodbav:"analysis_data"`
-	BudgetImpact    int64                `dynamodbav:"budget_impact"`
-	BudgetType      string               `dynamodbav:"budget_type"`
-	BudgetNote      string               `dynamodbav:"budget_note"`
-	BudgetBreakdown []budgetBreakdownRec `dynamodbav:"budget_breakdown"`
-	ClimateImpact   string               `dynamodbav:"climate_impact"`
-	HasVote         bool                 `dynamodbav:"has_vote"`
-	VotePour        *int                 `dynamodbav:"vote_pour"`
-	VoteContre      *int                 `dynamodbav:"vote_contre"`
-	VoteAbst        *int                 `dynamodbav:"vote_abstention"`
-	Disagreements   *string              `dynamodbav:"disagreements"`
-	IsSubstantial   bool                 `dynamodbav:"is_substantial"`
+	ID              string                `dynamodbav:"id"`
+	Counted         bool                  `dynamodbav:"counted"`
+	FactCheckModel  string                `dynamodbav:"fact_check_model"`
+	FactCheckedAt   string                `dynamodbav:"fact_checked_at"`
+	Title           string                `dynamodbav:"title"`
+	TopicTag        string                `dynamodbav:"topic_tag"`
+	PDFURL          string                `dynamodbav:"pdf_url"`
+	Summary         string                `dynamodbav:"summary"`
+	AnalysisData    analysisDataRec       `dynamodbav:"analysis_data"`
+	BudgetImpact    int64                 `dynamodbav:"budget_impact"`
+	BudgetType      string                `dynamodbav:"budget_type"`
+	BudgetNote      string                `dynamodbav:"budget_note"`
+	BudgetBreakdown []budgetBreakdownRec  `dynamodbav:"budget_breakdown"`
+	BudgetChanges   []shared.BudgetChange `dynamodbav:"budget_changes"`
+	ClimateImpact   string                `dynamodbav:"climate_impact"`
+	HasVote         bool                  `dynamodbav:"has_vote"`
+	VotePour        *int                  `dynamodbav:"vote_pour"`
+	VoteContre      *int                  `dynamodbav:"vote_contre"`
+	VoteAbst        *int                  `dynamodbav:"vote_abstention"`
+	Disagreements   *string               `dynamodbav:"disagreements"`
+	IsSubstantial   bool                  `dynamodbav:"is_substantial"`
 }
 
 // ── Handler ───────────────────────────────────────────────────────────────────
@@ -705,6 +706,7 @@ func toDeliberationViews(recs []deliberationRec) []shared.DeliberationView {
 			BudgetType:      r.BudgetType,
 			BudgetNote:      r.BudgetNote,
 			BudgetBreakdown: breakdown,
+			BudgetChanges:   r.BudgetChanges,
 			ClimateImpact:   r.ClimateImpact,
 			HasVote:         r.HasVote,
 			VotePour:        r.VotePour,
@@ -748,6 +750,7 @@ func toColdDelibs(delibs []shared.DeliberationView) []shared.ColdDeliberation {
 			BudgetImpact:    d.BudgetImpact,
 			BudgetType:      d.BudgetType,
 			BudgetNote:      d.BudgetNote,
+			BudgetChanges:   d.BudgetChanges,
 			HasVote:         d.HasVote,
 			Pour:            d.VotePour,
 			Contre:          d.VoteContre,

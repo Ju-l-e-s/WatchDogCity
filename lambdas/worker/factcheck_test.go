@@ -148,6 +148,7 @@ func TestFactCheckPayloadIncludesSourceFacingFields(t *testing.T) {
 	assert.Contains(t, string(payload), `"analysis_data"`)
 	assert.Contains(t, string(payload), `"vote"`)
 	assert.Contains(t, string(payload), `"budget_impact"`)
+	assert.Contains(t, string(payload), `"budget_changes"`)
 	assert.NotContains(t, string(payload), `"input_tokens"`)
 }
 

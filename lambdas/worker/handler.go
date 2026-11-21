@@ -152,6 +152,7 @@ func (h *WorkerHandler) handleRecord(ctx context.Context, msg SQSPayload, result
 		"budget_impact":    result.BudgetImpact,
 		"budget_type":      result.BudgetType,
 		"budget_breakdown": result.BudgetBreakdown,
+		"budget_changes":   result.BudgetChanges,
 		"climate_impact":   result.ClimateImpact,
 		"key_points":       result.KeyPoints,
 		"has_vote":         result.Vote.HasVote,

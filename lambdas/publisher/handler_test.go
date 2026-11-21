@@ -216,6 +216,16 @@ func TestBuildDataJSON_PublishesOptionalBudgetNote(t *testing.T) {
 	assert.Equal(t, "Redevance annuelle, montant minimum.", data.Councils[0].Deliberations[0].BudgetNote)
 }
 
+func TestBuildDataJSONPublishesStructuredBudgetChanges(t *testing.T) {
+	data, err := buildDataJSON(context.Background(), nil, []CouncilRecord{{CouncilID: "legacy"}}, map[string][]DeliberationRecord{
+		"legacy": {{ID: "D10-2026_128.pdf", BudgetChanges: []BudgetChangeItem{{Scope: "CP", Direction: "BAISSE", Label: "Prévert", Amount: 200_000}}}},
+	})
+	require.NoError(t, err)
+	require.Len(t, data.Councils, 1)
+	require.Len(t, data.Councils[0].Deliberations[0].BudgetChanges, 1)
+	assert.Equal(t, "CP", data.Councils[0].Deliberations[0].BudgetChanges[0].Scope)
+}
+
 // --- HasVote detection ---
 // HasVote in the output must be true whenever vote counts are present,
 // even if the source record has HasVote=false (e.g. reprocessed without the flag).

@@ -70,6 +70,26 @@ func TestParseGeminiResponseBudgetNote(t *testing.T) {
 	assert.Equal(t, "Recette ponctuelle de 696 000 € TTC, cession autorisée ; vente non encore attestée.", r.BudgetNote)
 }
 
+func TestParseAndValidateAPCPBudgetChanges(t *testing.T) {
+	r, err := parseGeminiResponse(`{"title":"Ajustement AP/CP","budget_impact":0,"budget_type":"AUCUN","budget_changes":[{"scope":"CP","direction":"BAISSE","label":"Prévert","amount":200000,"period":"2026"},{"scope":"AP","direction":"BAISSE","label":"Prévert","amount":500000}]}`)
+	require.NoError(t, err)
+	r.TopicTag = "Budget"
+	r.ClimateImpact = "neutre"
+	require.NoError(t, validateGeminiResult(r))
+	require.Len(t, r.BudgetChanges, 2)
+	assert.Equal(t, "CP", r.BudgetChanges[0].Scope)
+	assert.Equal(t, int64(200000), r.BudgetChanges[0].Amount)
+	assert.Equal(t, "BAISSE", r.BudgetChanges[1].Direction)
+}
+
+func TestValidateGeminiResultRejectsBudgetChangeMisclassifiedAsExpense(t *testing.T) {
+	r := validResultFixture()
+	r.BudgetChanges = []BudgetChangeItem{{Scope: "CP", Direction: "BAISSE", Label: "2026", Amount: 1_200_000}}
+	r.BudgetImpact = 1_200_000
+	r.BudgetType = "DÉPENSE"
+	require.ErrorContains(t, validateGeminiResult(r), "budget_changes")
+}
+
 // --- Float sanitization regression (obs 299) ---
 
 func TestParseGeminiResponse_BudgetImpactFloat(t *testing.T) {

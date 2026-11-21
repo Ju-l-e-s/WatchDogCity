@@ -30,7 +30,7 @@ Extrais les informations du PDF fourni au format JSON strict imposé par le sch�
 
 RÈGLES IMPÉRATIVES DE TRAITEMENT :
 
-1. CATÉGORISATION FINANCIÈRE ("budget_type" et "budget_impact") :
+1. CATÉGORISATION FINANCIÈRE ("budget_type", "budget_impact", "budget_changes") :
    - Extrais le montant principal en EUROS ENTIERS dans "budget_impact" (pas en centimes ; ne multiplie ni ne convertis aucun montant). Valeur 0 si aucun montant.
    - Une dépense ou une recette autorisée n'est pas à elle seule un montant chiffré. Si le PDF ne donne aucun total et qu'il est impossible de le calculer sans hypothèse (par exemple une rémunération dépendant d'un volume futur), indique 0 et "AUCUN" ; n'estime rien.
    - Tu DOIS qualifier ce flux dans "budget_type" en utilisant UNIQUEMENT l'une de ces 4 valeurs exactes :
@@ -38,6 +38,8 @@ RÈGLES IMPÉRATIVES DE TRAITEMENT :
      * "RECETTE" : La ville gagne ou collecte de l'argent (impôts, taxes, vente de biens, dotations).
      * "CAUTION" : La ville se porte garante ou cautionne un prêt (ex: Agence France Locale).
      * "AUCUN" : si et seulement si budget_impact = 0. Tout montant non nul (même faible) DOIT porter le type DÉPENSE, RECETTE ou CAUTION. Réciproquement, budget_impact = 0 impose budget_type = "AUCUN".
+   - Pour une délibération qui modifie des crédits ou enveloppes pluriannuelles (AP/CP), n'enregistre PAS ces variations comme une dépense ou une recette dans budget_impact. Mets budget_impact=0, budget_type="AUCUN", et décris chaque variation dans budget_changes avec scope="AP" ou "CP", direction="HAUSSE" ou "BAISSE", le libellé, le montant positif en euros entiers et la période si elle est indiquée. Distingue chaque enveloppe et période ; ne confonds jamais le total CP et une composante AP.
+   - Pour les autres montants financiers, budget_changes=[] et utilise les champs historiques budget_impact/type.
    - Renseigne "budget_note" en une phrase courte lorsque budget_impact est non nul : précise si le montant est ponctuel, mensuel ou annuel, sa composition si plusieurs flux sont additionnés, et s'il est voté, demandé, conditionnel ou déjà versé. N'invente aucune période ou certitude absente du PDF. Si aucun montant n'est connu, laisse "budget_note" vide.
 
 2. TITRE ("title") :
@@ -58,7 +60,7 @@ RÈGLES IMPÉRATIVES DE TRAITEMENT :
    - INTERDICTION ABSOLUE DU JARGON COMPTABLE ET LÉGAL :
      * Ne mentionne jamais de codes d'imputation budgétaire (ex: pas de "Chapitre 65", "nature 657363", "article 65748").
      * Ne cite jamais d'articles de loi ou de codes juridiques bruts (ex: bannir "article L.2241-1 du CGCT", "décret n°..."). Écris plutôt : "Conformément à la loi..." ou "Selon la réglementation...".
-     * Vulgarise systématiquement tous les acronymes ou termes techniques entre parenthèses lors de leur première apparition (ex: écrire "CFU (le bilan financier de l'année passée)", "CCAS (l'organisme d'action sociale de la ville)", "AP/CP (la programmation pluriannuelle des investissements)", "TPE (la taxe sur la publicité extérieure)", "ZAC (zone d'aménagement concerté)", "DSP (délégation de service public)").
+     * Vulgarise systématiquement tous les acronymes ou termes techniques entre parenthèses lors de leur première apparition. Pour AP, explique "enveloppe autorisée pour engager un projet sur plusieurs années" ; pour CP, explique "paiements prévus pour une année donnée". Ne présente jamais AP/CP sans cette explication dans le texte destiné au public.
    - STYLE JOURNALISTIQUE PÉDAGOGIQUE :
      * Traduis les termes administratifs en langage clair (ex: au lieu d'écrire "décision budgétaire modificative" ou "budget supplémentaire", explique : "Le conseil ajuste les comptes en cours d'année pour réallouer l'argent là où les besoins sont les plus urgents.").
      * Évite les répétitions et les formules vides de sens (ne pas écrire "le budget est concentré sur le budget").
@@ -91,6 +93,14 @@ type BudgetBreakdownItem struct {
 	Amount   int64  `json:"amount"    dynamodbav:"amount"`
 }
 
+type BudgetChangeItem struct {
+	Scope     string `json:"scope" dynamodbav:"scope"`
+	Direction string `json:"direction" dynamodbav:"direction"`
+	Label     string `json:"label" dynamodbav:"label"`
+	Amount    int64  `json:"amount" dynamodbav:"amount"`
+	Period    string `json:"period,omitempty" dynamodbav:"period,omitempty"`
+}
+
 type GeminiResult struct {
 	Title         string            `json:"title"`
 	Summary       string            `json:"summary"`
@@ -107,6 +117,7 @@ type GeminiResult struct {
 	BudgetType      string                `json:"budget_type"`
 	BudgetNote      string                `json:"budget_note"`
 	BudgetBreakdown []BudgetBreakdownItem `json:"budget_breakdown"`
+	BudgetChanges   []BudgetChangeItem    `json:"budget_changes"`
 	ClimateImpact   string                `json:"climate_impact"`
 	KeyPoints       []string              `json:"key_points"`
 	Vote            struct {
@@ -157,6 +168,14 @@ var deliberationSchema = &genai.Schema{
 			Enum:   validBudgetTypes,
 		},
 		"budget_note": {Type: genai.TypeString},
+		"budget_changes": {
+			Type: genai.TypeArray,
+			Items: &genai.Schema{Type: genai.TypeObject, Properties: map[string]*genai.Schema{
+				"scope":     {Type: genai.TypeString, Format: "enum", Enum: []string{"AP", "CP", "AUTRE"}},
+				"direction": {Type: genai.TypeString, Format: "enum", Enum: []string{"HAUSSE", "BAISSE"}},
+				"label":     {Type: genai.TypeString}, "amount": {Type: genai.TypeInteger, Format: "int64"}, "period": {Type: genai.TypeString},
+			}, PropertyOrdering: []string{"scope", "direction", "label", "amount", "period"}, Required: []string{"scope", "direction", "label", "amount"}},
+		},
 		"budget_breakdown": {
 			Type: genai.TypeArray,
 			Items: &genai.Schema{
@@ -194,13 +213,13 @@ var deliberationSchema = &genai.Schema{
 	},
 	PropertyOrdering: []string{
 		"title", "summary", "topic_tag", "is_substantial", "acronyms",
-		"analysis_data", "budget_impact", "budget_type", "budget_note", "budget_breakdown",
+		"analysis_data", "budget_impact", "budget_type", "budget_note", "budget_breakdown", "budget_changes",
 		"climate_impact", "key_points", "vote", "disagreements",
 	},
 	Required: []string{
 		"title", "summary", "topic_tag", "is_substantial",
 		"analysis_data", "budget_impact", "budget_type", "budget_note",
-		"climate_impact", "key_points", "vote",
+		"budget_changes", "climate_impact", "key_points", "vote",
 	},
 }
 
@@ -333,6 +352,20 @@ func validateGeminiResult(r *GeminiResult) error {
 
 	if r.BudgetType == "AUCUN" && r.BudgetImpact != 0 {
 		return fmt.Errorf("budget_type=AUCUN but budget_impact=%d", r.BudgetImpact)
+	}
+	if len(r.BudgetChanges) > 0 && (r.BudgetImpact != 0 || r.BudgetType != "AUCUN") {
+		return fmt.Errorf("budget_changes must be separate from budget_impact/type")
+	}
+	for i, change := range r.BudgetChanges {
+		if change.Scope != "AP" && change.Scope != "CP" && change.Scope != "AUTRE" {
+			return fmt.Errorf("budget_changes[%d] has invalid scope %q", i, change.Scope)
+		}
+		if change.Direction != "HAUSSE" && change.Direction != "BAISSE" {
+			return fmt.Errorf("budget_changes[%d] has invalid direction %q", i, change.Direction)
+		}
+		if change.Amount <= 0 || strings.TrimSpace(change.Label) == "" {
+			return fmt.Errorf("budget_changes[%d] requires a positive amount and label", i)
+		}
 	}
 	if r.BudgetImpact != 0 && strings.TrimSpace(r.BudgetNote) == "" {
 		return fmt.Errorf("budget_note required when budget_impact=%d", r.BudgetImpact)

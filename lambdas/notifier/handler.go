@@ -61,19 +61,21 @@ type councilRec struct {
 }
 
 type deliberationRec struct {
-	ID            string  `dynamodbav:"id"`
-	CouncilID     string  `dynamodbav:"council_id"`
-	Title         string  `dynamodbav:"title"`
-	TopicTag      string  `dynamodbav:"topic_tag"`
-	BudgetImpact  int64   `dynamodbav:"budget_impact"`
-	BudgetType    string  `dynamodbav:"budget_type"`
-	VotePour      *int    `dynamodbav:"vote_pour"`
-	VoteContre    *int    `dynamodbav:"vote_contre"`
-	VoteAbst      *int    `dynamodbav:"vote_abstention"`
-	Disagreements *string `dynamodbav:"disagreements"`
-	ClimateImpact string  `dynamodbav:"climate_impact"`
-	IsSubstantial bool    `dynamodbav:"is_substantial"`
-	Summary       string  `dynamodbav:"summary"`
+	ID            string                `dynamodbav:"id"`
+	CouncilID     string                `dynamodbav:"council_id"`
+	Title         string                `dynamodbav:"title"`
+	TopicTag      string                `dynamodbav:"topic_tag"`
+	BudgetImpact  int64                 `dynamodbav:"budget_impact"`
+	BudgetType    string                `dynamodbav:"budget_type"`
+	BudgetNote    string                `dynamodbav:"budget_note"`
+	BudgetChanges []shared.BudgetChange `dynamodbav:"budget_changes"`
+	VotePour      *int                  `dynamodbav:"vote_pour"`
+	VoteContre    *int                  `dynamodbav:"vote_contre"`
+	VoteAbst      *int                  `dynamodbav:"vote_abstention"`
+	Disagreements *string               `dynamodbav:"disagreements"`
+	ClimateImpact string                `dynamodbav:"climate_impact"`
+	IsSubstantial bool                  `dynamodbav:"is_substantial"`
+	Summary       string                `dynamodbav:"summary"`
 	AnalysisData  struct {
 		Impacts *string `dynamodbav:"impacts"`
 	} `dynamodbav:"analysis_data"`
@@ -545,10 +547,13 @@ func toColdDelibs(delibs []deliberationRec) []shared.ColdDeliberation {
 		}
 
 		cold[i] = shared.ColdDeliberation{
+			ID:              d.ID,
 			Title:           d.Title,
 			TopicTag:        d.TopicTag,
 			BudgetImpact:    d.BudgetImpact,
 			BudgetType:      d.BudgetType,
+			BudgetNote:      d.BudgetNote,
+			BudgetChanges:   d.BudgetChanges,
 			HasVote:         d.VotePour != nil || d.VoteContre != nil || d.VoteAbst != nil,
 			Pour:            d.VotePour,
 			Contre:          d.VoteContre,

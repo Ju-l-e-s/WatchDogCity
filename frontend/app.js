@@ -605,9 +605,21 @@ function renderDeliberationRow(e) {
           l = highlightText(e.summary, searchQuery, e.acronyms), 
           i = highlightText(e.topic_tag || "Délibération", searchQuery);
     
+    const budgetChanges = Array.isArray(e.budget_changes) ? e.budget_changes : [];
+    const budgetChangeRows = budgetChanges.map(change => {
+        const direction = change.direction === 'BAISSE' ? 'baisse' : 'hausse';
+        const period = change.period ? escapeHTML(change.period) : 'la période concernée';
+        const scope = change.scope === 'AP' ? 'Enveloppe autorisée pour engager le projet sur plusieurs années (AP)' :
+            change.scope === 'CP' ? `Paiements prévus en ${period} (CP)` : 'Montant budgétaire';
+        const label = change.label ? ` — ${escapeHTML(change.label)}` : '';
+        return `<p class="text-xs text-slate-700">${scope}${label} : ${direction} de <strong>${formatBudget(change.amount)} €</strong></p>`;
+    }).join('');
+
     // Badge budgétaire pour Option C
     let budgetBadge = '';
-    if (e.budget_impact > 0) {
+    if (budgetChanges.length > 0) {
+        budgetBadge = `<span class="inline-flex items-center whitespace-nowrap shrink-0 px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200 ml-2 shadow-sm">↕ Budget ajusté</span>`;
+    } else if (e.budget_impact > 0) {
         let badgeClasses = 'bg-slate-100 text-slate-700 border-slate-200';
         let icon = '💰';
         let typeLabel = 'Montant mentionné';
@@ -620,7 +632,16 @@ function renderDeliberationRow(e) {
     if (e.analysis_data) {
         // Détail budgétaire dans Éclairage pour Option C
         let budgetDetail = '';
-        if (e.budget_impact > 0) {
+        if (budgetChanges.length > 0) {
+            budgetDetail = `
+                <div class="mb-6">
+                    <p class="text-[11px] font-semibold text-brand-600 uppercase tracking-widest mb-1.5">Variations budgétaires</p>
+                    <div class="space-y-1">${budgetChangeRows}</div>
+                    <p class="text-[11px] text-slate-500 mt-2">L’enveloppe autorisée couvre l’engagement d’un projet sur plusieurs années. Les paiements prévus indiquent les sommes prévues pour l’année concernée.</p>
+                    ${e.budget_note ? `<p class="text-xs text-slate-600 mt-2">${escapeHTML(e.budget_note)}</p>` : ''}
+                </div>
+            `;
+        } else if (e.budget_impact > 0) {
             let badgeClasses = 'text-slate-600 bg-slate-100 border-slate-200'; // Fallback
             let icon = '💰';
             let typeLabel = e.budget_type || 'montant mentionné';

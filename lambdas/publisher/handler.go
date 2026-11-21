@@ -59,6 +59,14 @@ type BudgetBreakdownItem struct {
 	Amount   int64  `dynamodbav:"amount"    json:"amount"`
 }
 
+type BudgetChangeItem struct {
+	Scope     string `dynamodbav:"scope" json:"scope"`
+	Direction string `dynamodbav:"direction" json:"direction"`
+	Label     string `dynamodbav:"label" json:"label"`
+	Amount    int64  `dynamodbav:"amount" json:"amount"`
+	Period    string `dynamodbav:"period,omitempty" json:"period,omitempty"`
+}
+
 type DeliberationRecord struct {
 	ID              string                `dynamodbav:"id"`
 	Counted         bool                  `dynamodbav:"counted"`
@@ -76,6 +84,7 @@ type DeliberationRecord struct {
 	BudgetType      string                `dynamodbav:"budget_type"`
 	BudgetNote      string                `dynamodbav:"budget_note"`
 	BudgetBreakdown []BudgetBreakdownItem `dynamodbav:"budget_breakdown"`
+	BudgetChanges   []BudgetChangeItem    `dynamodbav:"budget_changes"`
 	HasVote         bool                  `dynamodbav:"has_vote"`
 	VotePour        *int                  `dynamodbav:"vote_pour"`
 	VoteContre      *int                  `dynamodbav:"vote_contre"`
@@ -116,6 +125,7 @@ type DeliberationOutput struct {
 	BudgetType      string                `json:"budget_type"`
 	BudgetNote      string                `json:"budget_note,omitempty"`
 	BudgetBreakdown []BudgetBreakdownItem `json:"budget_breakdown"`
+	BudgetChanges   []BudgetChangeItem    `json:"budget_changes,omitempty"`
 	Vote            VoteCount             `json:"vote"`
 	Disagreements   *string               `json:"disagreements"`
 }
@@ -192,6 +202,7 @@ func buildDataJSON(ctx context.Context, ddb *dynamodb.Client, councils []Council
 				BudgetType:      d.BudgetType,
 				BudgetNote:      d.BudgetNote,
 				BudgetBreakdown: d.BudgetBreakdown,
+				BudgetChanges:   d.BudgetChanges,
 				Vote: VoteCount{
 					HasVote:    d.HasVote || d.VotePour != nil || d.VoteContre != nil || d.VoteAbstention != nil,
 					Pour:       d.VotePour,

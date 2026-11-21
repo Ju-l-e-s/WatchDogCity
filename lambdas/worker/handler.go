@@ -110,6 +110,14 @@ func (h *WorkerHandler) HandleRequest(ctx context.Context, event events.SQSEvent
 		if err != nil {
 			log.Printf("fact-check failed for %s: %v", msg.PDFURL, err)
 			log.Printf("METRIC: GeminiFactCheckFailure count=1 deliberation=%s", deliberationID(msg.PDFURL))
+			// A factual FAIL is a document-level rejection. Transport, empty, or
+			// malformed model responses indicate Gemini instability and must feed
+			// the same circuit breaker as extraction failures.
+			if !isSubstantiveFactCheckRejection(err) {
+				if rerr := shared.RecordGeminiError(ctx, h.ddb, councilsTable); rerr != nil {
+					log.Printf("warn: record Gemini fact-check error: %v", rerr)
+				}
+			}
 			failures = append(failures, events.SQSBatchItemFailure{ItemIdentifier: record.MessageId})
 			continue
 		}

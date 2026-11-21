@@ -38,6 +38,15 @@ func (f *fakeCircuitDDB) GetItem(_ context.Context, _ *dynamodb.GetItemInput, _ 
 func (f *fakeCircuitDDB) UpdateItem(_ context.Context, in *dynamodb.UpdateItemInput, _ ...func(*dynamodb.Options)) (*dynamodb.UpdateItemOutput, error) {
 	expr := aws.ToString(in.UpdateExpression)
 	switch {
+	case strings.HasPrefix(expr, "SET error_count = :zero"):
+		now, _ := strconv.ParseInt(in.ExpressionAttributeValues[":now"].(*types.AttributeValueMemberN).Value, 10, 64)
+		if f.windowEnd != 0 && f.windowEnd < now {
+			f.errorCount = 0
+			f.windowEnd, _ = strconv.ParseInt(in.ExpressionAttributeValues[":wend"].(*types.AttributeValueMemberN).Value, 10, 64)
+			f.openUntil = nil
+			return &dynamodb.UpdateItemOutput{}, nil
+		}
+		return nil, &types.ConditionalCheckFailedException{}
 	case strings.HasPrefix(expr, "SET error_count"):
 		f.errorCount++
 		if f.windowEnd == 0 {
@@ -63,6 +72,27 @@ func (f *fakeCircuitDDB) UpdateItem(_ context.Context, in *dynamodb.UpdateItemIn
 		return nil, &types.ConditionalCheckFailedException{}
 	}
 	return &dynamodb.UpdateItemOutput{}, nil
+}
+
+func TestGeminiCircuit_ReopensAfterExpiredOutageWithoutSuccess(t *testing.T) {
+	openUntil := int64(1)
+	f := &fakeCircuitDDB{errorCount: 11, windowEnd: 1, openUntil: &openUntil}
+	ctx := context.Background()
+
+	if err := RecordGeminiError(ctx, f, "councils"); err != nil {
+		t.Fatalf("record first post-window error: %v", err)
+	}
+	if f.errorCount != 1 || f.openUntil != nil {
+		t.Fatalf("expired circuit should start a fresh window, got count=%d openUntil=%v", f.errorCount, f.openUntil)
+	}
+	for i := 0; i < errorThreshold-1; i++ {
+		if err := RecordGeminiError(ctx, f, "councils"); err != nil {
+			t.Fatalf("record continued outage error %d: %v", i, err)
+		}
+	}
+	if f.openUntil == nil {
+		t.Fatalf("circuit did not reopen after %d errors in fresh window", errorThreshold)
+	}
 }
 
 // TestGeminiCircuit_OpensAfterThreshold drives errors up to and past the

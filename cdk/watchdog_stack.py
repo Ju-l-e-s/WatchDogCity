@@ -119,7 +119,10 @@ class WatchdogStack(Stack):
             queue_name="watchdog-pdf-queue",
             visibility_timeout=Duration.minutes(6),
             dead_letter_queue=sqs.DeadLetterQueue(
-                max_receive_count=3,
+                # Keep messages alive across the 10-minute Gemini circuit-breaker
+                # window; transient quota/provider recovery should not strand an
+                # entire council in the DLQ after only three receives.
+                max_receive_count=5,
                 queue=dlq,
             ),
         )

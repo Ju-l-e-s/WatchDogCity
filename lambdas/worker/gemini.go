@@ -32,6 +32,7 @@ RÈGLES IMPÉRATIVES DE TRAITEMENT :
 
 1. CATÉGORISATION FINANCIÈRE ("budget_type" et "budget_impact") :
    - Extrais le montant principal en EUROS ENTIERS dans "budget_impact" (pas en centimes ; ne multiplie ni ne convertis aucun montant). Valeur 0 si aucun montant.
+   - Une dépense ou une recette autorisée n'est pas à elle seule un montant chiffré. Si le PDF ne donne aucun total et qu'il est impossible de le calculer sans hypothèse (par exemple une rémunération dépendant d'un volume futur), indique 0 et "AUCUN" ; n'estime rien.
    - Tu DOIS qualifier ce flux dans "budget_type" en utilisant UNIQUEMENT l'une de ces 4 valeurs exactes :
      * "DÉPENSE" : La ville paie ou verse de l'argent (subvention, achat, travaux, frais).
      * "RECETTE" : La ville gagne ou collecte de l'argent (impôts, taxes, vente de biens, dotations).
@@ -66,7 +67,8 @@ RÈGLES IMPÉRATIVES DE TRAITEMENT :
 
 6. RECADRAGE DE LA SECTION DÉSACCORDS / CONTROVERSES ("disagreements") :
    - Fais la différence entre une règle de procédure administrative obligatoire (ex: "Le maire a dû quitter la salle car il ne peut pas voter sur son propre bilan financier") et un véritable débat politique ou vote d'opposition.
-   - Ne décris sous "disagreements" que les véritables tensions politiques, les débats de fond, ou les votes d'opposition (ex: voix contre). Si le vote s'est déroulé de façon standard sans opposition, écris : "Aucun désaccord, procédure standard."
+   - Si le vote comporte des voix contre ou des abstentions, indique leurs nombres de façon neutre et n'affirme pas "Aucun désaccord". N'invente pas les raisons d'une abstention ou d'un vote contre.
+   - Écris "Aucun désaccord, procédure standard." uniquement si le PDF établit qu'il n'y a ni voix contre ni abstention, ou si aucun vote n'a eu lieu et qu'aucune controverse n'est rapportée.
 
 7. STADE, TEMPS ET PÉRIODE :
    - Distingue strictement une proposition, une décision qui autorise une opération, une convention signée, un paiement reçu ou effectué, et une réalisation effective. Une autorisation ne prouve ni la signature ni l'encaissement.

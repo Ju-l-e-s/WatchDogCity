@@ -28,6 +28,8 @@ def main():
                         help="Generate and fact-check a newsletter from this local data.json")
     parser.add_argument("--newsletter-stage-test", action="store_true",
                         help="Test approval wording with real newsletter fact checker")
+    parser.add_argument("--recent-council-test", action="store_true",
+                        help="Run extraction and PDF fact checks for the three recent Bègles deliberations")
     args = parser.parse_args()
     # CDK injects GEMINI_API_KEY from CI into the deployed Lambda environment.
     # Keep the key in process memory and never print the configuration response.
@@ -41,7 +43,13 @@ def main():
         raise SystemExit("Gemini key is empty")
     env = os.environ.copy()
     env["GEMINI_API_KEY"] = key
-    if args.newsletter_stage_test:
+    if args.recent_council_test:
+        env["WATCHDOG_LIVE_RECENT_COUNCIL"] = "1"
+        subprocess.run(
+            ["go", "test", "-run", "^TestLiveRecentCouncilPDFsPassFactCheck$", "-count=1", "-v", "./..."],
+            cwd=ROOT / "lambdas" / "worker", env=env, check=True,
+        )
+    elif args.newsletter_stage_test:
         env["WATCHDOG_LIVE_FACTCHECK"] = "1"
         subprocess.run(
             ["go", "test", "-run", "^TestLiveNewsletterFactCheckRejectsCompletedClaims$", "-count=1", "-v", "./..."],

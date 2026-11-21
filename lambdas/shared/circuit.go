@@ -61,6 +61,23 @@ func RecordGeminiError(ctx context.Context, api CircuitAPI, table string) error 
 	now := time.Now().Unix()
 	windowEnd := now + int64(windowDuration.Seconds())
 	openUntil := now + int64(openDuration.Seconds())
+	// A previous outage may have left an expired open_until and an expired
+	// counting window. Clear both before counting this failure so the breaker
+	// can open again if Gemini is still unavailable.
+	_, err := api.UpdateItem(ctx, &dynamodb.UpdateItemInput{
+		TableName:           aws.String(table),
+		Key:                 circuitKey(),
+		UpdateExpression:    aws.String("SET error_count = :zero, window_end = :wend REMOVE open_until"),
+		ConditionExpression: aws.String("attribute_exists(window_end) AND window_end < :now"),
+		ExpressionAttributeValues: map[string]types.AttributeValue{
+			":zero": &types.AttributeValueMemberN{Value: "0"},
+			":wend": &types.AttributeValueMemberN{Value: strconv.FormatInt(windowEnd, 10)},
+			":now":  &types.AttributeValueMemberN{Value: strconv.FormatInt(now, 10)},
+		},
+	})
+	if err != nil && !isConditionalCheckFailed(err) {
+		return err
+	}
 
 	if _, err := api.UpdateItem(ctx, &dynamodb.UpdateItemInput{
 		TableName:        aws.String(table),
@@ -75,7 +92,7 @@ func RecordGeminiError(ctx context.Context, api CircuitAPI, table string) error 
 		return err
 	}
 
-	_, err := api.UpdateItem(ctx, &dynamodb.UpdateItemInput{
+	_, err = api.UpdateItem(ctx, &dynamodb.UpdateItemInput{
 		TableName:           aws.String(table),
 		Key:                 circuitKey(),
 		UpdateExpression:    aws.String("SET open_until = :ou"),

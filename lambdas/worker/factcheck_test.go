@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"os"
 	"strings"
 	"testing"
@@ -9,7 +10,14 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/genai"
 )
+
+func factCheckResponse(text string) *genai.GenerateContentResponse {
+	return &genai.GenerateContentResponse{Candidates: []*genai.Candidate{{
+		Content: &genai.Content{Parts: []*genai.Part{{Text: text}}},
+	}}}
+}
 
 func TestParseFactCheckResponse(t *testing.T) {
 	result, err := parseFactCheckResponse(`{"verdict":"FAIL","findings":[{"field":"analysis_data.impacts","claim":"980 m² d'espaces paysagers","reason":"Le nombre est la superficie totale de deux parcelles cédées","pdf_evidence":"superficie totale de 980 m²"}]}`)
@@ -48,6 +56,35 @@ func TestLiveFactCheckRejectsWrongTiming(t *testing.T) {
 	result.Summary = "Le Conseil municipal approuve une convention de financement pour des travaux de plantation réalisés en 2024-2025 ; la subvention est plafonnée à 23 792 € et son versement dépend de justificatifs."
 	err = verifyFactsWithGemini(ctx, apiKey, pdf, result)
 	require.NoError(t, err)
+}
+
+// Opt-in end-to-end regression check for the PDFs that were stranded in the
+// November council. It runs extraction and the independent PDF check only; it
+// does not write AWS data or invoke publishing/newsletter functions.
+func TestLiveRecentCouncilPDFsPassFactCheck(t *testing.T) {
+	if os.Getenv("WATCHDOG_LIVE_RECENT_COUNCIL") != "1" {
+		t.Skip("set WATCHDOG_LIVE_RECENT_COUNCIL=1 for real Gemini/PDF checks")
+	}
+	apiKey := os.Getenv("GEMINI_API_KEY")
+	if apiKey == "" {
+		t.Fatal("GEMINI_API_KEY is required for live fact check")
+	}
+	pdfs := []string{
+		"https://www.mairie-begles.fr/app/uploads/2026/11/D06-2026_124.pdf",
+		"https://www.mairie-begles.fr/app/uploads/2026/11/D07-2026_125.pdf",
+		"https://www.mairie-begles.fr/app/uploads/2026/11/D09-2026_127.pdf",
+	}
+	for _, pdfURL := range pdfs {
+		t.Run(pdfURL, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
+			defer cancel()
+			pdf, err := downloadPDF(ctx, pdfURL)
+			require.NoError(t, err)
+			result, err := analyzeWithGemini(ctx, apiKey, pdf)
+			require.NoError(t, err)
+			require.NoError(t, verifyFactsWithGemini(ctx, apiKey, pdf, result))
+		})
+	}
 }
 
 func TestParseFactCheckResponseRejectsMalformedOrIncompleteJSON(t *testing.T) {
@@ -90,6 +127,18 @@ func TestAcceptFactCheckFailClosed(t *testing.T) {
 	}
 }
 
+func TestSubstantiveFactCheckRejectionClassification(t *testing.T) {
+	assert.True(t, isSubstantiveFactCheckRejection(errors.New("fact-check rejected: votes: unsupported")))
+	assert.False(t, isSubstantiveFactCheckRejection(nil))
+	assert.False(t, isSubstantiveFactCheckRejection(context.DeadlineExceeded))
+	assert.False(t, isSubstantiveFactCheckRejection(parseFactCheckErrorForTest()))
+}
+
+func parseFactCheckErrorForTest() error {
+	_, err := parseFactCheckResponse(`{`)
+	return err
+}
+
 func TestFactCheckPayloadIncludesSourceFacingFields(t *testing.T) {
 	result := &GeminiResult{Title: "Piste cyclable", Summary: "980 m² de terrains cédés", BudgetImpact: 0}
 	result.AnalysisData.Impacts = new(string)
@@ -100,6 +149,52 @@ func TestFactCheckPayloadIncludesSourceFacingFields(t *testing.T) {
 	assert.Contains(t, string(payload), `"vote"`)
 	assert.Contains(t, string(payload), `"budget_impact"`)
 	assert.NotContains(t, string(payload), `"input_tokens"`)
+}
+
+func TestCallFactCheckWithResponseRetry(t *testing.T) {
+	t.Run("retries malformed structured output once", func(t *testing.T) {
+		calls := 0
+		resp, raw, err := callFactCheckWithResponseRetry(context.Background(), func(context.Context) (*genai.GenerateContentResponse, error) {
+			calls++
+			if calls == 1 {
+				return factCheckResponse(`{"verdict":`), nil
+			}
+			return factCheckResponse(`{"verdict":"PASS","findings":[]}`), nil
+		})
+		require.NoError(t, err)
+		assert.NotNil(t, resp)
+		assert.Contains(t, raw, `"PASS"`)
+		assert.Equal(t, 2, calls)
+	})
+
+	t.Run("does not retry a valid FAIL verdict", func(t *testing.T) {
+		calls := 0
+		_, raw, err := callFactCheckWithResponseRetry(context.Background(), func(context.Context) (*genai.GenerateContentResponse, error) {
+			calls++
+			return factCheckResponse(`{"verdict":"FAIL","findings":[]}`), nil
+		})
+		require.NoError(t, err)
+		assert.Contains(t, raw, `"FAIL"`)
+		assert.Equal(t, 1, calls)
+	})
+
+	t.Run("fails closed after repeated empty responses", func(t *testing.T) {
+		calls := 0
+		_, _, err := callFactCheckWithResponseRetry(context.Background(), func(context.Context) (*genai.GenerateContentResponse, error) {
+			calls++
+			return &genai.GenerateContentResponse{}, nil
+		})
+		require.ErrorContains(t, err, "empty response")
+		assert.Equal(t, 2, calls)
+	})
+}
+
+func TestExtractionAndFactCheckPromptsAlignOnVoteAndBudgetSemantics(t *testing.T) {
+	assert.Contains(t, deliberationPrompt, "voix contre ou des abstentions")
+	assert.Contains(t, deliberationPrompt, "ni voix contre ni abstention")
+	assert.Contains(t, factCheckPrompt, "une obligation de payer en montant estimé")
+	assert.Contains(t, deliberationPrompt, "Une dépense ou une recette autorisée n'est pas à elle seule un montant chiffré")
+	assert.Contains(t, factCheckPrompt, "abstentions ne sont pas des voix contre")
 }
 
 func TestFactCheckModelDefaultAndOverride(t *testing.T) {

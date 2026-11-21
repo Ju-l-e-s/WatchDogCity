@@ -114,6 +114,7 @@ func TestParseDateFromTitle_OrdinalAndSingleDigit(t *testing.T) {
 func TestIsDeliberationPDFTitle_ExcludesAttachments(t *testing.T) {
 	assert.False(t, isDeliberationPDFTitle("Ordre du jour"))
 	assert.False(t, isDeliberationPDFTitle("D04 – Maquette du Budget"))
+	assert.False(t, isDeliberationPDFTitle("D09 – 2026_127 Maquette DM1"))
 	assert.True(t, isDeliberationPDFTitle("D04 – Vote du budget primitif 2026"))
 }
 

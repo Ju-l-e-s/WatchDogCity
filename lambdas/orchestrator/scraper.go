@@ -136,15 +136,15 @@ func (sc *Scraper) ScrapePDFLinks(ctx context.Context, councilURL string) ([]PDF
 	return items, nil
 }
 
-// Agenda and budget annexes are source documents, not separate voted
-// deliberations. Their PDFs must not replace a missing decision in the
+// Agendas, budget annexes and maquettes are source documents, not separate
+// voted deliberations. Their PDFs must not replace a missing decision in the
 // expected-ID manifest or be counted in the newsletter.
 func isDeliberationPDFTitle(title string) bool {
 	label := strings.ToLower(strings.TrimSpace(title))
 	if strings.HasPrefix(label, "ordre du jour") || strings.HasPrefix(label, "odj ") {
 		return false
 	}
-	return !(strings.Contains(label, "maquette") && strings.Contains(label, "budget"))
+	return !strings.Contains(label, "maquette")
 }
 
 func councilDateAndTitle(title, published string) (string, string) {

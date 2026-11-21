@@ -111,6 +111,18 @@ func TestParseDateFromTitle_OrdinalAndSingleDigit(t *testing.T) {
 	assert.Equal(t, "", parseDateFromTitle("Conseil municipal du 31 février 2026"))
 }
 
+func TestNextCouncilDateSkipsPastListingForNextUpcomingDate(t *testing.T) {
+	dates := []string{"Lundi 16 novembre, à 18h30", "Lundi 14 décembre, à 18h30", "Lundi 8 février, à 18h30"}
+	got := nextCouncilDateFromTexts(dates, time.Date(2026, time.November, 21, 12, 0, 0, 0, time.Local))
+	assert.Equal(t, "Lundi 14 décembre, à 18h30", got)
+}
+
+func TestNextCouncilDateInfersYearAtScheduleRollover(t *testing.T) {
+	dates := []string{"Lundi 14 décembre, à 18h30", "Lundi 8 février, à 18h30", "Lundi 5 avril, à 18h30"}
+	got := nextCouncilDateFromTexts(dates, time.Date(2026, time.December, 20, 12, 0, 0, 0, time.Local))
+	assert.Equal(t, "Lundi 8 février, à 18h30", got)
+}
+
 func TestIsDeliberationPDFTitle_ExcludesAttachments(t *testing.T) {
 	assert.False(t, isDeliberationPDFTitle("Ordre du jour"))
 	assert.False(t, isDeliberationPDFTitle("D04 – Maquette du Budget"))

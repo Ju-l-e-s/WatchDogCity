@@ -206,62 +206,59 @@ func (sc *Scraper) ScrapeNextCouncilDate(ctx context.Context, url string) (strin
 		return "", err
 	}
 
-	now := time.Now()
-	todayStr := now.Format("2006-01-02")
-	todayTime, _ := time.Parse("2006-01-02", todayStr)
+	var dates []string
+	doc.Find(".infowidget .rte ul li strong").Each(func(_ int, s *goquery.Selection) {
+		if text := strings.TrimSpace(s.Text()); text != "" {
+			dates = append(dates, text)
+		}
+	})
+	return nextCouncilDateFromTexts(dates, time.Now()), nil
+}
 
-	var nextDate string
+func nextCouncilDateFromTexts(dates []string, now time.Time) string {
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+	year := now.Year()
+	previousMonthDay := 0
+	var fallback string
 	dateRe := regexp.MustCompile(`(?i)(?:lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche)?\s*(\d{1,2})\s+([a-zéû]+)(?:\s+(\d{4}))?`)
 
-	doc.Find(".infowidget .rte ul li strong").EachWithBreak(func(_ int, s *goquery.Selection) bool {
-		text := strings.TrimSpace(s.Text())
+	for _, raw := range dates {
+		text := strings.TrimSpace(raw)
 		if text == "" {
-			return true
+			continue
 		}
-
+		if fallback == "" {
+			fallback = text
+		}
 		m := dateRe.FindStringSubmatch(text)
 		if m == nil {
-			if nextDate == "" {
-				nextDate = text
-			}
-			return true
+			continue
 		}
 
 		day, _ := strconv.Atoi(m[1])
 		monthName := strings.ToLower(m[2])
 		monthNumStr, ok := frMonthMap[monthName]
 		if !ok {
-			if nextDate == "" {
-				nextDate = text
-			}
-			return true
+			continue
 		}
 		month, _ := strconv.Atoi(monthNumStr)
 
-		year := now.Year()
 		if m[3] != "" {
 			year, _ = strconv.Atoi(m[3])
+		} else if previousMonthDay > 0 && month*100+day < previousMonthDay {
+			// The list spans a year boundary. Advance the year only when the
+			// schedule itself wraps from December back to an earlier month.
+			year++
 		}
 
 		parsedDate := time.Date(year, time.Month(month), day, 0, 0, 0, 0, time.UTC)
-
-		if parsedDate.Before(todayTime) && m[3] == "" {
-			parsedDate = time.Date(year+1, time.Month(month), day, 0, 0, 0, 0, time.UTC)
+		if !parsedDate.Before(today) {
+			return text
 		}
-
-		if !parsedDate.Before(todayTime) {
-			nextDate = text
-			return false // break loop
-		}
-
-		return true
-	})
-
-	if nextDate == "" {
-		nextDate = strings.TrimSpace(doc.Find(".infowidget .rte ul li strong").First().Text())
+		previousMonthDay = month*100 + day
 	}
 
-	return nextDate, nil
+	return fallback
 }
 
 func fetchDocument(ctx context.Context, url string) (*goquery.Document, error) {

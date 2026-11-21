@@ -166,6 +166,12 @@ func formatBudgetChangesFR(changes []BudgetChange) string {
 	return strings.Join(parts, "; ")
 }
 
+// The Brevo template adds a final currency symbol to the Budget field. Keep
+// symbols on individual rows, but omit the trailing one from the whole value.
+func formatBudgetChangesForTemplate(changes []BudgetChange) string {
+	return strings.TrimSuffix(formatBudgetChangesFR(changes), " €")
+}
+
 func plural(n int) string {
 	if n > 1 {
 		return "s"
@@ -406,7 +412,7 @@ func buildColdNewsletterPrompt(
 	sb.WriteString("- IMPACT DES VOTES NON UNANIMES : Dans tensions[], renseigne 'impact' dès qu'un effet concret pour les habitants est documenté dans le champ Impact de la source. Distingue cet effet du vote et du contexte. Si aucun effet citoyen n'est documenté, laisse 'impact' vide plutôt que d'inventer ou de répéter 'context'.\n")
 	sb.WriteString("- HIÉRARCHISATION DES BUDGETS : Les délibérations adoptées avec les plus gros budgets (notamment les budgets supplémentaires, Comptes Financiers Uniques (CFU), Comptes Administratifs, etc.) DOIVENT figurer en priorité dans la section 'adopted' avec leurs détails, et non pas dans les simples résumés ('briefs').\n")
 	sb.WriteString("- VULGARISATION INDEMNITÉS : Pour les indemnités des élus, explique simplement : 'Le conseil définit légalement la rémunération des élus pour leur travail, selon un barème national basé sur la taille de la ville'.\n")
-	sb.WriteString("- INTERDICTION ABSOLUE DU JARGON COMPTABLE ET LÉGAL : Bannis tout vocabulaire administratif, technocratique ou juridique brut. Pas de codes d'imputation (ex: Chapitres budgétaires, articles comptables). Ne cite pas d'articles de loi bruts, utilise plutôt 'Conformément à la loi...'. Vulgarise systématiquement tous les acronymes ou termes techniques entre parenthèses lors de leur première apparition (ex: écrire 'CFU (le bilan financier de l'année passée)', 'CCAS (l'organisme d'action sociale de la ville)', 'AP/CP (la programmation pluriannuelle des investissements)', 'TPE (la taxe sur la publicité extérieure)', 'ZAC (zone d'aménagement concerté)', 'DSP (délégation de service public)').\n")
+	sb.WriteString("- INTERDICTION ABSOLUE DU JARGON COMPTABLE ET LÉGAL : Bannis tout vocabulaire administratif, technocratique ou juridique brut. Pas de codes d'imputation (ex: Chapitres budgétaires, articles comptables). Ne cite pas d'articles de loi bruts, utilise plutôt 'Conformément à la loi...'. Vulgarise systématiquement tous les acronymes ou termes techniques lors de leur première apparition. Pour AP, explique 'enveloppe autorisée pour engager un projet sur plusieurs années' ; pour CP, explique 'somme que la Ville est autorisée à payer pendant une année donnée'. Ne dis pas que ces sommes ont été dépensées si le document décrit seulement des crédits prévus.\n")
 	sb.WriteString("- STYLE JOURNALISTIQUE PÉDAGOGIQUE : Traduis les termes administratifs complexes en langage clair. Par exemple, au lieu de parler de budget supplémentaire ou d'ajustements de crédits, explique : 'Le conseil ajuste les comptes en cours d'année pour réallouer l'argent là où les besoins sont les plus urgents.' Évite les répétitions vides ou tautologiques (ne pas écrire 'le budget est concentré sur le budget').\n")
 	sb.WriteString("- HUMANISATION DES CHIFFRES : Dans les champs textuels ('context', 'impact', 'summary'), arrondis systématiquement les grands chiffres pour faciliter la lecture (ex: écris 'environ 7 millions d'euros' au lieu de '7 034 925,77 €'). Les montants exacts ne doivent figurer que dans le champ numérique 'budget'.\n")
 	sb.WriteString("- RECADRAGE DES TENSIONS : Ne qualifie jamais un vote non unanime de débat ou de controverse sans preuve explicite. Décris séparément les voix contre et les abstentions. N'y inclus jamais les procédures administratives obligatoires.\n")
@@ -665,7 +671,7 @@ func finalizeNewsletterParams(params *NewsletterParams, councilDate string,
 
 	for i := range params.Tensions {
 		if changes := budgetChangesForID(params.Tensions[i].SourceID, cold); len(changes) > 0 {
-			params.Tensions[i].Budget = formatBudgetChangesFR(changes)
+			params.Tensions[i].Budget = formatBudgetChangesForTemplate(changes)
 		} else {
 			params.Tensions[i].Budget = formatBudgetStr(params.Tensions[i].Budget)
 		}
@@ -693,7 +699,7 @@ func finalizeNewsletterParams(params *NewsletterParams, councilDate string,
 	}
 	for i := range params.Adopted {
 		if changes := budgetChangesForID(params.Adopted[i].SourceID, cold); len(changes) > 0 {
-			params.Adopted[i].Budget = formatBudgetChangesFR(changes)
+			params.Adopted[i].Budget = formatBudgetChangesForTemplate(changes)
 		} else {
 			params.Adopted[i].Budget = formatBudgetStr(params.Adopted[i].Budget)
 		}

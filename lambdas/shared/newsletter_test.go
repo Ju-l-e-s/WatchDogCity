@@ -85,6 +85,9 @@ func TestFormatBudgetChangesKeepsAPAndCPAmountsDistinct(t *testing.T) {
 			t.Fatalf("budget changes %q missing %q", got, want)
 		}
 	}
+	if got := formatBudgetChangesForTemplate([]BudgetChange{{Scope: "AP", Direction: "BAISSE", Label: "École Prévert", Amount: 500_000}}); strings.HasSuffix(got, " €") {
+		t.Fatalf("template budget value should not duplicate its trailing currency symbol: %q", got)
+	}
 }
 
 func TestFinalizeNewsletterUsesSourceBudgetChangesInsteadOfModelBudget(t *testing.T) {
@@ -95,13 +98,16 @@ func TestFinalizeNewsletterUsesSourceBudgetChangesInsteadOfModelBudget(t *testin
 	params := &NewsletterParams{Adopted: []AdoptedItem{{SourceID: "D10.pdf", Budget: "1200000", HasBudget: true}}}
 	finalizeNewsletterParams(params, "2026-11-16", cold, coldNewsletterStats{}, "", 1, 12)
 	budget := params.Adopted[0].Budget
-	for _, want := range []string{"Paiements prévus en 2026 (CP)", "baisse de 1 200 000 €", "Enveloppe autorisée pour engager le projet sur plusieurs années (AP)", "baisse de 500 000 €"} {
+	for _, want := range []string{"Paiements prévus en 2026 (CP)", "baisse de 1 200 000 €", "Enveloppe autorisée pour engager le projet sur plusieurs années (AP)", "baisse de 500 000"} {
 		if !strings.Contains(budget, want) {
 			t.Fatalf("newsletter budget %q missing %q", budget, want)
 		}
 	}
 	if strings.Contains(strings.ToLower(budget), "dépense") {
 		t.Fatalf("AP/CP adjustment was mislabelled as a financial flow: %q", budget)
+	}
+	if strings.HasSuffix(budget, " €") {
+		t.Fatalf("budget value should leave the final currency symbol to the template: %q", budget)
 	}
 }
 

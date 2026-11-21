@@ -74,6 +74,20 @@ func TestColdNewsletterStatsNovemberCouncilVoteBreakdown(t *testing.T) {
 	}
 }
 
+func TestColdNewsletterPromptPrioritizesBroadPublicImpactOverOneOffEvent(t *testing.T) {
+	prompt := buildColdNewsletterPrompt("Conseil municipal", "2026-11-16", nil, coldNewsletterStats{}, "", 1, 12)
+	for _, want := range []string{
+		"La portée pour les habitants détermine aussi le choix entre 'adopted' et 'briefs'",
+		"le recensement ou les crèches",
+		"les tarifs des forains d'un carnaval",
+		"place la mesure événementielle dans 'briefs'",
+	} {
+		if !strings.Contains(prompt, want) {
+			t.Errorf("newsletter prompt missing editorial priority %q", want)
+		}
+	}
+}
+
 func TestFormatBudgetChangesKeepsAPAndCPAmountsDistinct(t *testing.T) {
 	got := formatBudgetChangesFR([]BudgetChange{
 		{Scope: "CP", Direction: "BAISSE", Label: "Prévert", Amount: 200_000, Period: "2026"},

@@ -133,8 +133,13 @@ func TestWebhookHandlesInProcessDeliveryAndDuplicate(t *testing.T) {
 	h, ddb, httpClient := handlerForTest()
 	httpClient.body = `{"status":"in_process","recipients":{"lists":[2]}}`
 	resp, _ := h.handle(context.Background(), request(`{"event":"delivered","camp_id":"42","ts_sent":1790695800}`))
+	if resp.StatusCode != 429 || len(ddb.updates) != 0 {
+		t.Fatalf("in-process delivery must retry without setting sent date: %+v", resp)
+	}
+	httpClient.body = `{"status":"sent","sentDate":"2026-09-29T15:30:00Z","recipients":{"lists":[2]}}`
+	resp, _ = h.handle(context.Background(), request(`{"event":"delivered","camp_id":42}`))
 	if resp.StatusCode != 200 || len(ddb.updates) != 1 {
-		t.Fatalf("in-process delivery was not recorded: %+v", resp)
+		t.Fatalf("sent status was not recorded: %+v", resp)
 	}
 	ddb.update = func(_ *dynamodb.UpdateItemInput) error { return &types.ConditionalCheckFailedException{} }
 	resp, _ = h.handle(context.Background(), request(`{"event":"delivered","camp_id":42}`))

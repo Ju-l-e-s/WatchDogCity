@@ -135,6 +135,24 @@ def generate_html(title, desc, url_path, content, breadcrumb, schema=None):
 </body>
 </html>"""
 
+def render_essential_facts(deliberation):
+    pdf = deliberation.get("pdf_url") or ""
+    safe_pdf = html.escape(pdf.split("#", 1)[0], quote=True) if pdf.lower().startswith(("https://", "http://")) else ""
+    items = []
+    for fact in deliberation.get("essential_facts") or []:
+        page = fact.get("page")
+        text = fact.get("text")
+        if type(page) is not int or page <= 0 or not text:
+            continue
+        reference = f"p. {page}"
+        if safe_pdf:
+            reference = f'<a href="{safe_pdf}#page={page}" target="_blank" rel="noopener">{reference}</a>'
+        items.append(f"<li>{html.escape(text)} ({reference})</li>")
+    if not items:
+        return ""
+    return "<details><summary>Faits essentiels et sources</summary><ul>" + "".join(items) + "</ul></details>"
+
+
 def main():
     if not os.path.exists(DATA_PATH):
         print(f"Erreur: Fichier {DATA_PATH} introuvable.")
@@ -302,6 +320,7 @@ def main():
             {f'<h3>Points de controverse</h3><p>{html.escape(analysis["points_debattus"])}</p>' if analysis.get('points_debattus') and analysis['points_debattus'].strip().lower() not in ('néant', 'null') else ''}
             
             {vote_html}
+            {render_essential_facts(d)}
         </div>
         """
 

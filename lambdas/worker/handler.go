@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -12,7 +13,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
@@ -21,13 +21,11 @@ import (
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
-	ddbtypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	awslambda "github.com/aws/aws-sdk-go-v2/service/lambda"
 	"github.com/watchdog/shared"
 )
 
 type DynamoDBAPI interface {
-	PutItem(ctx context.Context, params *dynamodb.PutItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.PutItemOutput, error)
 	UpdateItem(ctx context.Context, params *dynamodb.UpdateItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.UpdateItemOutput, error)
 	GetItem(ctx context.Context, params *dynamodb.GetItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.GetItemOutput, error)
 	TransactWriteItems(ctx context.Context, params *dynamodb.TransactWriteItemsInput, optFns ...func(*dynamodb.Options)) (*dynamodb.TransactWriteItemsOutput, error)
@@ -50,7 +48,12 @@ type SQSPayload struct {
 }
 
 func (h *WorkerHandler) HandleRequest(ctx context.Context, event events.SQSEvent) (events.SQSEventResponse, error) {
-	apiKey := os.Getenv("GEMINI_API_KEY")
+	return h.handleBatch(ctx, event, h.reviewPDF)
+}
+
+type pdfReview func(context.Context, SQSPayload) (*GeminiResult, []byte, error)
+
+func (h *WorkerHandler) handleBatch(ctx context.Context, event events.SQSEvent, review pdfReview) (events.SQSEventResponse, error) {
 	councilsTable := os.Getenv("COUNCILS_TABLE")
 	var failures []events.SQSBatchItemFailure
 
@@ -69,73 +72,195 @@ func (h *WorkerHandler) HandleRequest(ctx context.Context, event events.SQSEvent
 	for _, record := range event.Records {
 		var msg SQSPayload
 		if err := json.Unmarshal([]byte(record.Body), &msg); err != nil {
+			failures = append(failures, events.SQSBatchItemFailure{ItemIdentifier: record.MessageId})
 			log.Printf("error unmarshaling SQS body: %v", shared.TruncForLog(record.Body, 200))
 			continue
 		}
 
-		// Idempotence is enforced by the conditional PutItem in handleRecord.
-		// A pre-check GetItem here would only widen the race: two workers could
-		// both read "absent", both spend ~minutes downloading and calling Gemini,
-		// and the PutItem loser would have to recover afterwards anyway.
-		dlCtx, dlCancel := context.WithTimeout(ctx, 60*time.Second)
-		pdfBytes, err := downloadPDF(dlCtx, msg.PDFURL)
-		dlCancel()
-		if err != nil {
-			log.Printf("error downloading PDF %s: %v", msg.PDFURL, err)
+		if err := h.processPDF(ctx, msg, review); err != nil {
+			log.Printf("PDF %s: %v", msg.PDFURL, err)
 			failures = append(failures, events.SQSBatchItemFailure{ItemIdentifier: record.MessageId})
-			continue
-		}
-
-		gemCtx, gemCancel := context.WithTimeout(ctx, 120*time.Second)
-		result, err := analyzeWithGemini(gemCtx, apiKey, pdfBytes)
-		gemCancel()
-		if err != nil {
-			log.Printf("error analyzing with Gemini: %v", err)
-			if rerr := shared.RecordGeminiError(ctx, h.ddb, councilsTable); rerr != nil {
-				log.Printf("warn: record gemini error: %v", rerr)
-			}
-			failures = append(failures, events.SQSBatchItemFailure{ItemIdentifier: record.MessageId})
-			continue
-		}
-		if rerr := shared.RecordGeminiSuccess(ctx, h.ddb, councilsTable); rerr != nil {
-			log.Printf("warn: record gemini success: %v", rerr)
-		}
-
-		// Reject unsupported facts before the first deliberation write or counter
-		// increment. A rejected PDF retries through SQS and ultimately reaches
-		// the DLQ, leaving the council incomplete and unavailable to publish.
-		checkCtx, checkCancel := context.WithTimeout(ctx, 90*time.Second)
-		err = verifyFactsWithGemini(checkCtx, apiKey, pdfBytes, result)
-		checkCancel()
-		if err != nil {
-			log.Printf("fact-check failed for %s: %v", msg.PDFURL, err)
-			log.Printf("METRIC: GeminiFactCheckFailure count=1 deliberation=%s", deliberationID(msg.PDFURL))
-			// A factual FAIL is a document-level rejection. Transport, empty, or
-			// malformed model responses indicate Gemini instability and must feed
-			// the same circuit breaker as extraction failures.
-			if !isSubstantiveFactCheckRejection(err) {
-				if rerr := shared.RecordGeminiError(ctx, h.ddb, councilsTable); rerr != nil {
-					log.Printf("warn: record Gemini fact-check error: %v", rerr)
-				}
-			}
-			failures = append(failures, events.SQSBatchItemFailure{ItemIdentifier: record.MessageId})
-			continue
-		}
-		result.FactCheckModel = factCheckModel()
-		result.FactCheckedAt = time.Now().UTC().Format(time.RFC3339)
-
-		if err := h.handleRecord(ctx, msg, result); err != nil {
-			log.Printf("error handling record: %v", err)
-			failures = append(failures, events.SQSBatchItemFailure{ItemIdentifier: record.MessageId})
-			continue
 		}
 	}
 	return events.SQSEventResponse{BatchItemFailures: failures}, nil
 }
 
-func (h *WorkerHandler) handleRecord(ctx context.Context, msg SQSPayload, result *GeminiResult) error {
+func (h *WorkerHandler) reviewPDF(ctx context.Context, msg SQSPayload) (*GeminiResult, []byte, error) {
+	dlCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	pdf, err := downloadPDF(dlCtx, msg.PDFURL)
+	cancel()
+	if err != nil {
+		return nil, nil, err
+	}
+	key := os.Getenv("GEMINI_API_KEY")
+	table := os.Getenv("COUNCILS_TABLE")
+	gemCtx, cancel := context.WithTimeout(ctx, 120*time.Second)
+	result, err := analyzeWithGemini(gemCtx, key, pdf)
+	cancel()
+	if err == nil {
+		if e := shared.RecordGeminiSuccess(ctx, h.ddb, table); e != nil {
+			log.Printf("record Gemini success: %v", e)
+		}
+		checkCtx, cancel := context.WithTimeout(ctx, 90*time.Second)
+		err = verifyFactsWithGemini(checkCtx, key, pdf, result)
+		cancel()
+		if err != nil {
+			outcome := "technical"
+			if errors.Is(err, errFactCheckRejected) {
+				outcome = "rejected"
+			} else if errors.Is(err, errFactCheckReview) {
+				outcome = "source_review"
+			}
+			log.Printf("METRIC: GeminiFactCheckFailure count=1 deliberation=%s outcome=%s", deliberationID(msg.PDFURL), outcome)
+		}
+	}
+	if err != nil {
+		if !isSubstantiveFactCheckRejection(err) {
+			if e := shared.RecordGeminiError(ctx, h.ddb, table); e != nil {
+				log.Printf("record Gemini error: %v", e)
+			}
+		}
+		return nil, pdf, err
+	}
+	result.FactCheckModel = factCheckModel()
+	result.FactCheckedAt = time.Now().UTC().Format(time.RFC3339)
+	return result, pdf, nil
+}
+
+func (h *WorkerHandler) processPDF(ctx context.Context, msg SQSPayload, review pdfReview) error {
+	if msg.CouncilID == "" || msg.PDFURL == "" {
+		return errors.New("missing council_id or pdf_url")
+	}
+	owner := rand.Text()
+	err := h.claimReview(ctx, msg, owner)
+	if err != nil {
+		var conflict *types.TransactionCanceledException
+		if !errors.As(err, &conflict) {
+			// The request may have committed despite a lost response. No review has started.
+			return errors.Join(err, h.finishAttempt(ctx, msg, owner, nil, nil))
+		}
+		done, readErr := h.alreadyProcessedOrHeld(ctx, msg)
+		if readErr != nil {
+			return readErr
+		}
+		if done {
+			return nil
+		}
+		return fmt.Errorf("claim PDF review: %w", err)
+	}
+	result, pdf, err := review(ctx, msg)
+	if isSubstantiveFactCheckRejection(err) {
+		// Never release the claim on this path, including on an ambiguous write response.
+		return h.finishAttempt(ctx, msg, owner, pdf, err)
+	}
+	if err == nil {
+		err = h.handleRecord(ctx, msg, result, owner)
+		if err == nil {
+			return nil
+		}
+		if isSubstantiveFactCheckRejection(err) {
+			return h.finishAttempt(ctx, msg, owner, pdf, err)
+		}
+	}
+	// Only a known technical outcome may unlock the document for another review.
+	return errors.Join(err, h.finishAttempt(ctx, msg, owner, nil, nil))
+}
+
+func reviewHoldField(msg SQSPayload) string {
+	return "pdf_hold_" + digest([]byte(deliberationID(msg.PDFURL)))
+}
+
+func (h *WorkerHandler) alreadyProcessedOrHeld(ctx context.Context, msg SQSPayload) (bool, error) {
+	field := reviewHoldField(msg)
+	out, err := h.ddb.GetItem(ctx, &dynamodb.GetItemInput{TableName: aws.String(os.Getenv("COUNCILS_TABLE")),
+		Key:            map[string]types.AttributeValue{"council_id": &types.AttributeValueMemberS{Value: msg.CouncilID}},
+		ConsistentRead: aws.Bool(true), ProjectionExpression: aws.String("#hold, qc_status, pdf_review_held"), ExpressionAttributeNames: map[string]string{"#hold": field}})
+	if err != nil {
+		return false, err
+	}
+	if _, pending := out.Item[field].(*types.AttributeValueMemberS); pending {
+		return false, fmt.Errorf("unfinished PDF review for %s", msg.PDFURL)
+	}
+	if out.Item[field] != nil || out.Item["pdf_review_held"] != nil {
+		return true, nil
+	}
+	if status, ok := out.Item["qc_status"].(*types.AttributeValueMemberS); ok && (status.Value == "APPROVED" || status.Value == "QUARANTINED") {
+		return true, nil
+	}
+	id := deliberationID(msg.PDFURL)
+	stored, err := h.ddb.GetItem(ctx, &dynamodb.GetItemInput{
+		TableName:      aws.String(os.Getenv("DELIBERATIONS_TABLE")),
+		Key:            map[string]types.AttributeValue{"id": &types.AttributeValueMemberS{Value: id}},
+		ConsistentRead: aws.Bool(true), ProjectionExpression: aws.String("council_id, counted"),
+	})
+	if err != nil {
+		return false, err
+	}
+	if owner, ok := stored.Item["council_id"].(*types.AttributeValueMemberS); ok && owner.Value != msg.CouncilID {
+		return false, fmt.Errorf("deliberation %s belongs to a different council", id)
+	}
+	return isCounted(stored.Item), nil
+}
+
+// #hold stores the sole reviewing attempt until it becomes a durable rejection.
+// The set lets the council-wide gates test for any outstanding PDF in one condition.
+func attemptUpdate(msg SQSPayload, owner string) *types.Update {
+	return &types.Update{
+		TableName:                aws.String(os.Getenv("COUNCILS_TABLE")),
+		Key:                      map[string]types.AttributeValue{"council_id": &types.AttributeValueMemberS{Value: msg.CouncilID}},
+		ExpressionAttributeNames: map[string]string{"#hold": reviewHoldField(msg)},
+		ExpressionAttributeValues: map[string]types.AttributeValue{
+			":owner": &types.AttributeValueMemberS{Value: owner},
+			":ids":   &types.AttributeValueMemberSS{Value: []string{deliberationID(msg.PDFURL)}},
+		},
+	}
+}
+
+func (h *WorkerHandler) claimReview(ctx context.Context, msg SQSPayload, owner string) error {
+	u := attemptUpdate(msg, owner)
+	u.UpdateExpression = aws.String("SET #hold = :owner ADD pdf_reviews_pending :ids")
+	u.ConditionExpression = aws.String("processed_pdfs < total_pdfs AND attribute_not_exists(qc_status) AND attribute_not_exists(pdf_review_held) AND attribute_not_exists(#hold)")
+	_, err := h.ddb.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{TransactItems: []types.TransactWriteItem{
+		{Update: u},
+		{ConditionCheck: &types.ConditionCheck{
+			TableName: aws.String(os.Getenv("DELIBERATIONS_TABLE")), Key: map[string]types.AttributeValue{"id": &types.AttributeValueMemberS{Value: deliberationID(msg.PDFURL)}},
+			ConditionExpression:       aws.String("attribute_not_exists(counted) AND (attribute_not_exists(council_id) OR council_id = :cid)"),
+			ExpressionAttributeValues: map[string]types.AttributeValue{":cid": &types.AttributeValueMemberS{Value: msg.CouncilID}},
+		}},
+	}})
+	return err
+}
+
+func (h *WorkerHandler) finishAttempt(ctx context.Context, msg SQSPayload, owner string, pdf []byte, rejection error) error {
+	u := attemptUpdate(msg, owner)
+	expr := "REMOVE #hold DELETE pdf_reviews_pending :ids"
+	if rejection != nil {
+		marker, err := attributevalue.Marshal(map[string]string{"pdf_sha256": digest(pdf), "pdf_url": msg.PDFURL, "reason": shared.TruncForLog(rejection.Error(), 1000)})
+		if err != nil {
+			return err
+		}
+		u.ExpressionAttributeValues[":marker"] = marker
+		u.ExpressionAttributeValues[":yes"] = &types.AttributeValueMemberBOOL{Value: true}
+		expr = "SET #hold = :marker, pdf_review_held = :yes DELETE pdf_reviews_pending :ids"
+	}
+	_, err := h.ddb.UpdateItem(ctx, &dynamodb.UpdateItemInput{
+		TableName: u.TableName, Key: u.Key, ExpressionAttributeNames: u.ExpressionAttributeNames, ExpressionAttributeValues: u.ExpressionAttributeValues,
+		ConditionExpression: aws.String("#hold = :owner"), UpdateExpression: aws.String(expr),
+	})
+	return err
+}
+
+func (h *WorkerHandler) handleRecord(ctx context.Context, msg SQSPayload, result *GeminiResult, owner string) error {
 	if result == nil || result.FactCheckModel == "" || result.FactCheckedAt == "" {
-		return fmt.Errorf("refusing to store deliberation without a passed PDF fact check")
+		return fmt.Errorf("%w: refusing to store deliberation without a passed PDF fact check", errFactCheckReview)
+	}
+	if result.SourceFacts != nil {
+		payload, err := factCheckPayload(result)
+		if err != nil || result.SourceFacts.Version != shared.SourceFactsVersion ||
+			result.SourceFacts.ProofStatus != shared.ProofModelReviewed ||
+			result.SourceFacts.ReviewedPayloadSHA256 != digest(payload) {
+			return fmt.Errorf("%w: refusing to store deliberation without matching source fact review", errFactCheckReview)
+		}
 	}
 	id := deliberationID(msg.PDFURL)
 
@@ -149,6 +274,8 @@ func (h *WorkerHandler) handleRecord(ctx context.Context, msg SQSPayload, result
 		"summary":          result.Summary,
 		"is_substantial":   result.IsSubstantial,
 		"analysis_data":    result.AnalysisData,
+		"acronyms":         result.Acronyms,
+		"budget_note":      result.BudgetNote,
 		"budget_impact":    result.BudgetImpact,
 		"budget_type":      result.BudgetType,
 		"budget_breakdown": result.BudgetBreakdown,
@@ -168,137 +295,31 @@ func (h *WorkerHandler) handleRecord(ctx context.Context, msg SQSPayload, result
 		fields["fact_check_model"] = result.FactCheckModel
 		fields["fact_checked_at"] = result.FactCheckedAt
 	}
-	if result.BudgetNote != "" {
-		fields["budget_note"] = result.BudgetNote
+	if result.SourceFacts != nil {
+		packet := *result.SourceFacts
+		packet.Facts = result.CriticalFacts
+		fields["source_facts"] = packet
 	}
 	item, err := attributevalue.MarshalMap(fields)
 	if err != nil {
 		return fmt.Errorf("marshal item: %w", err)
 	}
 
-	shouldCount := true
-	_, err = h.ddb.PutItem(ctx, &dynamodb.PutItemInput{
-		TableName:           aws.String(os.Getenv("DELIBERATIONS_TABLE")),
-		Item:                item,
-		ConditionExpression: aws.String("attribute_not_exists(id)"),
-	})
+	u := attemptUpdate(msg, owner)
+	u.ConditionExpression = aws.String("#hold = :owner AND attribute_not_exists(pdf_review_held) AND attribute_not_exists(qc_status) AND processed_pdfs < total_pdfs")
+	u.ExpressionAttributeValues[":one"] = &types.AttributeValueMemberN{Value: "1"}
+	u.UpdateExpression = aws.String("REMOVE #hold ADD processed_pdfs :one DELETE pdf_reviews_pending :ids")
+	item["counted"] = &types.AttributeValueMemberBOOL{Value: true}
+	_, err = h.ddb.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{TransactItems: []types.TransactWriteItem{
+		{Update: u},
+		{Put: &types.Put{TableName: aws.String(os.Getenv("DELIBERATIONS_TABLE")), Item: item,
+			ConditionExpression:       aws.String("attribute_not_exists(counted) AND (attribute_not_exists(council_id) OR council_id = :cid)"),
+			ExpressionAttributeValues: map[string]types.AttributeValue{":cid": &types.AttributeValueMemberS{Value: msg.CouncilID}},
+		}},
+	}})
 	if err != nil {
-		var ccfe *ddbtypes.ConditionalCheckFailedException
-		if !errors.As(err, &ccfe) {
-			return fmt.Errorf("put deliberation: %w", err)
-		}
-		// Lost the PutItem race, or a previous attempt already claimed this id.
-		// Re-read to tell a fully-analyzed duplicate apart from a partial write
-		// left behind by a worker that crashed before storing analysis_data.
-		existing, gerr := h.ddb.GetItem(ctx, &dynamodb.GetItemInput{
-			TableName: aws.String(os.Getenv("DELIBERATIONS_TABLE")),
-			Key: map[string]types.AttributeValue{
-				"id": &types.AttributeValueMemberS{Value: id},
-			},
-		})
-		if gerr != nil {
-			return fmt.Errorf("get deliberation %s after conflict: %w", id, gerr)
-		}
-		// `counted` — not analysis_data — is the source of truth for "already
-		// accounted". A worker that crashed after PutItem leaves analysis_data
-		// behind but never counted; keying off counted lets us recover it.
-		if isCounted(existing.Item) {
-			log.Printf("deliberation %s already counted, skipping", id)
-			return nil
-		}
-		// A previous worker may have written an analysis before the fact-check
-		// gate existed, then crashed before counting. Replace such an uncounted
-		// row with this PDF-verified analysis before it can be counted.
-		_, checked := existing.Item["fact_checked_at"].(*types.AttributeValueMemberS)
-		if !hasAnalysisData(existing.Item) || !checked {
-			setExpr, names, values := buildSetExpression(item, "id")
-			_, uerr := h.ddb.UpdateItem(ctx, &dynamodb.UpdateItemInput{
-				TableName: aws.String(os.Getenv("DELIBERATIONS_TABLE")),
-				Key: map[string]types.AttributeValue{
-					"id": &types.AttributeValueMemberS{Value: id},
-				},
-				UpdateExpression:          aws.String(setExpr),
-				ConditionExpression:       aws.String("attribute_not_exists(counted) AND attribute_not_exists(fact_checked_at)"),
-				ExpressionAttributeNames:  names,
-				ExpressionAttributeValues: values,
-			})
-			if uerr != nil && !errors.As(uerr, &ccfe) {
-				return fmt.Errorf("recover partial deliberation %s: %w", id, uerr)
-			}
-			if errors.As(uerr, &ccfe) {
-				latest, gerr := h.ddb.GetItem(ctx, &dynamodb.GetItemInput{
-					TableName: aws.String(os.Getenv("DELIBERATIONS_TABLE")),
-					Key: map[string]types.AttributeValue{
-						"id": &types.AttributeValueMemberS{Value: id},
-					},
-				})
-				if gerr != nil {
-					return fmt.Errorf("verify recovered deliberation %s: %w", id, gerr)
-				}
-				_, verified := latest.Item["fact_checked_at"].(*types.AttributeValueMemberS)
-				if !isCounted(latest.Item) && (!hasAnalysisData(latest.Item) || !verified) {
-					return fmt.Errorf("deliberation %s remains incomplete after recovery race", id)
-				}
-			}
-		}
+		return fmt.Errorf("commit verified PDF: %w", err)
 	}
-
-	if shouldCount {
-		// 2. Count this pdf atomically: bump the council counter (capped at
-		//    total_pdfs) AND mark the deliberation counted, in one transaction.
-		//    The attribute_not_exists(counted) guard makes counting idempotent —
-		//    a retry of the same pdf can never double-count, and a council can
-		//    never be pushed past total.
-		_, terr := h.ddb.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{
-			TransactItems: []types.TransactWriteItem{
-				{
-					Update: &types.Update{
-						TableName: aws.String(os.Getenv("COUNCILS_TABLE")),
-						Key: map[string]types.AttributeValue{
-							"council_id": &types.AttributeValueMemberS{Value: msg.CouncilID},
-						},
-						UpdateExpression:    aws.String("ADD processed_pdfs :one"),
-						ConditionExpression: aws.String("processed_pdfs < total_pdfs"),
-						ExpressionAttributeValues: map[string]types.AttributeValue{
-							":one": &types.AttributeValueMemberN{Value: "1"},
-						},
-					},
-				},
-				{
-					Update: &types.Update{
-						TableName: aws.String(os.Getenv("DELIBERATIONS_TABLE")),
-						Key: map[string]types.AttributeValue{
-							"id": &types.AttributeValueMemberS{Value: id},
-						},
-						UpdateExpression:    aws.String("SET counted = :true"),
-						ConditionExpression: aws.String("attribute_not_exists(counted)"),
-						ExpressionAttributeValues: map[string]types.AttributeValue{
-							":true": &types.AttributeValueMemberBOOL{Value: true},
-						},
-					},
-				},
-			},
-		})
-		if terr != nil {
-			var tce *ddbtypes.TransactionCanceledException
-			if !errors.As(terr, &tce) {
-				return fmt.Errorf("transact counter for %s: %w", msg.CouncilID, terr)
-			}
-			// reasons[0] = council update, reasons[1] = deliberation update.
-			reasons := tce.CancellationReasons
-			switch {
-			case len(reasons) > 1 && reasons[1].Code != nil && *reasons[1].Code == "ConditionalCheckFailed":
-				log.Printf("deliberation %s already counted, skipping increment", id)
-			case len(reasons) > 0 && reasons[0].Code != nil && *reasons[0].Code == "ConditionalCheckFailed":
-				log.Printf("council %s already capped, skipping increment", msg.CouncilID)
-			default:
-				return fmt.Errorf("transact counter for %s: %w", msg.CouncilID, terr)
-			}
-			return nil
-		}
-
-	}
-
 	// Metrics
 	log.Printf("METRIC: GeminiUsage input=%d output=%d", result.InputTokens, result.OutputTokens)
 
@@ -350,36 +371,6 @@ func deliberationID(url string) string {
 	return last
 }
 
-func attrInt(m map[string]types.AttributeValue, key string) int {
-	if val, ok := m[key]; ok {
-		if n, ok := val.(*types.AttributeValueMemberN); ok {
-			i, _ := strconv.Atoi(n.Value)
-			return i
-		}
-	}
-	return 0
-}
-
-// hasAnalysisData reports whether a deliberation item carries a populated
-// analysis_data attribute, i.e. it was fully analyzed and is a real duplicate
-// rather than a bare claim left behind by a crashed worker.
-func hasAnalysisData(item map[string]types.AttributeValue) bool {
-	v, ok := item["analysis_data"]
-	if !ok {
-		return false
-	}
-	switch t := v.(type) {
-	case *types.AttributeValueMemberNULL:
-		return !t.Value
-	case *types.AttributeValueMemberM:
-		return len(t.Value) > 0
-	case *types.AttributeValueMemberS:
-		return t.Value != ""
-	default:
-		return true
-	}
-}
-
 // isCounted reports whether a deliberation has already been tallied into its
 // council counter. It is the authoritative "already accounted" signal,
 // independent of whether analysis_data was written.
@@ -388,30 +379,4 @@ func isCounted(item map[string]types.AttributeValue) bool {
 		return v.Value
 	}
 	return false
-}
-
-// buildSetExpression renders a DynamoDB SET update writing every attribute in
-// item except the skipped keys. Name placeholders keep attribute names clear of
-// reserved-word collisions.
-func buildSetExpression(item map[string]types.AttributeValue, skip ...string) (string, map[string]string, map[string]types.AttributeValue) {
-	skipped := make(map[string]bool, len(skip))
-	for _, k := range skip {
-		skipped[k] = true
-	}
-	names := map[string]string{}
-	values := map[string]types.AttributeValue{}
-	var sets []string
-	i := 0
-	for k, v := range item {
-		if skipped[k] {
-			continue
-		}
-		nk := fmt.Sprintf("#k%d", i)
-		vk := fmt.Sprintf(":v%d", i)
-		names[nk] = k
-		values[vk] = v
-		sets = append(sets, nk+" = "+vk)
-		i++
-	}
-	return "SET " + strings.Join(sets, ", "), names, values
 }

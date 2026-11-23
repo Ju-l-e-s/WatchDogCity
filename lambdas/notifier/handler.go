@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
-	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -50,15 +49,17 @@ type NotifierEvent struct {
 // ── DynamoDB records (minimal projection) ────────────────────────────────────
 
 type councilRec struct {
-	CouncilID            string `dynamodbav:"council_id"`
-	Title                string `dynamodbav:"title"`
-	Date                 string `dynamodbav:"date"`
-	Category             string `dynamodbav:"category"`
-	QCStatus             string `dynamodbav:"qc_status"`
-	NewsletterParamsJSON string `dynamodbav:"newsletter_params_json"`
-	NewsletterSentAt     string `dynamodbav:"newsletter_sent_at,omitempty"`
-	NewsletterPendingAt  string `dynamodbav:"newsletter_pending_at,omitempty"`
-	NewsletterCampaignID int    `dynamodbav:"newsletter_campaign_id,omitempty"`
+	CouncilID              string `dynamodbav:"council_id"`
+	Title                  string `dynamodbav:"title"`
+	Date                   string `dynamodbav:"date"`
+	Category               string `dynamodbav:"category"`
+	QCStatus               string `dynamodbav:"qc_status"`
+	NewsletterDraftOnly    bool   `dynamodbav:"newsletter_draft_only"`
+	NewsletterParamsJSON   string `dynamodbav:"newsletter_params_json"`
+	NewsletterSentAt       string `dynamodbav:"newsletter_sent_at,omitempty"`
+	NewsletterPendingAt    string `dynamodbav:"newsletter_pending_at,omitempty"`
+	NewsletterCampaignID   int    `dynamodbav:"newsletter_campaign_id,omitempty"`
+	NewsletterDraftRequest string `dynamodbav:"newsletter_draft_request,omitempty"`
 }
 
 type deliberationRec struct {
@@ -69,6 +70,7 @@ type deliberationRec struct {
 	BudgetImpact  int64                 `dynamodbav:"budget_impact"`
 	BudgetType    string                `dynamodbav:"budget_type"`
 	BudgetNote    string                `dynamodbav:"budget_note"`
+	SourceFacts   *shared.SourceFacts   `dynamodbav:"source_facts"`
 	BudgetChanges []shared.BudgetChange `dynamodbav:"budget_changes"`
 	VotePour      *int                  `dynamodbav:"vote_pour"`
 	VoteContre    *int                  `dynamodbav:"vote_contre"`
@@ -78,7 +80,8 @@ type deliberationRec struct {
 	IsSubstantial bool                  `dynamodbav:"is_substantial"`
 	Summary       string                `dynamodbav:"summary"`
 	AnalysisData  struct {
-		Impacts *string `dynamodbav:"impacts"`
+		Impacts  *string `dynamodbav:"impacts"`
+		Decision *string `dynamodbav:"decision"`
 	} `dynamodbav:"analysis_data"`
 }
 
@@ -106,19 +109,20 @@ const pendingClaimTTL = 10 * time.Minute
 func ptrInt32(i int32) *int32 { return &i }
 
 type notifierDeps struct {
-	ddb                dynamoQuerier
-	httpClient         httpDoer
-	geminiKey          string
-	geminiModel        string
-	brevoKey           string
-	brevoTemplateID    int
-	brevoListID        int
-	testEmail          string
-	autoSendEnabled    bool
-	senderEmail        string
-	councilsTable      string
-	deliberationsTable string
-	now                func() time.Time // injectable for tests; defaults to time.Now
+	ddb                  dynamoQuerier
+	httpClient           httpDoer
+	geminiKey            string
+	geminiModel          string
+	geminiFactCheckModel string
+	brevoKey             string
+	brevoTemplateID      int
+	brevoListID          int
+	testEmail            string
+	releasesTable        string
+	senderEmail          string
+	councilsTable        string
+	deliberationsTable   string
+	now                  func() time.Time // injectable for tests; defaults to time.Now
 }
 
 // ── Handler ───────────────────────────────────────────────────────────────────
@@ -128,6 +132,9 @@ func HandleRequest(ctx context.Context, event NotifierEvent) error {
 }
 
 func (d *notifierDeps) handle(ctx context.Context, event NotifierEvent) error {
+	if d.brevoListID == 3 && event.TestListID == nil && !event.ReconcileOnly {
+		return errors.New("production draft list must differ from test list 3")
+	}
 	if strings.HasPrefix(event.CouncilID, "metadata#") {
 		log.Printf("notifier skip: council_id represents metadata (%q)", event.CouncilID)
 		return nil
@@ -137,6 +144,9 @@ func (d *notifierDeps) handle(ctx context.Context, event NotifierEvent) error {
 	}
 	if event.ReconcileOnly && (event.TestListID != nil || event.NewsletterParams != nil || event.ScheduledAt != nil || event.DraftOnly) {
 		return fmt.Errorf("reconcile_only requires only council_id")
+	}
+	if event.ScheduledAt != nil {
+		return fmt.Errorf("production scheduling requires the newsletter administration command")
 	}
 	if event.TestListID != nil {
 		return d.handleTest(ctx, event)
@@ -152,8 +162,7 @@ func (d *notifierDeps) handle(ctx context.Context, event NotifierEvent) error {
 	if council.QCStatus != "APPROVED" || (council.Category != "" && council.Category != "Conseil municipal") {
 		return fmt.Errorf("council %s must be an APPROVED Conseil municipal", event.CouncilID)
 	}
-	automaticDelivery := d.autoSendEnabled && !event.DraftOnly
-	if council.NewsletterCampaignID != 0 && !automaticDelivery {
+	if council.NewsletterCampaignID != 0 {
 		sent, err := d.syncSentCampaign(ctx, event.CouncilID, council.NewsletterCampaignID)
 		if err != nil {
 			return err
@@ -170,42 +179,13 @@ func (d *notifierDeps) handle(ctx context.Context, event NotifierEvent) error {
 			return fmt.Errorf("council %s has invalid Validator newsletter params", event.CouncilID)
 		}
 		params = &stored
-	} else if event.NewsletterParams != nil {
-		// Compatibility with Validator events created before the stored JSON existed.
-		params = event.NewsletterParams
 	} else {
-		// Legacy / test path: generate via Gemini.
-		if open, err := shared.GeminiCircuitOpen(ctx, d.ddb, d.councilsTable); err != nil {
-			log.Printf("gemini circuit check failed, proceeding: %v", err)
-		} else if open {
-			log.Printf("gemini circuit OPEN — skipping newsletter for council %s; will retry on next schedule", event.CouncilID)
-			return nil
-		}
-		delibs, err := d.fetchDeliberations(ctx, event.CouncilID)
-		if err != nil {
-			return fmt.Errorf("fetch deliberations for %s: %w", event.CouncilID, err)
-		}
-		nextMeeting := d.fetchNextMeeting(ctx)
-		totalCouncils, totalDelibs := d.fetchGlobalStats(ctx)
-		params, err = d.generateNewsletterParams(ctx, council, delibs, nextMeeting, totalCouncils, totalDelibs)
-		if err != nil {
-			return fmt.Errorf("generate newsletter params: %w", err)
-		}
+		return fmt.Errorf("council %s has no stored Validator newsletter params", event.CouncilID)
 	}
 	if params.FactCheckVersion < 1 {
 		return fmt.Errorf("council %s newsletter params have not passed the fact check; refresh them with Validator", event.CouncilID)
 	}
 
-	// Two-phase claim/commit:
-	//   1. claimPending sets newsletter_pending_at conditionally — exactly one
-	//      concurrent invocation wins. A pending claim older than
-	//      pendingClaimTTL is considered stale (crashed Lambda) and reusable.
-	//   2. sendCampaign creates a draft and sends a test email.
-	//   3. With automatic sending enabled, confirmSent flips pending → sent.
-	//      Manual mode releases the claim while the campaign stays a draft.
-	//   4. releasePending also wipes the pending flag on Brevo failure, so the
-	//      next async retry (handled by AWS Lambda + DLQ, see CDK config)
-	//      can take over without waiting for the TTL.
 	if err := d.claimPending(ctx, event.CouncilID); err != nil {
 		if errors.Is(err, errClaimAlreadyHeld) {
 			log.Printf("newsletter already claimed or in-flight for council %s — skipping", event.CouncilID)
@@ -214,65 +194,36 @@ func (d *notifierDeps) handle(ctx context.Context, event NotifierEvent) error {
 		return fmt.Errorf("claim newsletter slot: %w", err)
 	}
 
-	var campaignID int
-	if event.DraftOnly {
-		campaignID, err = d.sendCampaignDraft(ctx, params, event.CouncilID, council.Date)
-	} else {
-		campaignID, err = d.sendCampaign(ctx, params, event.CouncilID, council.Date, event.ScheduledAt)
-	}
-	if err != nil {
-		if relErr := d.releasePending(ctx, event.CouncilID); relErr != nil {
-			log.Printf("warn: failed to release pending claim for %s: %v", event.CouncilID, relErr)
+	defer func() {
+		cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+		defer cancel()
+		if err := d.releasePending(cleanup, event.CouncilID); err != nil {
+			log.Printf("release newsletter claim: %v", err)
 		}
-		return fmt.Errorf("send brevo campaign: %w", err)
+	}()
+	latest, err := d.fetchCouncil(ctx, event.CouncilID)
+	if err != nil {
+		return err
+	}
+	if latest.QCStatus != "APPROVED" || latest.NewsletterParamsJSON != council.NewsletterParamsJSON {
+		return errors.New("approved newsletter changed while preparing draft; retry with current content")
+	}
+	draftOnly := event.DraftOnly || council.NewsletterDraftOnly || latest.NewsletterDraftOnly
+	campaignID, err := d.prepareDraft(ctx, params, event.CouncilID, latest.Date, latest.NewsletterCampaignID, latest.NewsletterDraftRequest, draftOnly)
+	if err != nil {
+		return fmt.Errorf("prepare Brevo draft: %w", err)
 	}
 	if err := d.recordCampaignID(ctx, event.CouncilID, campaignID); err != nil {
-		if relErr := d.releasePending(ctx, event.CouncilID); relErr != nil {
-			log.Printf("warn: failed to release pending claim for %s: %v", event.CouncilID, relErr)
-		}
 		return fmt.Errorf("record production campaign ID: %w", err)
 	}
-	if event.DraftOnly {
-		if err := d.releasePending(ctx, event.CouncilID); err != nil {
-			return fmt.Errorf("release draft-only claim for %s: %w", event.CouncilID, err)
-		}
-		log.Printf("newsletter campaign %d kept as draft without preview or delivery", campaignID)
+	if draftOnly {
 		return nil
 	}
-	if !d.autoSendEnabled {
-		// A previous draft may have been sent manually between the initial
-		// council read and this invocation. Reconcile before sending to list 3.
-		sent, err := d.syncSentCampaign(ctx, event.CouncilID, campaignID)
-		if err != nil {
-			if relErr := d.releasePending(ctx, event.CouncilID); relErr != nil {
-				log.Printf("warn: failed to release pending claim for %s: %v", event.CouncilID, relErr)
-			}
-			return err
-		}
-		if sent {
-			return nil
-		}
-		if err := d.sendToTestList(ctx, params, event.CouncilID, council.Date); err != nil {
-			if relErr := d.releasePending(ctx, event.CouncilID); relErr != nil {
-				log.Printf("warn: failed to release pending claim for %s: %v", event.CouncilID, relErr)
-			}
-			return fmt.Errorf("send newsletter to test list: %w", err)
-		}
-		if err := d.releasePending(ctx, event.CouncilID); err != nil {
-			return fmt.Errorf("release preview claim for %s: %w", event.CouncilID, err)
-		}
-		log.Printf("newsletter draft and test email ready for manual review: council %s (%s)", event.CouncilID, council.Date)
-		return nil
+	sent, err := d.syncSentCampaign(ctx, event.CouncilID, campaignID)
+	if err != nil || sent {
+		return err
 	}
-
-	if err := d.confirmSent(ctx, event.CouncilID); err != nil {
-		// Best-effort: Brevo accepted the campaign — losing the confirmation
-		// just risks a duplicate on next async retry, never a lost send.
-		log.Printf("warn: brevo accepted campaign but DDB confirm failed for %s: %v", event.CouncilID, err)
-	}
-
-	log.Printf("newsletter campaign sent for council %s (%s)", event.CouncilID, council.Date)
-	return nil
+	return d.sendToTestList(ctx, params, event.CouncilID, latest.Date)
 }
 
 // handleTest is intended for a synchronous Lambda console test event. It uses
@@ -287,6 +238,9 @@ func (d *notifierDeps) handleTest(ctx context.Context, event NotifierEvent) erro
 	council, err := d.fetchCouncil(ctx, event.CouncilID)
 	if err != nil {
 		return fmt.Errorf("fetch test council: %w", err)
+	}
+	if council.NewsletterDraftOnly {
+		return errors.New("this council is restricted to draft_only")
 	}
 	if council.QCStatus != "APPROVED" || council.Category != "Conseil municipal" {
 		return fmt.Errorf("test council must be an APPROVED Conseil municipal")
@@ -318,7 +272,6 @@ func (d *notifierDeps) sendToTestList(ctx context.Context, params *NewsletterPar
 	testDeps := *d
 	testDeps.brevoListID = 3
 	name := fmt.Sprintf("Newsletter-TEST-list-3-%s-%s", councilID, councilDate)
-	idemKey := idempotencyKey("TEST-list-3-"+councilID, councilDate)
 	id, status, err := testDeps.lookupCampaign(ctx, name)
 	if err != nil {
 		return fmt.Errorf("lookup test campaign: %w", err)
@@ -328,12 +281,12 @@ func (d *notifierDeps) sendToTestList(ctx context.Context, params *NewsletterPar
 		return nil
 	}
 	if id == 0 {
-		id, err = testDeps.createCampaign(ctx, params, name, idemKey, nil)
+		id, err = testDeps.createCampaign(ctx, params, name)
 		if err != nil {
 			return fmt.Errorf("create test-list campaign: %w", err)
 		}
 	}
-	if err := testDeps.triggerSend(ctx, id, idemKey); err != nil {
+	if err := testDeps.sendTestCampaignNow(ctx, id); err != nil {
 		return fmt.Errorf("send test-list campaign %d: %w", id, err)
 	}
 	log.Printf("Brevo test-list campaign %d sent to list 3", id)
@@ -372,19 +325,34 @@ func (d *notifierDeps) claimPending(ctx context.Context, councilID string) error
 	return nil
 }
 
-func (d *notifierDeps) confirmSent(ctx context.Context, councilID string) error {
-	return d.confirmSentAt(ctx, councilID, d.now().UTC())
-}
-
-func (d *notifierDeps) confirmSentAt(ctx context.Context, councilID string, sentAt time.Time) error {
+func (d *notifierDeps) confirmSentAt(ctx context.Context, councilID string, campaignID int, sentAt time.Time) error {
 	_, err := d.ddb.UpdateItem(ctx, &dynamodb.UpdateItemInput{
 		TableName: aws.String(d.councilsTable),
 		Key: map[string]types.AttributeValue{
 			"council_id": &types.AttributeValueMemberS{Value: councilID},
 		},
-		UpdateExpression: aws.String("SET newsletter_sent_at = :ts REMOVE newsletter_pending_at"),
+		UpdateExpression:    aws.String("SET newsletter_sent_at = :ts"),
+		ConditionExpression: aws.String("qc_status = :approved AND newsletter_campaign_id = :id AND attribute_not_exists(newsletter_sent_at)"),
 		ExpressionAttributeValues: map[string]types.AttributeValue{
-			":ts": &types.AttributeValueMemberS{Value: sentAt.UTC().Format(time.RFC3339)},
+			":ts":       &types.AttributeValueMemberS{Value: sentAt.UTC().Format(time.RFC3339)},
+			":id":       &types.AttributeValueMemberN{Value: fmt.Sprint(campaignID)},
+			":approved": &types.AttributeValueMemberS{Value: "APPROVED"},
+		},
+	})
+	return err
+}
+
+// Record the intent before the POST. A retry may find the campaign by name,
+// but cannot issue a second creation if Brevo's first response was lost.
+func (d *notifierDeps) recordDraftRequest(ctx context.Context, councilID, name string) error {
+	_, err := d.ddb.UpdateItem(ctx, &dynamodb.UpdateItemInput{
+		TableName:           aws.String(d.councilsTable),
+		Key:                 map[string]types.AttributeValue{"council_id": &types.AttributeValueMemberS{Value: councilID}},
+		UpdateExpression:    aws.String("SET newsletter_draft_request = :name"),
+		ConditionExpression: aws.String("qc_status = :approved AND attribute_not_exists(newsletter_campaign_id) AND attribute_not_exists(newsletter_draft_request)"),
+		ExpressionAttributeValues: map[string]types.AttributeValue{
+			":name":     &types.AttributeValueMemberS{Value: name},
+			":approved": &types.AttributeValueMemberS{Value: "APPROVED"},
 		},
 	})
 	return err
@@ -399,7 +367,7 @@ func (d *notifierDeps) recordCampaignID(ctx context.Context, councilID string, c
 		Key: map[string]types.AttributeValue{
 			"council_id": &types.AttributeValueMemberS{Value: councilID},
 		},
-		UpdateExpression:    aws.String("SET newsletter_campaign_id = :id"),
+		UpdateExpression:    aws.String("SET newsletter_campaign_id = :id REMOVE newsletter_draft_request"),
 		ConditionExpression: aws.String("attribute_not_exists(newsletter_campaign_id) OR newsletter_campaign_id = :id"),
 		ExpressionAttributeValues: map[string]types.AttributeValue{
 			":id": &types.AttributeValueMemberN{Value: fmt.Sprint(campaignID)},
@@ -436,11 +404,18 @@ func (d *notifierDeps) syncSentCampaign(ctx context.Context, councilID string, c
 	if info.Status != "sent" {
 		return false, nil
 	}
+	if info.ID != campaignID || !info.targetsOnly(d.brevoListID) {
+		return false, fmt.Errorf("sent campaign %d does not match the production campaign and list", campaignID)
+	}
 	sentAt, err := time.Parse(time.RFC3339, info.SentDate)
 	if err != nil {
 		return false, fmt.Errorf("campaign %d is sent but has no valid sentDate: %w", campaignID, err)
 	}
-	if err := d.confirmSentAt(ctx, councilID, sentAt); err != nil {
+	if err := d.confirmSentAt(ctx, councilID, campaignID, sentAt); err != nil {
+		var conflict *types.ConditionalCheckFailedException
+		if errors.As(err, &conflict) {
+			return true, nil
+		}
 		return false, fmt.Errorf("record manual send for council %s: %w", councilID, err)
 	}
 	log.Printf("production campaign %d sent at %s; DynamoDB reconciled", campaignID, sentAt.Format(time.RFC3339))
@@ -548,21 +523,15 @@ func (d *notifierDeps) fetchGlobalStats(ctx context.Context) (councils int, deli
 func toColdDelibs(delibs []deliberationRec) []shared.ColdDeliberation {
 	cold := make([]shared.ColdDeliberation, len(delibs))
 	for i, d := range delibs {
-		contre := 0
-		if d.VoteContre != nil {
-			contre = *d.VoteContre
-		}
-		abst := 0
-		if d.VoteAbst != nil {
-			abst = *d.VoteAbst
-		}
-		hasDisagreement := contre > 0 || abst > 0
-
 		impactsVal := ""
 		if d.AnalysisData.Impacts != nil {
 			impactsVal = *d.AnalysisData.Impacts
 		}
 
+		decision := ""
+		if d.AnalysisData.Decision != nil {
+			decision = *d.AnalysisData.Decision
+		}
 		cold[i] = shared.ColdDeliberation{
 			ID:              d.ID,
 			Title:           d.Title,
@@ -577,7 +546,9 @@ func toColdDelibs(delibs []deliberationRec) []shared.ColdDeliberation {
 			Abstention:      d.VoteAbst,
 			ClimateImpact:   d.ClimateImpact,
 			IsSubstantial:   d.IsSubstantial || d.BudgetImpact >= 5000,
-			HasDisagreement: hasDisagreement,
+			HasDisagreement: d.SourceFacts.HasKind("DISAGREEMENT"),
+			SourceFacts:     d.SourceFacts,
+			Decision:        decision,
 			Summary:         d.Summary,
 			Impacts:         impactsVal,
 		}
@@ -595,7 +566,7 @@ func (d *notifierDeps) generateNewsletterParams(
 	cold := toColdDelibs(delibs)
 	params, err := shared.GenerateNewsletterParams(
 		ctx,
-		shared.GeminiDeps{APIKey: d.geminiKey, Model: d.geminiModel},
+		shared.GeminiDeps{APIKey: d.geminiKey, Model: d.geminiModel, FactCheckModel: d.geminiFactCheckModel},
 		council.Title, council.Date,
 		cold,
 		nextMeeting, totalCouncils, totalDelibs,
@@ -621,22 +592,10 @@ func parseNewsletterParams(raw string) (*NewsletterParams, error) {
 
 // ── Brevo campaign ────────────────────────────────────────────────────────────
 
-func (d *notifierDeps) sendCampaign(ctx context.Context, params *NewsletterParams, councilID, councilDate string, scheduledAt *string) (int, error) {
-	return d.sendCampaignMode(ctx, params, councilID, councilDate, scheduledAt, false)
-}
-
-func (d *notifierDeps) sendCampaignDraft(ctx context.Context, params *NewsletterParams, councilID, councilDate string) (int, error) {
-	return d.sendCampaignMode(ctx, params, councilID, councilDate, nil, true)
-}
-
-func (d *notifierDeps) sendCampaignMode(ctx context.Context, params *NewsletterParams, councilID, councilDate string, scheduledAt *string, draftOnly bool) (int, error) {
+func (d *notifierDeps) prepareDraft(ctx context.Context, params *NewsletterParams, councilID, councilDate string, existingID int, draftRequest string, draftOnly bool) (int, error) {
 	testEmail := strings.TrimSpace(d.testEmail)
-	automaticDelivery := d.autoSendEnabled && !draftOnly
 	if draftOnly {
 		testEmail = ""
-	}
-	if testEmail == "" && automaticDelivery {
-		return 0, fmt.Errorf("BREVO_TEST_EMAIL is required when AUTO_SEND_ENABLED is true")
 	}
 	if testEmail != "" {
 		address, err := mail.ParseAddress(testEmail)
@@ -644,62 +603,54 @@ func (d *notifierDeps) sendCampaignMode(ctx context.Context, params *NewsletterP
 			return 0, fmt.Errorf("BREVO_TEST_EMAIL must contain one valid email address")
 		}
 	}
-	// A deterministic name keyed on (councilID, councilDate) lets us recognise a
-	// campaign a previous — possibly transparently retried — invocation already
-	// created, so a client-side HTTP retry can never create a second campaign.
 	name := fmt.Sprintf("Newsletter-%s-%s", councilID, councilDate)
-	idemKey := idempotencyKey(councilID, councilDate)
-
-	existingID, status, err := d.lookupCampaign(ctx, name)
+	if draftRequest != "" {
+		name = draftRequest
+	}
+	var status string
+	var err error
+	if existingID == 0 {
+		existingID, status, err = d.lookupCampaign(ctx, name)
+	} else {
+		status, err = d.getCampaignStatus(ctx, existingID)
+	}
 	if err != nil {
 		return 0, fmt.Errorf("lookup campaign %q: %w", name, err)
 	}
-
-	var campaignID int
+	campaignID := existingID
 	switch {
 	case existingID != 0 && (status == "sent" || status == "queued" || status == "in_process" || status == "scheduled"):
-		log.Printf("Brevo campaign %d (%q) already %s — skipping send", existingID, name, status)
 		return existingID, nil
 	case existingID != 0 && status == "draft":
-		// Brevo does not rebuild an existing draft from current params. Update it
-		// explicitly before sending a preview or leaving it ready for review.
+		locked, err := d.releaseRecorded(ctx, existingID)
+		if err != nil {
+			return 0, err
+		}
+		if locked {
+			return existingID, nil
+		}
 		if err := d.updateDraftCampaign(ctx, existingID, params); err != nil {
 			return 0, fmt.Errorf("refresh Brevo draft %d: %w", existingID, err)
 		}
-		log.Printf("refreshed existing Brevo draft %d (%q)", existingID, name)
-		campaignID = existingID
 	case existingID != 0:
 		return 0, fmt.Errorf("Brevo campaign %d has uneditable status %q", existingID, status)
 	default:
-		createScheduledAt := scheduledAt
-		if !automaticDelivery {
-			createScheduledAt = nil
+		if draftRequest != "" {
+			return 0, fmt.Errorf("Brevo draft creation for %q is unresolved; reconcile by name before retrying", name)
 		}
-		campaignID, err = d.createCampaign(ctx, params, name, idemKey, createScheduledAt)
+		if err := d.recordDraftRequest(ctx, councilID, name); err != nil {
+			return 0, err
+		}
+		campaignID, err = d.createCampaign(ctx, params, name)
 		if err != nil {
 			return 0, fmt.Errorf("create campaign: %w", err)
 		}
 	}
-
 	if testEmail != "" {
 		if err := d.sendTest(ctx, campaignID, testEmail); err != nil {
 			return 0, fmt.Errorf("send test for campaign %d: %w", campaignID, err)
 		}
 	}
-	if !automaticDelivery {
-		log.Printf("Brevo campaign %d kept as draft for manual approval", campaignID)
-		return campaignID, nil
-	}
-	if scheduledAt != nil {
-		log.Printf("Brevo campaign %d scheduled for %s — skipping immediate sendNow", campaignID, *scheduledAt)
-		return campaignID, nil
-	}
-
-	if err := d.triggerSend(ctx, campaignID, idemKey); err != nil {
-		return 0, fmt.Errorf("send campaign %d: %w", campaignID, err)
-	}
-
-	log.Printf("Brevo campaign %d dispatched", campaignID)
 	return campaignID, nil
 }
 
@@ -770,57 +721,64 @@ func (d *notifierDeps) sendTest(ctx context.Context, campaignID int, email strin
 	return nil
 }
 
-// idempotencyKey derives a stable key from the council identity so that two
-// requests for the same newsletter carry an identical Idempotency-Key header.
-// Brevo may ignore the header; if so this is a harmless no-op and the
-// lookupCampaign/pre-send-status guards still prevent a double send.
-func idempotencyKey(councilID, councilDate string) string {
-	sum := sha256.Sum256([]byte(councilID + "|" + councilDate))
-	return hex.EncodeToString(sum[:16])
+func (d *notifierDeps) lookupCampaign(ctx context.Context, name string) (int, string, error) {
+	var id int
+	var status string
+	for offset := 0; ; offset += 50 {
+		campaigns, err := d.campaignPage(ctx, offset)
+		if err != nil {
+			return 0, "", err
+		}
+		for _, campaign := range campaigns {
+			if campaign.Name == name {
+				if id != 0 || campaign.ID <= 0 {
+					return 0, "", fmt.Errorf("ambiguous Brevo campaign %q", name)
+				}
+				id, status = campaign.ID, campaign.Status
+			}
+		}
+		if len(campaigns) < 50 {
+			return id, status, nil
+		}
+	}
 }
 
-// lookupCampaign returns the id and status of the first campaign whose name
-// matches exactly. Brevo offers no server-side name filter, so we page the
-// most recent campaigns and match locally. (0, "", nil) means no match.
-func (d *notifierDeps) lookupCampaign(ctx context.Context, name string) (int, string, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, brevoBaseURL+"/emailCampaigns?limit=50&offset=0", nil)
+type brevoCampaignSummary struct {
+	ID     int    `json:"id"`
+	Name   string `json:"name"`
+	Status string `json:"status"`
+}
+
+func (d *notifierDeps) campaignPage(ctx context.Context, offset int) ([]brevoCampaignSummary, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/emailCampaigns?limit=50&offset=%d", brevoBaseURL, offset), nil)
 	if err != nil {
-		return 0, "", err
+		return nil, err
 	}
 	req.Header.Set("api-key", d.brevoKey)
 	req.Header.Set("accept", "application/json")
 
 	resp, err := d.httpClient.Do(req)
 	if err != nil {
-		return 0, "", fmt.Errorf("list campaigns request: %w", err)
+		return nil, fmt.Errorf("list campaigns request: %w", err)
 	}
 	defer resp.Body.Close()
 	body, _ := io.ReadAll(resp.Body)
 
 	if resp.StatusCode >= 300 {
-		return 0, "", fmt.Errorf("brevo list campaigns status %d: %s", resp.StatusCode, body)
+		return nil, fmt.Errorf("brevo list campaigns status %d: %s", resp.StatusCode, body)
 	}
 
 	var result struct {
-		Campaigns []struct {
-			ID     int    `json:"id"`
-			Name   string `json:"name"`
-			Status string `json:"status"`
-		} `json:"campaigns"`
+		Campaigns []brevoCampaignSummary `json:"campaigns"`
 	}
 	if err := json.Unmarshal(body, &result); err != nil {
-		return 0, "", fmt.Errorf("decode campaign list: %w", err)
+		return nil, fmt.Errorf("decode campaign list: %w", err)
 	}
 
-	for _, c := range result.Campaigns {
-		if c.Name == name {
-			return c.ID, c.Status, nil
-		}
-	}
-	return 0, "", nil
+	return result.Campaigns, nil
 }
 
-func (d *notifierDeps) createCampaign(ctx context.Context, params *NewsletterParams, name, idemKey string, scheduledAt *string) (int, error) {
+func (d *notifierDeps) createCampaign(ctx context.Context, params *NewsletterParams, name string) (int, error) {
 	// Convert params struct → map[string]interface{} for the Brevo params field
 	paramsJSON, err := json.Marshal(params)
 	if err != nil {
@@ -844,9 +802,6 @@ func (d *notifierDeps) createCampaign(ctx context.Context, params *NewsletterPar
 		},
 		"params": paramsMap,
 	}
-	if scheduledAt != nil {
-		campaignData["scheduledAt"] = *scheduledAt
-	}
 
 	payload, err := json.Marshal(campaignData)
 	if err != nil {
@@ -860,7 +815,6 @@ func (d *notifierDeps) createCampaign(ctx context.Context, params *NewsletterPar
 	req.Header.Set("api-key", d.brevoKey)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("accept", "application/json")
-	req.Header.Set("Idempotency-Key", idemKey)
 
 	resp, err := d.httpClient.Do(req)
 	if err != nil {
@@ -886,8 +840,26 @@ func (d *notifierDeps) createCampaign(ctx context.Context, params *NewsletterPar
 
 // getCampaignStatus returns the current status of a single campaign.
 type brevoCampaignInfo struct {
+	ID             int             `json:"id"`
+	Subject        string          `json:"subject"`
+	HTML           string          `json:"htmlContent"`
+	ModifiedAt     string          `json:"modifiedAt"`
+	ScheduledAt    string          `json:"scheduledAt"`
+	SendAtBestTime bool            `json:"sendAtBestTime"`
+	Sender         json.RawMessage `json:"sender"`
+	Recipients     struct {
+		Lists          []int `json:"lists"`
+		ExclusionLists []int `json:"exclusionLists"`
+		Segments       []int `json:"segments"`
+		SegmentIDs     []int `json:"segmentIds"`
+	} `json:"recipients"`
 	Status   string `json:"status"`
 	SentDate string `json:"sentDate"`
+}
+
+func (c brevoCampaignInfo) targetsOnly(list int) bool {
+	return list > 0 && len(c.Recipients.Lists) == 1 && c.Recipients.Lists[0] == list &&
+		len(c.Recipients.ExclusionLists) == 0 && len(c.Recipients.Segments) == 0 && len(c.Recipients.SegmentIDs) == 0
 }
 
 func (d *notifierDeps) getCampaignStatus(ctx context.Context, campaignID int) (string, error) {
@@ -922,37 +894,20 @@ func (d *notifierDeps) getCampaignInfo(ctx context.Context, campaignID int) (bre
 	return result, nil
 }
 
-func (d *notifierDeps) triggerSend(ctx context.Context, campaignID int, idemKey string) error {
-	// Pre-send guard: if Brevo already accepted this campaign for delivery, a
-	// transparent HTTP retry must not fire sendNow a second time. A failed
-	// status check is non-fatal — we'd rather risk Brevo's own dedup than drop
-	// the newsletter on a transient read error.
-	if status, err := d.getCampaignStatus(ctx, campaignID); err != nil {
-		log.Printf("warn: pre-send status check failed for campaign %d, proceeding: %v", campaignID, err)
-	} else if status == "sent" || status == "queued" || status == "in_process" {
-		log.Printf("Brevo campaign %d already %s — skipping sendNow", campaignID, status)
-		return nil
-	}
-
-	url := fmt.Sprintf("%s/emailCampaigns/%d/sendNow", brevoBaseURL, campaignID)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, nil)
+func (d *notifierDeps) sendTestCampaignNow(ctx context.Context, campaignID int) error {
+	info, err := d.getCampaignInfo(ctx, campaignID)
 	if err != nil {
 		return err
 	}
-	req.Header.Set("api-key", d.brevoKey)
-	req.Header.Set("accept", "application/json")
-	req.Header.Set("Idempotency-Key", idemKey)
-
-	resp, err := d.httpClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("sendNow request: %w", err)
+	if info.ID != campaignID || !info.targetsOnly(3) {
+		return fmt.Errorf("campaign %d does not exclusively target test list 3", campaignID)
 	}
-	defer resp.Body.Close()
-	body, _ := io.ReadAll(resp.Body)
-
-	// 204 No Content = success
-	if resp.StatusCode >= 300 {
-		return fmt.Errorf("brevo sendNow status %d: %s", resp.StatusCode, body)
+	switch info.Status {
+	case "sent", "queued", "in_process", "scheduled":
+		return nil
+	case "draft":
+		return d.mutateDelivery(ctx, campaignID, time.Time{})
+	default:
+		return fmt.Errorf("unexpected test campaign status %q", info.Status)
 	}
-	return nil
 }

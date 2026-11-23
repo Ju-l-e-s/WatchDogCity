@@ -55,6 +55,7 @@ type DeliberationView struct {
 	Counted         bool
 	FactCheckModel  string
 	FactCheckedAt   string
+	SourceFacts     *SourceFacts
 	Title           string
 	TopicTag        string
 	Summary         string
@@ -456,10 +457,11 @@ func ValidateStatistical(c CouncilView, delibs []DeliberationView, base Baseline
 
 	if c.RequireFactCheck {
 		for _, d := range delibs {
-			if strings.TrimSpace(d.FactCheckModel) == "" || strings.TrimSpace(d.FactCheckedAt) == "" {
+			if strings.TrimSpace(d.FactCheckModel) == "" || strings.TrimSpace(d.FactCheckedAt) == "" ||
+				(d.SourceFacts != nil && !d.SourceFacts.Reviewed()) {
 				viols = append(viols, Violation{
 					Rule: "S9_MISSING_FACT_CHECK", Severity: SeverityHigh,
-					DeliberationID: d.ID, Detail: "fact-check model or timestamp is missing",
+					DeliberationID: d.ID, Detail: "fact-check model, timestamp or source fact review is missing",
 				})
 			}
 		}

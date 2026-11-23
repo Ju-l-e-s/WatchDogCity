@@ -9,7 +9,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	awslambda "github.com/aws/aws-sdk-go-v2/service/lambda"
-	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/watchdog/shared"
 )
 
@@ -21,15 +20,14 @@ func main() {
 	handler := &ValidatorHandler{
 		ddb:                dynamodb.NewFromConfig(cfg),
 		lambdaClient:       awslambda.NewFromConfig(cfg),
-		sqsClient:          sqs.NewFromConfig(cfg),
 		councilsTable:      mustEnv("COUNCILS_TABLE"),
 		deliberationsTable: mustEnv("DELIBERATIONS_TABLE"),
 		publisherFnName:    mustEnv("PUBLISHER_FUNCTION_NAME"),
 		notifierFnName:     mustEnv("NOTIFIER_FUNCTION_NAME"),
-		sqsQueueURL:        os.Getenv("PDF_QUEUE_URL"), // optional; empty disables self-heal
 		geminiDeps: shared.GeminiDeps{
-			APIKey: mustEnv("GEMINI_API_KEY"),
-			Model:  mustEnv("GEMINI_MODEL"),
+			APIKey:         mustEnv("GEMINI_API_KEY"),
+			Model:          mustEnv("GEMINI_MODEL"),
+			FactCheckModel: mustEnv("GEMINI_FACT_CHECK_MODEL"),
 		},
 		cfg: shared.DefaultQcConfig(),
 	}

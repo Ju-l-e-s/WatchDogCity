@@ -2,8 +2,10 @@ package shared
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/rand"
+	"net"
 	"strings"
 	"time"
 
@@ -50,6 +52,17 @@ func CallGeminiWithRetry(ctx context.Context, call GeminiCall, maxAttempts int) 
 }
 
 func isRetriable(err error) bool {
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return false
+	}
+	var apiErr genai.APIError
+	if errors.As(err, &apiErr) {
+		return apiErr.Code == 429 || apiErr.Code == 500 || apiErr.Code == 502 || apiErr.Code == 503 || apiErr.Code == 504
+	}
+	var networkErr net.Error
+	if errors.As(err, &networkErr) && networkErr.Timeout() {
+		return true
+	}
 	msg := err.Error()
 	for _, sig := range []string{"429", "500", "502", "503", "504", "deadline exceeded", "connection reset"} {
 		if strings.Contains(msg, sig) {

@@ -115,16 +115,14 @@ func marshalDelib(d deliberationRec) map[string]ddbtypes.AttributeValue {
 }
 
 // makeHandler builds a ValidatorHandler with the given mocks and sensible defaults.
-func makeHandler(ddb ddbAPI, lambdaClient lambdaAPI, sqsClient sqsAPI) *ValidatorHandler {
+func makeHandler(ddb ddbAPI, lambdaClient lambdaAPI, _ *mockSQS) *ValidatorHandler {
 	return &ValidatorHandler{
 		ddb:                ddb,
 		lambdaClient:       lambdaClient,
-		sqsClient:          sqsClient,
 		councilsTable:      "councils",
 		deliberationsTable: "deliberations",
 		publisherFnName:    "publisher-fn",
 		notifierFnName:     "notifier-fn",
-		sqsQueueURL:        "https://sqs.example.com/queue",
 		geminiDeps:         shared.GeminiDeps{APIKey: "", Model: ""},
 		cfg:                shared.DefaultQcConfig(),
 	}
@@ -217,7 +215,7 @@ func TestClaimValidating_Success(t *testing.T) {
 	if *in.TableName != "councils" {
 		t.Errorf("expected table=councils, got %q", *in.TableName)
 	}
-	if *in.ConditionExpression != "qc_status = :pending" {
+	if *in.ConditionExpression != "(qc_status = :pending OR (qc_status = :validating AND qc_validation_until < :now)) AND attribute_not_exists(pdf_review_held) AND attribute_not_exists(pdf_reviews_pending)" {
 		t.Errorf("unexpected ConditionExpression: %q", *in.ConditionExpression)
 	}
 }
@@ -432,172 +430,6 @@ func TestInvokePublisher_InvokeError_Logged(t *testing.T) {
 	h.invokePublisher(context.Background(), "council-1")
 	if len(lambda.invokeCalls) != 1 {
 		t.Fatalf("expected 1 Invoke call, got %d", len(lambda.invokeCalls))
-	}
-}
-
-// ── maybeHeal tests ──────────────────────────────────────────────────────────
-
-func TestMaybeHeal_NoSQSClient(t *testing.T) {
-	ddb := &mockDDB{}
-	h := makeHandler(ddb, nil, nil)
-	h.sqsClient = nil
-	h.sqsQueueURL = "https://sqs.example.com/queue"
-	c := okCouncilRec()
-	c.QcAttempts = 1
-	h.maybeHeal(context.Background(), &c, []deliberationRec{okDelibRec("d1")})
-	if len(ddb.deleteItemCalls) != 0 {
-		t.Error("expected no DeleteItem calls when SQS is nil")
-	}
-}
-
-func TestMaybeHeal_EmptyQueueURL(t *testing.T) {
-	sqs := &mockSQS{}
-	ddb := &mockDDB{}
-	h := makeHandler(ddb, nil, sqs)
-	h.sqsQueueURL = ""
-	c := okCouncilRec()
-	c.QcAttempts = 1
-	h.maybeHeal(context.Background(), &c, []deliberationRec{okDelibRec("d1")})
-	if len(ddb.deleteItemCalls) != 0 {
-		t.Error("expected no DeleteItem calls when queue URL is empty")
-	}
-}
-
-func TestMaybeHeal_AtMaxAttempts(t *testing.T) {
-	sqs := &mockSQS{}
-	ddb := &mockDDB{}
-	h := makeHandler(ddb, nil, sqs)
-	c := okCouncilRec()
-	c.QcAttempts = maxHealAttempts // exactly at limit
-	h.maybeHeal(context.Background(), &c, []deliberationRec{okDelibRec("d1")})
-	if len(ddb.deleteItemCalls) != 0 {
-		t.Error("expected no DeleteItem calls when at max attempts")
-	}
-	if len(sqs.sendMessageCalls) != 0 {
-		t.Error("expected no SendMessage calls when at max attempts")
-	}
-}
-
-func TestMaybeHeal_ExceededMaxAttempts(t *testing.T) {
-	sqs := &mockSQS{}
-	ddb := &mockDDB{}
-	h := makeHandler(ddb, nil, sqs)
-	c := okCouncilRec()
-	c.QcAttempts = maxHealAttempts + 1
-	h.maybeHeal(context.Background(), &c, []deliberationRec{okDelibRec("d1")})
-	if len(ddb.deleteItemCalls) != 0 {
-		t.Error("expected no DeleteItem calls when over max attempts")
-	}
-}
-
-func TestMaybeHeal_NoPDFs(t *testing.T) {
-	sqs := &mockSQS{}
-	ddb := &mockDDB{}
-	h := makeHandler(ddb, nil, sqs)
-	c := okCouncilRec()
-	c.QcAttempts = 1
-	c.TotalPdfs = 0
-	// Empty deliberation list
-	h.maybeHeal(context.Background(), &c, []deliberationRec{})
-	// Still resets and re-enqueues even with 0 PDFs — but DeleteItem and SendMessage loops are skipped because slice is empty
-	if len(ddb.updateItemCalls) != 1 {
-		t.Errorf("expected reset UpdateItem call, got %d", len(ddb.updateItemCalls))
-	}
-	// Verify REMOVE qc_status + SET processed_pdfs=0
-	u := ddb.updateItemCalls[0]
-	if !strings.Contains(*u.UpdateExpression, "REMOVE qc_status") {
-		t.Errorf("expected REMOVE qc_status in expression, got %q", *u.UpdateExpression)
-	}
-}
-
-func TestMaybeHeal_UnderLimit_WithPDFs(t *testing.T) {
-	sqs := &mockSQS{}
-	ddb := &mockDDB{
-		deleteItemFn: func(ctx context.Context, in *dynamodb.DeleteItemInput, opts ...func(*dynamodb.Options)) (*dynamodb.DeleteItemOutput, error) {
-			return &dynamodb.DeleteItemOutput{}, nil
-		},
-	}
-	h := makeHandler(ddb, nil, sqs)
-	c := okCouncilRec()
-	c.QcAttempts = 1
-	c.TotalPdfs = 2
-	delibs := []deliberationRec{
-		okDelibRec("d1"),
-		okDelibRec("d2"),
-	}
-	h.maybeHeal(context.Background(), &c, delibs)
-
-	// Should delete both deliberations
-	if len(ddb.deleteItemCalls) != 2 {
-		t.Errorf("expected 2 DeleteItem calls, got %d", len(ddb.deleteItemCalls))
-	}
-	// Should reset council
-	if len(ddb.updateItemCalls) != 1 {
-		t.Errorf("expected 1 UpdateItem call for reset, got %d", len(ddb.updateItemCalls))
-	}
-	// Should enqueue 2 SQS messages
-	if len(sqs.sendMessageCalls) != 2 {
-		t.Errorf("expected 2 SendMessage calls, got %d", len(sqs.sendMessageCalls))
-	}
-	// Verify SQS payload contains council_id and pdf_url
-	for i, msg := range sqs.sendMessageCalls {
-		if *msg.QueueUrl != "https://sqs.example.com/queue" {
-			t.Errorf("SQS[%d]: expected queue URL, got %q", i, *msg.QueueUrl)
-		}
-		var body map[string]interface{}
-		if err := json.Unmarshal([]byte(*msg.MessageBody), &body); err != nil {
-			t.Errorf("SQS[%d]: invalid JSON body: %v", i, err)
-		}
-		if body["council_id"] != "council-1" {
-			t.Errorf("SQS[%d]: council_id mismatch", i)
-		}
-	}
-}
-
-func TestMaybeHeal_SkipsEmptyPDFURL(t *testing.T) {
-	sqs := &mockSQS{}
-	ddb := &mockDDB{}
-	h := makeHandler(ddb, nil, sqs)
-	c := okCouncilRec()
-	c.QcAttempts = 1
-	c.TotalPdfs = 2
-	d := okDelibRec("d1")
-	d.PDFURL = "" // empty URL — should skip SQS
-	delibs := []deliberationRec{d, okDelibRec("d2")}
-	h.maybeHeal(context.Background(), &c, delibs)
-
-	// Only 1 SQS message (the empty-PDF one is skipped)
-	if len(sqs.sendMessageCalls) != 1 {
-		t.Errorf("expected 1 SendMessage call (one skipped), got %d", len(sqs.sendMessageCalls))
-	}
-	if len(ddb.deleteItemCalls) != 2 {
-		t.Errorf("expected 2 DeleteItem calls (still deleted even if no PDF), got %d", len(ddb.deleteItemCalls))
-	}
-}
-
-func TestMaybeHeal_ResetFailure_NoReenqueue(t *testing.T) {
-	sqs := &mockSQS{}
-	ddb := &mockDDB{
-		updateItemFn: func(ctx context.Context, in *dynamodb.UpdateItemInput, opts ...func(*dynamodb.Options)) (*dynamodb.UpdateItemOutput, error) {
-			// Check if this is the reset call (REMOVE qc_status)
-			if in.UpdateExpression != nil && strings.Contains(*in.UpdateExpression, "REMOVE qc_status") {
-				return nil, fmt.Errorf("reset failed")
-			}
-			return &dynamodb.UpdateItemOutput{}, nil
-		},
-	}
-	h := makeHandler(ddb, nil, sqs)
-	c := okCouncilRec()
-	c.QcAttempts = 1
-	h.maybeHeal(context.Background(), &c, []deliberationRec{okDelibRec("d1")})
-
-	// DeleteItem should have been called (happens before reset)
-	if len(ddb.deleteItemCalls) == 0 {
-		t.Error("expected DeleteItem calls before reset attempt")
-	}
-	// But SQS should NOT have been called because reset failed
-	if len(sqs.sendMessageCalls) != 0 {
-		t.Errorf("expected 0 SendMessage calls after reset failure, got %d", len(sqs.sendMessageCalls))
 	}
 }
 
@@ -1036,7 +868,6 @@ func TestHandleRequest(t *testing.T) {
 			},
 			wantErr: false,
 			validateFunc: func(t *testing.T, ddb *mockDDB, lambda *mockLambda, sqs *mockSQS) {
-				// Should have claim + quarantine (+ maybeHeal resets). Look for quarantine update
 				// by checking expression attribute values, not expression text.
 				foundQuarantine := false
 				for _, u := range ddb.updateItemCalls {
@@ -1178,9 +1009,9 @@ func TestHandleRequest(t *testing.T) {
 	}
 }
 
-// ── Integration-style test: HandleRequest QUARANTINED with self-heal ─────────
+// ── Integration-style test: HandleRequest durable QUARANTINED state ─────────
 
-func TestHandleRequest_QuarantineWithSelfHeal(t *testing.T) {
+func TestHandleRequest_QuarantineIsDurable(t *testing.T) {
 	c := okCouncilRec()
 	c.TotalPdfs = 1
 	c.ProcessedPdfs = 1
@@ -1237,36 +1068,10 @@ func TestHandleRequest_QuarantineWithSelfHeal(t *testing.T) {
 		t.Error("expected QUARANTINED update")
 	}
 
-	// Self-heal should have deleted the deliberation
-	if len(ddb.deleteItemCalls) != 1 {
-		t.Errorf("expected 1 DeleteItem for self-heal, got %d", len(ddb.deleteItemCalls))
+	if len(ddb.deleteItemCalls) != 0 || len(sqs.sendMessageCalls) != 0 || len(lambda.invokeCalls) != 0 || len(ddb.updateItemCalls) != 2 {
+		t.Fatal("quarantine must preserve all records and stop downstream work")
 	}
 
-	// Self-heal should have sent SQS message
-	if len(sqs.sendMessageCalls) != 1 {
-		t.Errorf("expected 1 SQS SendMessage for self-heal, got %d", len(sqs.sendMessageCalls))
-	}
-
-	// Self-heal should have reset the council
-	resetFound := false
-	for _, u := range ddb.updateItemCalls {
-		if u.UpdateExpression != nil && strings.Contains(*u.UpdateExpression, "REMOVE qc_status") {
-			resetFound = true
-			break
-		}
-	}
-	if !resetFound {
-		t.Error("expected REMOVE qc_status reset update for self-heal")
-	}
-}
-
-func TestCompletenessViolationDisablesPartialSelfHeal(t *testing.T) {
-	if !hasCompletenessViolation(shared.Verdict{Violations: []shared.Violation{{Rule: "S8_PDF_MANIFEST_MISMATCH"}}}) {
-		t.Fatal("manifest mismatch must not re-enqueue only the known PDFs")
-	}
-	if hasCompletenessViolation(shared.Verdict{Violations: []shared.Violation{{Rule: "D2_BUDGET_AUCUN_NONZERO"}}}) {
-		t.Fatal("ordinary data violation should remain eligible for self-heal")
-	}
 }
 
 // ── handleApproved tests (isolated, testing non-Gemini branches) ─────────────
@@ -1346,8 +1151,8 @@ func TestToColdDelibs_BasicMapping(t *testing.T) {
 	if !c.IsSubstantial {
 		t.Error("expected IsSubstantial=true (BudgetImpact >= 5000)")
 	}
-	if !c.HasDisagreement {
-		t.Error("expected HasDisagreement=true (Contre=5)")
+	if c.HasDisagreement || c.Contre == nil || *c.Contre != 5 {
+		t.Error("recorded opposition must be preserved separately from a documented disagreement")
 	}
 	if c.Impacts != "Impact fort." {
 		t.Errorf("impacts mismatch: %q", c.Impacts)
@@ -1388,9 +1193,8 @@ func TestToColdDelibs_AbstentionOnly_NoDisagreement(t *testing.T) {
 		VoteAbstention: ptrInt(3),
 	}
 	cold := toColdDelibs([]shared.DeliberationView{dv})
-	// hasDisagreement = contre>0 || abst>0 → abst=3 >0 → true
-	if !cold[0].HasDisagreement {
-		t.Error("expected HasDisagreement=true when abstention > 0")
+	if cold[0].HasDisagreement || cold[0].Abstention == nil || *cold[0].Abstention != 3 {
+		t.Error("abstentions must be preserved without inferring a documented disagreement")
 	}
 }
 
@@ -1607,7 +1411,6 @@ func TestHandleRequest_ComputeBaselineFails_StillQuarantines(t *testing.T) {
 	}
 	h := makeHandler(ddb, &mockLambda{}, &mockSQS{})
 	// Disable heal so we only test quarantine
-	h.sqsQueueURL = ""
 
 	err := h.HandleRequest(context.Background(), ValidatorEvent{CouncilID: "council-1"})
 	if err != nil {
@@ -1648,7 +1451,6 @@ func TestHandleRequest_EmptyDeliberations(t *testing.T) {
 		},
 	}
 	h := makeHandler(ddb, &mockLambda{}, &mockSQS{})
-	h.sqsQueueURL = ""
 
 	err := h.HandleRequest(context.Background(), ValidatorEvent{CouncilID: "council-1"})
 	if err != nil {
@@ -1666,66 +1468,6 @@ func TestHandleRequest_EmptyDeliberations(t *testing.T) {
 	}
 	if !quarantineFound {
 		t.Error("expected QUARANTINED for empty deliberations (S1)")
-	}
-}
-
-// ── maybeHeal: deletes with individual errors logged (non-fatal) ─────────────
-
-func TestMaybeHeal_DeleteErrorsNonFatal(t *testing.T) {
-	sqs := &mockSQS{}
-	deleteCalls := 0
-	ddb := &mockDDB{
-		deleteItemFn: func(ctx context.Context, in *dynamodb.DeleteItemInput, opts ...func(*dynamodb.Options)) (*dynamodb.DeleteItemOutput, error) {
-			deleteCalls++
-			if deleteCalls == 2 {
-				return nil, fmt.Errorf("delete failed for d2")
-			}
-			return &dynamodb.DeleteItemOutput{}, nil
-		},
-	}
-	h := makeHandler(ddb, nil, sqs)
-	c := okCouncilRec()
-	c.QcAttempts = 1
-	c.TotalPdfs = 3
-	delibs := []deliberationRec{okDelibRec("d1"), okDelibRec("d2"), okDelibRec("d3")}
-	h.maybeHeal(context.Background(), &c, delibs)
-
-	// All 3 deletes attempted even though d2 fails
-	if len(ddb.deleteItemCalls) != 3 {
-		t.Errorf("expected 3 delete attempts, got %d", len(ddb.deleteItemCalls))
-	}
-	// Reset should still happen
-	if len(ddb.updateItemCalls) != 1 {
-		t.Errorf("expected 1 reset update, got %d", len(ddb.updateItemCalls))
-	}
-	// All 3 SQS should be sent (error in delete doesn't block SQS)
-	if len(sqs.sendMessageCalls) != 3 {
-		t.Errorf("expected 3 SQS messages, got %d", len(sqs.sendMessageCalls))
-	}
-}
-
-// ── maybeHeal: SQS send errors logged but non-fatal ─────────────────────────
-
-func TestMaybeHeal_SQSErrorsNonFatal(t *testing.T) {
-	sqs := &mockSQS{
-		sendMessageFn: func(ctx context.Context, in *sqs.SendMessageInput, opts ...func(*sqs.Options)) (*sqs.SendMessageOutput, error) {
-			if strings.Contains(*in.MessageBody, "d2") {
-				return nil, fmt.Errorf("sqs send failed for d2")
-			}
-			return &sqs.SendMessageOutput{}, nil
-		},
-	}
-	ddb := &mockDDB{}
-	h := makeHandler(ddb, nil, sqs)
-	c := okCouncilRec()
-	c.QcAttempts = 1
-	c.TotalPdfs = 2
-	delibs := []deliberationRec{okDelibRec("d1"), okDelibRec("d2")}
-	h.maybeHeal(context.Background(), &c, delibs)
-
-	// Both SendMessage calls attempted
-	if len(sqs.sendMessageCalls) != 2 {
-		t.Errorf("expected 2 SQS attempts, got %d", len(sqs.sendMessageCalls))
 	}
 }
 
@@ -1769,5 +1511,40 @@ func TestHandleRequest_FetchDeliberationsFails(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "fetch deliberations") {
 		t.Errorf("error should mention fetch, got %q", err.Error())
+	}
+}
+
+func TestApprovedDispatchResumesAfterInvokeFailure(t *testing.T) {
+	c := okCouncilRec()
+	c.QcStatus = "APPROVED"
+	c.DispatchPending = true
+	c.NewsletterParamsJSON = `{"email_subject":"Sujet stocké","fact_check_version":1}`
+	ddb := &mockDDB{updateItemFn: func(ctx context.Context, in *dynamodb.UpdateItemInput, opts ...func(*dynamodb.Options)) (*dynamodb.UpdateItemOutput, error) {
+		if strings.Contains(aws.ToString(in.UpdateExpression), "ADD qc_attempts") {
+			return nil, &ddbtypes.ConditionalCheckFailedException{Item: marshalCouncil(c)}
+		}
+		if aws.ToString(in.UpdateExpression) != "REMOVE qc_dispatch_pending" {
+			t.Fatalf("unexpected update: %s", aws.ToString(in.UpdateExpression))
+		}
+		c.DispatchPending = false
+		return &dynamodb.UpdateItemOutput{}, nil
+	}}
+	client := &mockLambda{invokeFn: func(context.Context, *awslambda.InvokeInput, ...func(*awslambda.Options)) (*awslambda.InvokeOutput, error) {
+		return nil, errors.New("publisher unavailable")
+	}}
+	h := makeHandler(ddb, client, nil)
+	ev := ValidatorEvent{CouncilID: c.CouncilID}
+	if err := h.HandleRequest(context.Background(), ev); err == nil || !c.DispatchPending {
+		t.Fatal("failed handoff must remain pending")
+	}
+	client.invokeFn = nil
+	if err := h.HandleRequest(context.Background(), ev); err != nil {
+		t.Fatal(err)
+	}
+	if c.DispatchPending || len(client.invokeCalls) != 3 {
+		t.Fatal("retry should dispatch and clear the pending marker")
+	}
+	if err := h.HandleRequest(context.Background(), ev); err != nil || len(client.invokeCalls) != 3 {
+		t.Fatal("completed handoff replayed", err)
 	}
 }

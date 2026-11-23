@@ -3,10 +3,12 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/watchdog/shared"
 )
 
 func intPtr(i int) *int       { return &i }
@@ -253,4 +255,34 @@ func TestBuildDataJSON_HasVoteFalseWhenNoCounts(t *testing.T) {
 	data, err := buildDataJSON(context.Background(), nil, councils, delibs)
 	require.NoError(t, err)
 	assert.False(t, data.Councils[0].Deliberations[0].Vote.HasVote)
+}
+
+func TestPublicEssentialFactsAreAdditive(t *testing.T) {
+	source := &shared.SourceFacts{Version: shared.SourceFactsVersion, ProofStatus: shared.ProofStructural,
+		PDFSHA256: strings.Repeat("1", 64), ReviewedPayloadSHA256: strings.Repeat("2", 64),
+		Facts: []shared.SourceFact{
+			{ID: "grant", Kind: "FINANCE", Audience: "SITE", Label: "Aide plafonnée", Evidence: shared.PDFPassage{Page: 5, Excerpt: "au maximum"}},
+			{Kind: "CONDITION", FinancialFactID: "grant", Audience: "SITE", Label: "Versement sur justificatifs", Evidence: shared.PDFPassage{Page: 6, Excerpt: "après obtention des justificatifs"}},
+			{Audience: "EXTRACTION", Label: "Repère de tableau", Evidence: shared.PDFPassage{Page: 7, Excerpt: "code"}},
+		},
+	}
+	require.Empty(t, publicSourceFacts(nil))
+	require.Empty(t, publicSourceFacts(source))
+	source.ProofStatus = shared.ProofModelReviewed
+	councils := []CouncilRecord{{CouncilID: "council", Date: "2026-11-16", Category: "Conseil municipal"}}
+	output, err := buildDataJSON(context.Background(), nil, councils, map[string][]DeliberationRecord{
+		"council": {{ID: "new", SourceFacts: source}},
+	})
+	require.NoError(t, err)
+	require.Len(t, output.Councils, 1)
+	got := output.Councils[0].Deliberations[0]
+	require.Equal(t, []PublicSourceFact{
+		{Text: "Aide plafonnée", Page: 5, Passage: "au maximum"},
+		{Text: "Versement sur justificatifs", Page: 6, Passage: "après obtention des justificatifs"},
+	}, got.EssentialFacts)
+	require.Equal(t, source.PDFSHA256, got.SourcePDFSHA256)
+	legacy, err := json.Marshal(DeliberationOutput{ID: "legacy"})
+	require.NoError(t, err)
+	require.NotContains(t, string(legacy), "essential_facts")
+	require.Contains(t, string(legacy), "budget_impact")
 }

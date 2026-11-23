@@ -1,7 +1,15 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
+	"github.com/aws/aws-lambda-go/events"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	awslambda "github.com/aws/aws-sdk-go-v2/service/lambda"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
@@ -193,4 +201,55 @@ func TestComputeStats_NilVotePointers(t *testing.T) {
 	assert.Equal(t, 0, stats.totalPour)
 	assert.Equal(t, 0, stats.totalContre)
 	assert.Equal(t, 0, stats.totalAbst)
+}
+
+// Replay the two distinct Stream images produced by PutItem and the count transaction.
+func TestCountedStreamCompletesAndResumesValidation(t *testing.T) {
+	var calls []string
+	pending := false
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		op := r.Header.Get("X-Amz-Target")
+		calls = append(calls, op)
+		w.Header().Set("Content-Type", "application/x-amz-json-1.0")
+		switch op {
+		case "DynamoDB_20120810.GetItem":
+			status := ""
+			if pending {
+				status = `,"qc_status":{"S":"PENDING"}`
+			}
+			io.WriteString(w, `{"Item":{"processed_pdfs":{"N":"1"},"total_pdfs":{"N":"1"}`+status+`}}`)
+		case "DynamoDB_20120810.Query":
+			io.WriteString(w, `{"Items":[{"id":{"S":"d1"},"counted":{"BOOL":true}}]}`)
+		case "DynamoDB_20120810.UpdateItem":
+			pending = true
+			io.WriteString(w, "{}")
+		case "":
+			if r.URL.Path != "/2015-03-31/functions/validator/invocations" {
+				t.Errorf("unexpected path %s", r.URL.Path)
+			}
+			w.WriteHeader(http.StatusAccepted)
+		default:
+			t.Errorf("unexpected API %s", op)
+		}
+	}))
+	defer server.Close()
+	cfg := aws.Config{Region: "eu-west-3", Credentials: aws.AnonymousCredentials{}}
+	oldDB, oldLambda := ddb, lambdaClient
+	defer func() { ddb, lambdaClient = oldDB, oldLambda }()
+	ddb = dynamodb.NewFromConfig(cfg, func(o *dynamodb.Options) { o.BaseEndpoint = aws.String(server.URL) })
+	lambdaClient = awslambda.NewFromConfig(cfg, func(o *awslambda.Options) { o.BaseEndpoint = aws.String(server.URL) })
+	t.Setenv("COUNCILS_TABLE", "councils")
+	t.Setenv("DELIBERATIONS_TABLE", "deliberations")
+	t.Setenv("VALIDATOR_FUNCTION_NAME", "validator")
+	image := map[string]events.DynamoDBAttributeValue{"council_id": events.NewStringAttribute("c1")}
+	event := events.DynamoDBEvent{Records: []events.DynamoDBEventRecord{{EventName: "INSERT", Change: events.DynamoDBStreamRecord{NewImage: image}}}}
+	require.NoError(t, handler(context.Background(), event))
+	require.Empty(t, calls)
+	event.Records[0].EventName = "MODIFY"
+	image["counted"] = events.NewBooleanAttribute(true)
+	require.NoError(t, handler(context.Background(), event))
+	require.Equal(t, []string{"DynamoDB_20120810.GetItem", "DynamoDB_20120810.Query", "DynamoDB_20120810.UpdateItem", ""}, calls)
+	calls = nil
+	require.NoError(t, handler(context.Background(), event))
+	require.Equal(t, []string{"DynamoDB_20120810.GetItem", ""}, calls)
 }

@@ -46,7 +46,6 @@ type webhookEvent struct {
 	CampaignID json.RawMessage `json:"campaign_id"`
 	CampID     json.RawMessage `json:"camp_id"`
 	ID         json.RawMessage `json:"id"`
-	TSSent     int64           `json:"ts_sent"`
 }
 
 type campaignInfo struct {
@@ -125,19 +124,15 @@ func (h *webhookHandler) handle(ctx context.Context, req events.LambdaFunctionUR
 	if len(info.Recipients.Lists) != 1 || info.Recipients.Lists[0] != h.prodList {
 		return response(http.StatusOK, "ignored"), nil
 	}
-	if event.Event == "delivered" && info.Status == "queued" {
+	if info.Status == "queued" || info.Status == "in_process" {
 		return response(http.StatusTooManyRequests, "retry campaign status"), nil
 	}
-	if info.Status != "sent" && !(event.Event == "delivered" && info.Status == "in_process") {
+	if info.Status != "sent" {
 		return response(http.StatusOK, "ignored"), nil
 	}
-	sentAt := h.now().UTC()
-	if info.SentDate != "" {
-		if parsed, err := time.Parse(time.RFC3339, info.SentDate); err == nil {
-			sentAt = parsed.UTC()
-		}
-	} else if event.TSSent > 0 {
-		sentAt = time.Unix(event.TSSent, 0).UTC()
+	sentAt, err := time.Parse(time.RFC3339, info.SentDate)
+	if err != nil {
+		return response(http.StatusTooManyRequests, "retry campaign sent date"), nil
 	}
 	if err := h.recordSent(ctx, councilID, campaignID, sentAt); err != nil {
 		var conditional *types.ConditionalCheckFailedException
@@ -237,7 +232,7 @@ func (h *webhookHandler) recordSent(ctx context.Context, councilID string, campa
 		Key: map[string]types.AttributeValue{
 			"council_id": &types.AttributeValueMemberS{Value: councilID},
 		},
-		UpdateExpression:    aws.String("SET newsletter_sent_at = :sent REMOVE newsletter_pending_at"),
+		UpdateExpression:    aws.String("SET newsletter_sent_at = :sent"),
 		ConditionExpression: aws.String("newsletter_campaign_id = :id AND qc_status = :approved AND attribute_not_exists(newsletter_sent_at)"),
 		ExpressionAttributeValues: map[string]types.AttributeValue{
 			":id":       &types.AttributeValueMemberN{Value: strconv.Itoa(campaignID)},

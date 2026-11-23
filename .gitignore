@@ -40,3 +40,5 @@ purge_april.py
 remote_data*.json
 response_*.json
 publisher_*.json
+/scripts/localtest/output/newsletter_*.json
+/scripts/localtest/output/newsletter_*.html

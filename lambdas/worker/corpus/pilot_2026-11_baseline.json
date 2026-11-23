@@ -1,0 +1,798 @@
+{
+  "metadata": {
+    "reference_sha256": "bdb67392e891e5499b870ea098f21168ff1ae62bc4511fc10fbe982d3472889a",
+    "sdk": "google.golang.org/genai v1.52.1",
+    "repository_head": "01347a7",
+    "input_code": "local working tree",
+    "test_harness_sha256": "c79510e073e67200ee98f3f171e8301e5a0cc6e7fb7405ea8fa7fbc01faa16aa",
+    "method": "Gemini API Standard 2026 tariffs, estimated from provider usage metadata, no provider bill accessed",
+    "stage_columns": [
+      "calls",
+      "input_tokens",
+      "output_tokens",
+      "thinking_tokens",
+      "total_tokens",
+      "cost_estimated_usd",
+      "elapsed_ms"
+    ],
+    "stages": {
+      "pdf_extract": [
+        4,
+        24196,
+        2121,
+        0,
+        26317,
+        0.012561300000000001,
+        11620
+      ],
+      "pdf_verify": [
+        4,
+        19119,
+        461,
+        7403,
+        26983,
+        0.04382925,
+        75310
+      ],
+      "newsletter_write": [
+        1,
+        3855,
+        648,
+        0,
+        4503,
+        0.00532125,
+        8436
+      ],
+      "newsletter_verify": [
+        1,
+        1487,
+        16,
+        1029,
+        2532,
+        0.005034,
+        9254
+      ],
+      "pdf_verifier_control": [
+        2,
+        19612,
+        191,
+        1947,
+        21750,
+        0.0227265,
+        24511
+      ]
+    }
+  },
+  "records": [
+    {
+      "attempt": 1,
+      "case": "D10-2026_128.pdf",
+      "cost_upper_usd": 0.025532,
+      "input_upper": 16840,
+      "kind": "dispatch",
+      "model": "gemini-3.5-flash-lite",
+      "stage": "pdf_extract"
+    },
+    {
+      "attempt": 1,
+      "case": "D10-2026_128.pdf",
+      "cost_estimated_usd": 0.0029333,
+      "cumulative_usd": 0.0029333,
+      "duration_ms": 2961,
+      "kind": "response",
+      "model_version": "gemini-3.5-flash-lite",
+      "stage": "pdf_extract",
+      "status": 200,
+      "usage": {
+        "PromptTokenCount": 4311,
+        "CandidatesTokenCount": 656,
+        "ThoughtsTokenCount": 0,
+        "TotalTokenCount": 4967
+      },
+      "finish_reasons": [
+        "STOP"
+      ],
+      "response_id": "RMICa9_FMZmb3boPsKzegQc",
+      "public_candidate_text": "{\n  \"title\": \"Actualisation des investissements pluriannuels de la ville\",\n  \"summary\": \"Le conseil municipal actualise les enveloppes budgétaires des projets d'investissement en cours, notamment la cuisine centrale, le groupe scolaire Prévert, le complexe sportif polyvalent et le restaurant scolaire Joliot-Curie.\",\n  \"topic_tag\": \"Budget\",\n  \"is_substantial\": true,\n  \"acronyms\": {},\n  \"analysis_data\": {\n    \"contexte\": \"Dans le cadre de la gestion pluriannuelle des investissements, la ville suit l'évolution des autorisations de programme (AP, enveloppes globales pour financer des projets sur plusieurs années) et des crédits de paiement (CP, sommes payables pour une année donnée).\",\n    \"decision\": \"Le conseil municipal approuve l'actualisation et la révision des autorisations de programme et des crédits de paiement pour l'exercice 2026.\",\n    \"impacts\": \"Néant\",\n    \"points_debattus\": null\n  },\n  \"budget_impact\": 0,\n  \"budget_type\": \"AUCUN\",\n  \"budget_note\": \"\",\n  \"budget_breakdown\": [],\n  \"budget_changes\": [\n    {\n      \"scope\": \"AP\",\n      \"direction\": \"BAISSE\",\n      \"label\": \"Création Groupe scolaire Prévert\",\n      \"amount\": 500000,\n      \"period\": \"2026\"\n    },\n    {\n      \"scope\": \"CP\",\n      \"direction\": \"BAISSE\",\n      \"label\": \"Création Groupe scolaire Prévert\",\n      \"amount\": 200000,\n      \"period\": \"2026\"\n    },\n    {\n      \"scope\": \"CP\",\n      \"direction\": \"BAISSE\",\n      \"label\": \"Création d'un Complexe Sportif Polyvalent\",\n      \"amount\": 1000000,\n      \"period\": \"2026\"\n    }\n  ],\n  \"climate_impact\": \"neutre\",\n  \"key_points\": [\n    \"Actualisation des enveloppes pluriannuelles et des crédits de l'année pour quatre grands projets de la commune.\",\n    \"Réduction de l'autorisation de programme du groupe scolaire Prévert de 500 000 euros avant sa clôture définitive.\",\n    \"Réajustement des crédits de paiement de l'année 2026 pour le groupe scolaire Prévert et le complexe sportif polyvalent.\"\n  ],\n  \"vote\": {\n    \"has_vote\": true,\n    \"pour\": 30,\n    \"contre\": 0,\n    \"abstention\": 9\n  },\n  \"disagreements\": \"9 conseillers municipaux se sont abstenus lors du vote.\"\n}"
+    },
+    {
+      "case": "D10-2026_128.pdf",
+      "kind": "extraction_parse",
+      "success": true
+    },
+    {
+      "case": "D10-2026_128.pdf",
+      "data": {
+        "acronyms": {},
+        "analysis_data": {
+          "contexte": "Dans le cadre de la gestion pluriannuelle des investissements, la ville suit l'évolution des autorisations de programme (AP, enveloppes globales pour financer des projets sur plusieurs années) et des crédits de paiement (CP, sommes payables pour une année donnée).",
+          "decision": "Le conseil municipal approuve l'actualisation et la révision des autorisations de programme et des crédits de paiement pour l'exercice 2026.",
+          "impacts": "Néant",
+          "points_debattus": null
+        },
+        "budget_breakdown": [],
+        "budget_changes": [
+          {
+            "scope": "AP",
+            "direction": "BAISSE",
+            "label": "Création Groupe scolaire Prévert",
+            "amount": 500000,
+            "period": "2026"
+          },
+          {
+            "scope": "CP",
+            "direction": "BAISSE",
+            "label": "Création Groupe scolaire Prévert",
+            "amount": 200000,
+            "period": "2026"
+          },
+          {
+            "scope": "CP",
+            "direction": "BAISSE",
+            "label": "Création d'un Complexe Sportif Polyvalent",
+            "amount": 1000000,
+            "period": "2026"
+          }
+        ],
+        "budget_impact": 0,
+        "budget_note": "",
+        "budget_type": "AUCUN",
+        "climate_impact": "neutre",
+        "disagreements": "9 conseillers municipaux se sont abstenus lors du vote.",
+        "is_substantial": true,
+        "key_points": [
+          "Actualisation des enveloppes pluriannuelles et des crédits de l'année pour quatre grands projets de la commune.",
+          "Réduction de l'autorisation de programme du groupe scolaire Prévert de 500 000 euros avant sa clôture définitive.",
+          "Réajustement des crédits de paiement de l'année 2026 pour le groupe scolaire Prévert et le complexe sportif polyvalent."
+        ],
+        "summary": "Le conseil municipal actualise les enveloppes budgétaires des projets d'investissement en cours, notamment la cuisine centrale, le groupe scolaire Prévert, le complexe sportif polyvalent et le restaurant scolaire Joliot-Curie.",
+        "title": "Actualisation des investissements pluriannuels de la ville",
+        "topic_tag": "Budget",
+        "vote": {
+          "has_vote": true,
+          "pour": 30,
+          "contre": 0,
+          "abstention": 9
+        }
+      },
+      "kind": "normalized_extraction"
+    },
+    {
+      "attempt": 2,
+      "case": "D10-2026_128.pdf",
+      "cost_upper_usd": 0.023265,
+      "input_upper": 10540,
+      "kind": "dispatch",
+      "model": "gemini-3.8-flash",
+      "stage": "pdf_verify"
+    },
+    {
+      "attempt": 2,
+      "case": "D10-2026_128.pdf",
+      "cost_estimated_usd": 0.0059295,
+      "cumulative_usd": 0.0088628,
+      "duration_ms": 9594,
+      "kind": "response",
+      "model_version": "gemini-3.8-flash",
+      "stage": "pdf_verify",
+      "status": 200,
+      "usage": {
+        "PromptTokenCount": 3106,
+        "CandidatesTokenCount": 18,
+        "ThoughtsTokenCount": 942,
+        "TotalTokenCount": 4066
+      },
+      "finish_reasons": [
+        "STOP"
+      ],
+      "response_id": "R8ICa6fzJ-L728oPvKuBwQM",
+      "public_candidate_text": "{\n  \"verdict\": \"PASS\",\n  \"findings\": []\n}"
+    },
+    {
+      "case": "D10-2026_128.pdf",
+      "kind": "pdf_verdict_acceptance",
+      "success": true
+    },
+    {
+      "attempt": 3,
+      "case": "D09-2026_127.pdf",
+      "cost_upper_usd": 0.025868,
+      "input_upper": 17960,
+      "kind": "dispatch",
+      "model": "gemini-3.5-flash-lite",
+      "stage": "pdf_extract"
+    },
+    {
+      "attempt": 3,
+      "case": "D09-2026_127.pdf",
+      "cost_estimated_usd": 0.0023665,
+      "cumulative_usd": 0.0112293,
+      "duration_ms": 2274,
+      "kind": "response",
+      "model_version": "gemini-3.5-flash-lite",
+      "stage": "pdf_extract",
+      "status": 200,
+      "usage": {
+        "PromptTokenCount": 4855,
+        "CandidatesTokenCount": 364,
+        "ThoughtsTokenCount": 0,
+        "TotalTokenCount": 5219
+      },
+      "finish_reasons": [
+        "STOP"
+      ],
+      "response_id": "UcICa-6wD5fQvdIPq4Ku0QU",
+      "public_candidate_text": "{\n  \"title\": \"Ajustement du budget municipal 2026\",\n  \"summary\": \"Le conseil municipal adopte la première décision modificative du budget 2026 pour ajuster les recettes et les dépenses en cours d'année.\",\n  \"topic_tag\": \"Budget\",\n  \"is_substantial\": true,\n  \"acronyms\": {},\n  \"analysis_data\": {\n    \"contexte\": \"La gestion de l'année 2026 nécessite des ajustements comptables et financiers entre le budget primitif et le budget supplémentaire.\",\n    \"decision\": \"Le conseil municipal adopte la décision modificative n°1 du budget 2026, actant des mouvements de crédits en fonctionnement et en investissement.\",\n    \"impacts\": \"Néant\",\n    \"points_debattus\": null\n  },\n  \"budget_impact\": 0,\n  \"budget_type\": \"AUCUN\",\n  \"budget_note\": \"\",\n  \"budget_breakdown\": [],\n  \"budget_changes\": [],\n  \"climate_impact\": \"neutre\",\n  \"key_points\": [\n    \"Ajustement des comptes de fonctionnement et d'investissement pour l'exercice 2026\",\n    \"Répartition des modifications de crédits par chapitre\"\n  ],\n  \"vote\": {\n    \"has_vote\": true,\n    \"pour\": 30,\n    \"contre\": 9,\n    \"abstention\": 0\n  },\n  \"disagreements\": \"Neuf élus ont voté contre cette décision modificative budgétaire.\"\n}"
+    },
+    {
+      "case": "D09-2026_127.pdf",
+      "kind": "extraction_parse",
+      "success": true
+    },
+    {
+      "case": "D09-2026_127.pdf",
+      "data": {
+        "acronyms": {},
+        "analysis_data": {
+          "contexte": "La gestion de l'année 2026 nécessite des ajustements comptables et financiers entre le budget primitif et le budget supplémentaire.",
+          "decision": "Le conseil municipal adopte la décision modificative n°1 du budget 2026, actant des mouvements de crédits en fonctionnement et en investissement.",
+          "impacts": "Néant",
+          "points_debattus": null
+        },
+        "budget_breakdown": [],
+        "budget_changes": [],
+        "budget_impact": 0,
+        "budget_note": "",
+        "budget_type": "AUCUN",
+        "climate_impact": "neutre",
+        "disagreements": "Neuf élus ont voté contre cette décision modificative budgétaire.",
+        "is_substantial": true,
+        "key_points": [
+          "Ajustement des comptes de fonctionnement et d'investissement pour l'exercice 2026",
+          "Répartition des modifications de crédits par chapitre"
+        ],
+        "summary": "Le conseil municipal adopte la première décision modificative du budget 2026 pour ajuster les recettes et les dépenses en cours d'année.",
+        "title": "Ajustement du budget municipal 2026",
+        "topic_tag": "Budget",
+        "vote": {
+          "has_vote": true,
+          "pour": 30,
+          "contre": 9,
+          "abstention": 0
+        }
+      },
+      "kind": "normalized_extraction"
+    },
+    {
+      "attempt": 4,
+      "case": "D09-2026_127.pdf",
+      "cost_upper_usd": 0.02346825,
+      "input_upper": 10811,
+      "kind": "dispatch",
+      "model": "gemini-3.8-flash",
+      "stage": "pdf_verify"
+    },
+    {
+      "attempt": 4,
+      "case": "D09-2026_127.pdf",
+      "cost_estimated_usd": 0.012645,
+      "cumulative_usd": 0.0238743,
+      "duration_ms": 23265,
+      "kind": "response",
+      "model_version": "gemini-3.8-flash",
+      "stage": "pdf_verify",
+      "status": 200,
+      "usage": {
+        "PromptTokenCount": 3440,
+        "CandidatesTokenCount": 262,
+        "ThoughtsTokenCount": 2422,
+        "TotalTokenCount": 6124
+      },
+      "finish_reasons": [
+        "STOP"
+      ],
+      "response_id": "U8ICa7ODH8X628oPtsqN8AM",
+      "public_candidate_text": "{\n  \"verdict\": \"FAIL\",\n  \"findings\": [\n    {\n      \"field\": \"analysis_data.contexte\",\n      \"claim\": \"La gestion de l'année 2026 nécessite des ajustements comptables et financiers entre le budget primitif et le budget supplémentaire.\",\n      \"reason\": \"Le document n'indique pas que des ajustements sont opérés « entre » le budget primitif et le budget supplémentaire. Il précise que les ajustements budgétaires (décision modificative n°1 en date du 16 novembre 2026) interviennent après l'adoption successive du budget primitif le 18 décembre 2025, puis du budget supplémentaire le 22 juin 2026.\",\n      \"pdf_evidence\": \"Considérant les prévisions inscrites tant en recettes qu’en dépenses au budget primitif adopté le 18 décembre 2025 puis au budget supplémentaire adopté le 22 juin 2026, les impératifs comptables, juridiques économiques et sociaux difficiles à prévoir dans leurs conséquences financières, Il y a lieu de procéder à certains ajustements budgétaires\"\n    }\n  ]\n}"
+    },
+    {
+      "case": "D09-2026_127.pdf",
+      "kind": "pdf_verdict_acceptance",
+      "success": false
+    },
+    {
+      "attempt": 5,
+      "case": "D07-2026_125.pdf",
+      "cost_upper_usd": 0.025196,
+      "input_upper": 15720,
+      "kind": "dispatch",
+      "model": "gemini-3.5-flash-lite",
+      "stage": "pdf_extract"
+    },
+    {
+      "attempt": 5,
+      "case": "D07-2026_125.pdf",
+      "cost_estimated_usd": 0.0024423,
+      "cumulative_usd": 0.0263166,
+      "duration_ms": 2205,
+      "kind": "response",
+      "model_version": "gemini-3.5-flash-lite",
+      "stage": "pdf_extract",
+      "status": 200,
+      "usage": {
+        "PromptTokenCount": 3791,
+        "CandidatesTokenCount": 522,
+        "ThoughtsTokenCount": 0,
+        "TotalTokenCount": 4313
+      },
+      "finish_reasons": [
+        "STOP"
+      ],
+      "response_id": "asICa4DwL_ykvdIPvs-oqAI",
+      "public_candidate_text": "{\n  \"title\": \"Recrutement de sept agents recenseurs et désignation du coordonnateur pour le recensement 2027\",\n  \"summary\": \"La ville de Bègles recrute sept agents recenseurs vacataires et désigne un coordonnateur pour mener l'enquête de recensement de la population qui se déroulera du 21 janvier au 27 février 2027, en partenariat avec l'INSEE.\",\n  \"topic_tag\": \"Administration\",\n  \"is_substantial\": false,\n  \"acronyms\": {},\n  \"analysis_data\": {\n    \"contexte\": \"Le maire est responsable de l'enquête annuelle de recensement de la population en partenariat avec l'Institut National de la Statistique et des Etudes Economiques.\",\n    \"decision\": \"Le conseil municipal décide de recruter sept agents recenseurs vacataires, de fixer leur rémunération et leurs conditions de déplacement, d'autoriser le versement d'indemnités horaires pour travaux supplémentaires aux agents municipaux si nécessaire, et de désigner un coordonnateur d'enquête.\",\n    \"impacts\": \"Néant\",\n    \"points_debattus\": null\n  },\n  \"budget_impact\": 0,\n  \"budget_type\": \"AUCUN\",\n  \"budget_note\": \"\",\n  \"budget_breakdown\": [],\n  \"budget_changes\": [],\n  \"climate_impact\": \"neutre\",\n  \"key_points\": [\n    \"Recrutement de 7 agents recenseurs vacataires du 21 janvier 2027 au 27 février 2027.\",\n    \"Couverture d'environ 1 438 logements ainsi que des habitations mobiles et des personnes sans abri.\",\n    \"Rémunération fixée par type de document rempli (feuille de logement, enquête famille, bulletin individuel) ainsi qu'un forfait pour la formation, le repérage et les déplacements.\",\n    \"Désignation d'un coordonnateur d'enquête et d'un coordonnateur adjoint.\"\n  ],\n  \"vote\": {\n    \"has_vote\": true,\n    \"pour\": 38,\n    \"contre\": 0,\n    \"abstention\": 0\n  },\n  \"disagreements\": \"Aucun désaccord, procédure standard.\"\n}"
+    },
+    {
+      "case": "D07-2026_125.pdf",
+      "kind": "extraction_parse",
+      "success": true
+    },
+    {
+      "case": "D07-2026_125.pdf",
+      "data": {
+        "acronyms": {},
+        "analysis_data": {
+          "contexte": "Le maire est responsable de l'enquête annuelle de recensement de la population en partenariat avec l'Institut National de la Statistique et des Etudes Economiques.",
+          "decision": "Le conseil municipal décide de recruter sept agents recenseurs vacataires, de fixer leur rémunération et leurs conditions de déplacement, d'autoriser le versement d'indemnités horaires pour travaux supplémentaires aux agents municipaux si nécessaire, et de désigner un coordonnateur d'enquête.",
+          "impacts": "Néant",
+          "points_debattus": null
+        },
+        "budget_breakdown": [],
+        "budget_changes": [],
+        "budget_impact": 0,
+        "budget_note": "",
+        "budget_type": "AUCUN",
+        "climate_impact": "neutre",
+        "disagreements": "Aucun désaccord, procédure standard.",
+        "is_substantial": false,
+        "key_points": [
+          "Recrutement de 7 agents recenseurs vacataires du 21 janvier 2027 au 27 février 2027.",
+          "Couverture d'environ 1 438 logements ainsi que des habitations mobiles et des personnes sans abri.",
+          "Rémunération fixée par type de document rempli (feuille de logement, enquête famille, bulletin individuel) ainsi qu'un forfait pour la formation, le repérage et les déplacements.",
+          "Désignation d'un coordonnateur d'enquête et d'un coordonnateur adjoint."
+        ],
+        "summary": "La ville de Bègles recrute sept agents recenseurs vacataires et désigne un coordonnateur pour mener l'enquête de recensement de la population qui se déroulera du 21 janvier au 27 février 2027, en partenariat avec l'INSEE.",
+        "title": "Recrutement de sept agents recenseurs et désignation du coordonnateur pour le recensement 2027",
+        "topic_tag": "Administration",
+        "vote": {
+          "has_vote": true,
+          "pour": 38,
+          "contre": 0,
+          "abstention": 0
+        }
+      },
+      "kind": "normalized_extraction"
+    },
+    {
+      "attempt": 6,
+      "case": "D07-2026_125.pdf",
+      "cost_upper_usd": 0.02225475,
+      "input_upper": 9193,
+      "kind": "dispatch",
+      "model": "gemini-3.8-flash",
+      "stage": "pdf_verify"
+    },
+    {
+      "attempt": 6,
+      "case": "D07-2026_125.pdf",
+      "cost_estimated_usd": 0.00551775,
+      "cumulative_usd": 0.03183435,
+      "duration_ms": 12313,
+      "kind": "response",
+      "model_version": "gemini-3.8-flash",
+      "stage": "pdf_verify",
+      "status": 200,
+      "usage": {
+        "PromptTokenCount": 2532,
+        "CandidatesTokenCount": 18,
+        "ThoughtsTokenCount": 947,
+        "TotalTokenCount": 3497
+      },
+      "finish_reasons": [
+        "STOP"
+      ],
+      "response_id": "bMICa9j_PKWvnsEPr9qeiQk",
+      "public_candidate_text": "{\n  \"verdict\": \"PASS\",\n  \"findings\": []\n}"
+    },
+    {
+      "case": "D07-2026_125.pdf",
+      "kind": "pdf_verdict_acceptance",
+      "success": true
+    },
+    {
+      "attempt": 7,
+      "case": "D23-2026_113.pdf",
+      "cost_upper_usd": 0.0299,
+      "input_upper": 31400,
+      "kind": "dispatch",
+      "model": "gemini-3.5-flash-lite",
+      "stage": "pdf_extract"
+    },
+    {
+      "attempt": 7,
+      "case": "D23-2026_113.pdf",
+      "cost_estimated_usd": 0.0048192,
+      "cumulative_usd": 0.03665355,
+      "duration_ms": 4180,
+      "kind": "response",
+      "model_version": "gemini-3.5-flash-lite",
+      "stage": "pdf_extract",
+      "status": 200,
+      "usage": {
+        "PromptTokenCount": 11239,
+        "CandidatesTokenCount": 579,
+        "ThoughtsTokenCount": 0,
+        "TotalTokenCount": 11818
+      },
+      "finish_reasons": [
+        "STOP"
+      ],
+      "response_id": "esICa6aIFrT6xs0PjLiDoQk",
+      "public_candidate_text": "{\n  \"title\": \"Subvention de la Métropole pour les plantations d'arbres au parc des Sœurs de la Charité et à l'école La Ferrade\",\n  \"summary\": \"Le Conseil municipal valide une convention de financement avec Bordeaux Métropole pour un montant de 23 792 euros. Cette aide financière correspond à 50 pour cent des dépenses éligibles pour des projets de végétalisation réalisés au parc des Sœurs de la Charité et à l'école maternelle La Ferrade, représentant un total de 495 arbres plantés.\",\n  \"topic_tag\": \"Environnement\",\n  \"is_substantial\": true,\n  \"acronyms\": {},\n  \"analysis_data\": {\n    \"contexte\": \"Dans le cadre du programme métropolitain Plantons un million d'arbres, la Ville de Bègles a déposé une demande de financement pour des travaux de végétalisation.\",\n    \"decision\": \"Le Conseil municipal approuve la convention financière de 23 792 euros avec Bordeaux Métropole pour les plantations réalisées au parc des Sœurs de la Charité et à l'école maternelle La Ferrade.\",\n    \"impacts\": \"Plantation de 495 arbres et arbustes, renforcement des îlots de fraîcheur urbains, création d'un jardin-forêt nourricier et renaturation d'une cour d'école.\",\n    \"points_debattus\": null\n  },\n  \"budget_impact\": 23792,\n  \"budget_type\": \"RECETTE\",\n  \"budget_note\": \"Il s'agit d'une subvention d'investissement perçue de Bordeaux Métropole, correspondant à 50 pour cent des dépenses éligibles engagées pour les projets.\",\n  \"budget_breakdown\": [],\n  \"budget_changes\": [],\n  \"climate_impact\": \"positif\",\n  \"key_points\": [\n    \"Approbation de la convention de versement d'un fonds de concours de 23 792 euros par Bordeaux Métropole.\",\n    \"Financement partiel de travaux de végétalisation au parc des Sœurs de la Charité et à l'école maternelle La Ferrade.\",\n    \"Plantation totale de 495 arbres et arbustes dans le cadre de ces deux projets.\"\n  ],\n  \"vote\": {\n    \"has_vote\": true,\n    \"pour\": 39,\n    \"contre\": 0,\n    \"abstention\": 0\n  },\n  \"disagreements\": \"Aucun désaccord, adopté à l'unanimité.\"\n}"
+    },
+    {
+      "case": "D23-2026_113.pdf",
+      "kind": "extraction_parse",
+      "success": true
+    },
+    {
+      "case": "D23-2026_113.pdf",
+      "data": {
+        "acronyms": {},
+        "analysis_data": {
+          "contexte": "Dans le cadre du programme métropolitain Plantons un million d'arbres, la Ville de Bègles a déposé une demande de financement pour des travaux de végétalisation.",
+          "decision": "Le Conseil municipal approuve la convention financière de 23 792 euros avec Bordeaux Métropole pour les plantations réalisées au parc des Sœurs de la Charité et à l'école maternelle La Ferrade.",
+          "impacts": "Plantation de 495 arbres et arbustes, renforcement des îlots de fraîcheur urbains, création d'un jardin-forêt nourricier et renaturation d'une cour d'école.",
+          "points_debattus": null
+        },
+        "budget_breakdown": [],
+        "budget_changes": [],
+        "budget_impact": 23792,
+        "budget_note": "Il s'agit d'une subvention d'investissement perçue de Bordeaux Métropole, correspondant à 50 pour cent des dépenses éligibles engagées pour les projets.",
+        "budget_type": "RECETTE",
+        "climate_impact": "positif",
+        "disagreements": "Aucun désaccord, adopté à l'unanimité.",
+        "is_substantial": true,
+        "key_points": [
+          "Approbation de la convention de versement d'un fonds de concours de 23 792 euros par Bordeaux Métropole.",
+          "Financement partiel de travaux de végétalisation au parc des Sœurs de la Charité et à l'école maternelle La Ferrade.",
+          "Plantation totale de 495 arbres et arbustes dans le cadre de ces deux projets."
+        ],
+        "summary": "Le Conseil municipal valide une convention de financement avec Bordeaux Métropole pour un montant de 23 792 euros. Cette aide financière correspond à 50 pour cent des dépenses éligibles pour des projets de végétalisation réalisés au parc des Sœurs de la Charité et à l'école maternelle La Ferrade, représentant un total de 495 arbres plantés.",
+        "title": "Subvention de la Métropole pour les plantations d'arbres au parc des Sœurs de la Charité et à l'école La Ferrade",
+        "topic_tag": "Environnement",
+        "vote": {
+          "has_vote": true,
+          "pour": 39,
+          "contre": 0,
+          "abstention": 0
+        }
+      },
+      "kind": "normalized_extraction"
+    },
+    {
+      "attempt": 8,
+      "case": "D23-2026_113.pdf",
+      "cost_upper_usd": 0.0341925,
+      "input_upper": 25110,
+      "kind": "dispatch",
+      "model": "gemini-3.8-flash",
+      "stage": "pdf_verify"
+    },
+    {
+      "attempt": 8,
+      "case": "D23-2026_113.pdf",
+      "cost_estimated_usd": 0.019737,
+      "cumulative_usd": 0.05639055,
+      "duration_ms": 30138,
+      "kind": "response",
+      "model_version": "gemini-3.8-flash",
+      "stage": "pdf_verify",
+      "status": 200,
+      "usage": {
+        "PromptTokenCount": 10041,
+        "CandidatesTokenCount": 163,
+        "ThoughtsTokenCount": 3092,
+        "TotalTokenCount": 13296
+      },
+      "finish_reasons": [
+        "STOP"
+      ],
+      "response_id": "fsICa5T1HoemnsEP1fCfuQc",
+      "public_candidate_text": "{\"verdict\":\"FAIL\",\"findings\":[{\"field\":\"impacts\",\"claim\":\"Plantation de 495 arbres et arbustes\",\"reason\":\"Le document indique que le total de 495 concerne uniquement les arbres, et non les arbres et arbustes cumulés.\",\"pdf_evidence\":\"Un total de 495 arbres est planté sur ces deux projets.\"},{\"field\":\"key_points\",\"claim\":\"Plantation totale de 495 arbres et arbustes dans le cadre de ces deux projets.\",\"reason\":\"Le référent du nombre 495 est constitué uniquement d'arbres dans le texte de la convention, et non d'arbres et arbustes.\",\"pdf_evidence\":\"Un total de 495 arbres est planté sur ces deux projets.\"}]}"
+    },
+    {
+      "case": "D23-2026_113.pdf",
+      "kind": "pdf_verdict_acceptance",
+      "success": false
+    },
+    {
+      "data": [
+        {
+          "ID": "D07-2026_125.pdf",
+          "Title": "Recrutement pour le recensement",
+          "TopicTag": "Administration",
+          "BudgetImpact": 0,
+          "BudgetType": "AUCUN",
+          "BudgetNote": "",
+          "BudgetChanges": null,
+          "HasVote": true,
+          "Pour": 38,
+          "Contre": 0,
+          "Abstention": 0,
+          "ClimateImpact": "neutre",
+          "IsSubstantial": true,
+          "HasDisagreement": false,
+          "Summary": "Environ 1 438 logements sont concernés. Le recensement des habitations mobiles et des personnes sans abri est prévu les 21 et 22 janvier 2027. Une partie de la rémunération dépend du travail effectué, aucun coût total n’est chiffré.",
+          "Decision": "Le conseil décide de recruter sept agents vacataires pour le recensement du 21 janvier au 27 février 2027.",
+          "Impacts": "Le recensement de la population se déroule du 21 janvier au 27 février 2027."
+        },
+        {
+          "ID": "D09-2026_127.pdf",
+          "Title": "Décision modificative n°1 du budget 2026",
+          "TopicTag": "Budget",
+          "BudgetImpact": 0,
+          "BudgetType": "AUCUN",
+          "BudgetNote": "",
+          "BudgetChanges": null,
+          "HasVote": true,
+          "Pour": 30,
+          "Contre": 9,
+          "Abstention": 0,
+          "ClimateImpact": "neutre",
+          "IsSubstantial": true,
+          "HasDisagreement": true,
+          "Summary": "Ajustement voté de −1 102 550,42 € en investissement et +233 364,06 € en fonctionnement, chacun en dépenses comme en recettes dans sa section. Il s’agit de variations de prévisions budgétaires.",
+          "Decision": "Le conseil adopte la décision modificative n°1 du budget 2026, en fonctionnement et en investissement.",
+          "Impacts": "Néant"
+        },
+        {
+          "ID": "D10-2026_128.pdf",
+          "Title": "Révision des enveloppes et crédits de paiement 2026",
+          "TopicTag": "Budget",
+          "BudgetImpact": 0,
+          "BudgetType": "AUCUN",
+          "BudgetNote": "",
+          "BudgetChanges": [
+            {
+              "scope": "AP",
+              "direction": "BAISSE",
+              "label": "Groupe scolaire Prévert",
+              "amount": 500000
+            },
+            {
+              "scope": "CP",
+              "direction": "BAISSE",
+              "label": "Groupe scolaire Prévert",
+              "amount": 200000,
+              "period": "2026"
+            },
+            {
+              "scope": "CP",
+              "direction": "BAISSE",
+              "label": "Complexe sportif polyvalent",
+              "amount": 1000000,
+              "period": "2026"
+            }
+          ],
+          "HasVote": true,
+          "Pour": 30,
+          "Contre": 0,
+          "Abstention": 9,
+          "ClimateImpact": "neutre",
+          "IsSubstantial": true,
+          "HasDisagreement": true,
+          "Summary": "L’annexe indique une baisse d’autorisation de programme de 500 000 € pour le groupe scolaire Prévert. La colonne de réajustement des crédits de paiement 2026 indique −200 000 € pour Prévert et −1 000 000 € pour le complexe sportif, soit −1 200 000 € au total. Pour Prévert, les colonnes de crédits ouverts avant et après donnent un écart arithmétique de −700 000 €, différent de la valeur indiquée pour le réajustement. L’acte ne réconcilie pas les valeurs.",
+          "Decision": "Le conseil approuve l’actualisation et la révision des autorisations de programme et des crédits de paiement.",
+          "Impacts": "Néant"
+        }
+      ],
+      "date": "2026-11-16",
+      "kind": "frozen_newsletter_input",
+      "next_meeting": "",
+      "scope": "3 acts"
+    },
+    {
+      "attempt": 9,
+      "case": "newsletter_16_novembre",
+      "cost_upper_usd": 0.136611,
+      "input_upper": 18308,
+      "kind": "dispatch",
+      "model": "gemini-3.8-flash",
+      "stage": "newsletter_write"
+    },
+    {
+      "attempt": 9,
+      "case": "newsletter_16_novembre",
+      "cost_estimated_usd": 0.00532125,
+      "cumulative_usd": 0.0617118,
+      "duration_ms": 8436,
+      "kind": "response",
+      "model_version": "gemini-3.8-flash",
+      "stage": "newsletter_write",
+      "status": 200,
+      "usage": {
+        "PromptTokenCount": 3855,
+        "CandidatesTokenCount": 648,
+        "ThoughtsTokenCount": 0,
+        "TotalTokenCount": 4503
+      },
+      "finish_reasons": [
+        "STOP"
+      ],
+      "response_id": "m8ICa_GGMP2kkdUPy9jD-AQ",
+      "public_candidate_text": "{\n  \"email_subject\": \"\",\n  \"council_title\": \"Conseil municipal du 16 novembre 2026\",\n  \"council_date\": \"16 novembre 2026\",\n  \"main_issue\": \"\",\n  \"budget_total\": \"\",\n  \"has_global_budget\": false,\n  \"vote_climat\": \"VOTES NON UNANIMES\",\n  \"climat_color\": \"\",\n  \"vote_stats\": \"2 délib. non unanimes / 1 avec voix contre / 1 avec abstention / jusqu'à 9 voix contre\",\n  \"total_delibs_in_council\": 3,\n  \"tensions\": [\n    {\n      \"source_id\": \"D09-2026_127.pdf\",\n      \"title\": \"Décision modificative n°1 du budget 2026\",\n      \"context\": \"Le conseil municipal adopte la décision modificative n°1 du budget 2026 en fonctionnement et en investissement. Il s'agit d'ajustements de prévisions budgétaires représentant une baisse d'environ 1,1 million d'euros en investissement et une hausse d'environ 233 000 euros en fonctionnement.\",\n      \"impact\": \"\",\n      \"budget\": \"\",\n      \"has_budget\": false,\n      \"vote_details\": \"9 votes contre\"\n    }\n  ],\n  \"adopted\": [\n    {\n      \"source_id\": \"D07-2026_125.pdf\",\n      \"tag\": \"Administration\",\n      \"title\": \"Recrutement d'agents vacataires pour le recensement\",\n      \"context\": \"Le conseil municipal approuve le recrutement de sept agents vacataires pour la campagne de recensement. Cette mesure concerne environ 1 438 logements, ainsi que les habitations mobiles et les personnes sans abri les 21 et 22 janvier 2027.\",\n      \"impact\": \"Le recensement de la population se déroule du 21 janvier au 27 février 2027.\",\n      \"budget\": \"\",\n      \"has_budget\": false\n    }\n  ],\n  \"briefs\": [\n    {\n      \"source_id\": \"D10-2026_128.pdf\",\n      \"tag\": \"Budget\",\n      \"summary\": \"Le conseil municipal approuve l'ajustement d'enveloppes prévues sur plusieurs années et de paiements planifiés pour 2026 pour le groupe scolaire Prévert et le complexe sportif polyvalent.\"\n    }\n  ],\n  \"next_meeting\": \"\",\n  \"website_url\": \"https://lobservatoiredebegles.fr\",\n  \"total_councils\": 1,\n  \"total_delibs\": 3\n}"
+    },
+    {
+      "attempt": 10,
+      "case": "newsletter_16_novembre",
+      "cost_upper_usd": 0.06695025,
+      "input_upper": 7347,
+      "kind": "dispatch",
+      "model": "gemini-3.8-flash",
+      "stage": "newsletter_verify"
+    },
+    {
+      "attempt": 10,
+      "case": "newsletter_16_novembre",
+      "cost_estimated_usd": 0.005034,
+      "cumulative_usd": 0.0667458,
+      "duration_ms": 9254,
+      "kind": "response",
+      "model_version": "gemini-3.8-flash",
+      "stage": "newsletter_verify",
+      "status": 200,
+      "usage": {
+        "PromptTokenCount": 1487,
+        "CandidatesTokenCount": 16,
+        "ThoughtsTokenCount": 1029,
+        "TotalTokenCount": 2532
+      },
+      "finish_reasons": [
+        "STOP"
+      ],
+      "response_id": "pMICa-7GDfeL7M8P8KDWsAU",
+      "public_candidate_text": "{\n  \"supported\": true,\n  \"issues\": []\n}"
+    },
+    {
+      "case": "newsletter_16_novembre",
+      "kind": "newsletter_acceptance",
+      "success": true
+    },
+    {
+      "data": {
+        "fact_check_version": 1,
+        "email_subject": "L'Essentiel du Conseil",
+        "council_title": "Conseil municipal du 16 novembre 2026",
+        "council_date": "16 novembre 2026",
+        "main_issue": "Le conseil municipal approuve le recrutement de sept agents vacataires pour la campagne de recensement.",
+        "budget_total": "",
+        "has_global_budget": false,
+        "vote_climat": "VOTES NON UNANIMES",
+        "climat_color": "#E11D48",
+        "vote_stats": "2 délib. non unanimes / 1 avec voix contre / 1 avec abstention / jusqu'à 9 voix contre",
+        "total_delibs_in_council": 3,
+        "tensions": [
+          {
+            "source_id": "D09-2026_127.pdf",
+            "title": "Décision modificative n°1 du budget 2026",
+            "context": "Le conseil municipal adopte la décision modificative n°1 du budget 2026 en fonctionnement et en investissement. Il s'agit d'ajustements de prévisions budgétaires représentant une baisse d'environ 1,1 million d'euros en investissement et une hausse d'environ 233 000 euros en fonctionnement.",
+            "impact": "",
+            "budget": "",
+            "has_budget": false,
+            "vote_details": "9 votes contre"
+          }
+        ],
+        "adopted": [
+          {
+            "source_id": "D07-2026_125.pdf",
+            "tag": "Administration",
+            "title": "Recrutement d'agents vacataires pour le recensement",
+            "context": "Le conseil municipal approuve le recrutement de sept agents vacataires pour la campagne de recensement. Cette mesure concerne environ 1 438 logements, ainsi que les habitations mobiles et les personnes sans abri les 21 et 22 janvier 2027.",
+            "impact": "Le recensement de la population se déroule du 21 janvier au 27 février 2027.",
+            "budget": "",
+            "has_budget": false
+          }
+        ],
+        "briefs": [
+          {
+            "source_id": "D10-2026_128.pdf",
+            "tag": "Budget",
+            "summary": "Le conseil municipal approuve l'ajustement d'enveloppes prévues sur plusieurs années et de paiements planifiés pour 2026 pour le groupe scolaire Prévert et le complexe sportif polyvalent."
+          }
+        ],
+        "next_meeting": "",
+        "website_url": "https://lobservatoiredebegles.fr",
+        "total_councils": 1,
+        "total_delibs": 3
+      },
+      "kind": "final_newsletter"
+    },
+    {
+      "attempt": 11,
+      "case": "control_disbursement",
+      "cost_upper_usd": 0.0335175,
+      "input_upper": 24210,
+      "kind": "dispatch",
+      "model": "gemini-3.8-flash",
+      "stage": "pdf_verify"
+    },
+    {
+      "attempt": 11,
+      "case": "control_disbursement",
+      "cost_estimated_usd": 0.01007625,
+      "cumulative_usd": 0.07682205,
+      "duration_ms": 9627,
+      "kind": "response",
+      "model_version": "gemini-3.8-flash",
+      "stage": "pdf_verify",
+      "status": 200,
+      "usage": {
+        "PromptTokenCount": 9825,
+        "CandidatesTokenCount": 173,
+        "ThoughtsTokenCount": 549,
+        "TotalTokenCount": 10547
+      },
+      "finish_reasons": [
+        "STOP"
+      ],
+      "response_id": "rsICa_u5JJTvxs0P_MTWoAs",
+      "public_candidate_text": "{\n  \"verdict\": \"FAIL\",\n  \"findings\": [\n    {\n      \"field\": \"summary\",\n      \"claim\": \"La subvention a déjà été versée.\",\n      \"reason\": \"L'affirmation selon laquelle la subvention a déjà été versée est contredite par la convention, qui stipule à l'article 4 que Bordeaux Métropole procèdera à son versement en une seule fois après obtention des justificatifs requis.\",\n      \"pdf_evidence\": \"Bordeaux Métropole procèdera au versement de la subvention selon les modalités suivantes : Elle procèdera au versement de la subvention en une seule fois après obtention des justificatifs mentionnés à l’article 5 de la présente convention signée.\"\n    }\n  ]\n}"
+    },
+    {
+      "case": "control_disbursement",
+      "kind": "control_verdict_acceptance",
+      "success": false
+    },
+    {
+      "attempt": 12,
+      "case": "control_omission",
+      "cost_upper_usd": 0.033387,
+      "input_upper": 24036,
+      "kind": "dispatch",
+      "model": "gemini-3.8-flash",
+      "stage": "pdf_verify"
+    },
+    {
+      "attempt": 12,
+      "case": "control_omission",
+      "cost_estimated_usd": 0.01265025,
+      "cumulative_usd": 0.0894723,
+      "duration_ms": 14884,
+      "kind": "response",
+      "model_version": "gemini-3.8-flash",
+      "stage": "pdf_verify",
+      "status": 200,
+      "usage": {
+        "PromptTokenCount": 9787,
+        "CandidatesTokenCount": 18,
+        "ThoughtsTokenCount": 1398,
+        "TotalTokenCount": 11203
+      },
+      "finish_reasons": [
+        "STOP"
+      ],
+      "response_id": "uMICa8afGsWY3boPq-G8mQo",
+      "public_candidate_text": "{\n  \"verdict\": \"PASS\",\n  \"findings\": []\n}"
+    },
+    {
+      "case": "control_omission",
+      "kind": "control_verdict_acceptance",
+      "success": true
+    },
+    {
+      "calls": 12,
+      "estimated_usd": 0.0894723,
+      "halted": false,
+      "kind": "total"
+    }
+  ]
+}

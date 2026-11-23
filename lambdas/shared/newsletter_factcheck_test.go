@@ -14,15 +14,20 @@ func TestParseNewsletterFactVerdict(t *testing.T) {
 		t.Fatalf("supported copy rejected: %v", err)
 	}
 	for _, raw := range []string{
-		`{"supported":false,"issues":[{"location":"adopted[0].impact","claim":"495 arbres seront plantés","reason":"La source indique que les plantations ont déjà été réalisées."}]}`,
+		`{"supported":false,"issues":[{"kind":"CONTRADICTION","location":"adopted[0].impact","claim":"495 arbres seront plantés","reason":"La source indique que les plantations ont déjà été réalisées."}]}`,
 		`{"supported":false,"issues":[]}`,
-		`{"supported":true,"issues":[{"location":"briefs[0]","claim":"la convention est signée","reason":"Seule la signature est autorisée."}]}`,
+		`{"supported":true,"issues":[{"kind":"UNSUPPORTED","location":"briefs[0]","claim":"la convention est signée","reason":"Seule la signature est autorisée."}]}`,
 	} {
 		err := parseNewsletterFactVerdict(raw)
 		var factErr *NewsletterFactCheckError
 		if !errors.As(err, &factErr) {
 			t.Fatalf("unsupported or inconclusive copy was accepted: %s (%v)", raw, err)
 		}
+	}
+	var omission *NewsletterFactCheckError
+	err := parseNewsletterFactVerdict(`{"supported":false,"issues":[{"kind":"OMISSION","location":"briefs[0].summary","claim":"Versement sur justificatifs","reason":"Condition essentielle absente"}]}`)
+	if !errors.As(err, &omission) || len(omission.Issues) != 1 || omission.Issues[0].Kind != "OMISSION" {
+		t.Fatalf("omission not preserved independently: %v", err)
 	}
 	if err := parseNewsletterFactVerdict(`{"supported":false,"issues":[{"location":"","claim":"x","reason":"y"}]}`); err == nil {
 		t.Fatal("malformed issue was accepted")
@@ -33,6 +38,7 @@ func TestParseNewsletterFactVerdict(t *testing.T) {
 	for _, raw := range []string{
 		`{"supported":true}`,
 		`{"supported":true,"issues":null}`,
+		`{"issues":[]}`,
 		`{"supported":true,"issues":[],"extra":true}`,
 		`{"supported":true,"issues":[]} {"supported":true,"issues":[]}`,
 	} {
@@ -65,6 +71,7 @@ func TestLiveNewsletterFactCheckRejectsCompletedClaims(t *testing.T) {
 	if err := VerifyNewsletterFacts(ctx, deps, cold, params); !errors.As(err, &factErr) {
 		t.Fatalf("unsupported completion claims were accepted: %v", err)
 	}
+	params.Adopted[0].Context = "Le conseil approuve la cession gratuite de deux terrains."
 	params.Adopted[0].Impact = "Les terrains dont la cession est approuvée sont destinés à une piste cyclable."
 	params.Briefs[0].Summary = "Le conseil approuve le projet de renouvellement du bail des locaux du CIO pour neuf ans."
 	if err := VerifyNewsletterFacts(ctx, deps, cold, params); err != nil {

@@ -34,11 +34,6 @@ func envInt(key string, def int) int {
 	return def
 }
 
-func envBool(key string) bool {
-	value, err := strconv.ParseBool(os.Getenv(key))
-	return err == nil && value
-}
-
 var sharedDeps *notifierDeps
 
 func init() {
@@ -49,27 +44,35 @@ func init() {
 	sharedDeps = &notifierDeps{
 		ddb: dynamodb.NewFromConfig(cfg),
 		httpClient: &http.Client{
-			Timeout: 30 * time.Second,
+			Timeout:       30 * time.Second,
+			CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
 			Transport: &http.Transport{
 				MaxIdleConns:        10,
 				IdleConnTimeout:     90 * time.Second,
 				TLSHandshakeTimeout: 10 * time.Second,
 			},
 		},
-		geminiKey:          os.Getenv("GEMINI_API_KEY"),
-		geminiModel:        envOrDefault("GEMINI_MODEL", "gemini-2.5-pro"),
-		brevoKey:           os.Getenv("BREVO_API_KEY"),
-		brevoTemplateID:    envInt("BREVO_NEWSLETTER_TEMPLATE_ID", 2),
-		brevoListID:        envInt("BREVO_LIST_ID", 2),
-		testEmail:          envOrDefault("BREVO_TEST_EMAIL", os.Getenv("ADMIN_EMAIL")),
-		autoSendEnabled:    envBool("AUTO_SEND_ENABLED"),
-		senderEmail:        envOrDefault("SENDER_EMAIL", "noreply@lobservatoiredebegles.fr"),
-		councilsTable:      os.Getenv("COUNCILS_TABLE"),
-		deliberationsTable: os.Getenv("DELIBERATIONS_TABLE"),
-		now:                time.Now,
+		geminiKey:            os.Getenv("GEMINI_API_KEY"),
+		geminiModel:          envOrDefault("GEMINI_MODEL", "gemini-3.8-flash"),
+		geminiFactCheckModel: envOrDefault("GEMINI_FACT_CHECK_MODEL", "gemini-3.8-flash"),
+		brevoKey:             os.Getenv("BREVO_API_KEY"),
+		brevoTemplateID:      envInt("BREVO_NEWSLETTER_TEMPLATE_ID", 2),
+		brevoListID:          envInt("BREVO_LIST_ID", 2),
+		testEmail:            envOrDefault("BREVO_TEST_EMAIL", os.Getenv("ADMIN_EMAIL")),
+		releasesTable:        envOrDefault("NEWSLETTER_RELEASES_TABLE", "watchdog-newsletter-releases"),
+		senderEmail:          envOrDefault("SENDER_EMAIL", "noreply@lobservatoiredebegles.fr"),
+		councilsTable:        envOrDefault("COUNCILS_TABLE", "watchdog-councils"),
+		deliberationsTable:   os.Getenv("DELIBERATIONS_TABLE"),
+		now:                  time.Now,
 	}
 }
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "release" {
+		if err := sharedDeps.runReleaseCommand(os.Args[2:]); err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
 	lambda.Start(HandleRequest)
 }

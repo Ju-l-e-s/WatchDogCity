@@ -15,18 +15,17 @@ EventBridge (cron lun-ven 18h Paris / 16h UTC)
             ├─ Écrit/Met à jour le conseil dans DynamoDB (watchdog-councils)
             └─ Envoie un message par PDF dans SQS (watchdog-pdf-queue)
                     └─► Worker Lambda (Go, ARM64)
+                            ├─ Réserve le PDF dans DynamoDB avant tout appel Gemini.
                             ├─ Télécharge le PDF depuis le site municipal
-                            ├─ Extrait & analyse les données structurées via Gemini (gemini-2.5-flash)
-                            ├─ Écrit la délibération dans DynamoDB (watchdog-deliberations, status=PENDING)
-                            └─ Incrémente atomiquement le compteur de PDFs traités.
-                               Si processed_pdfs == total_pdfs:
-                                    └─► Définit le conseil à PENDING et invoque le Validator Lambda.
+                            ├─ Extrait & analyse les données structurées via Gemini (gemini-3.5-flash-lite, configurable)
+                            ├─ Écrit la fiche vérifiée et comptée, incrémente le compteur et libère sa réservation dans une transaction.
+                            └─ Un rejet critique ou une réservation non résolue bloque l’approbation de la séance.
 
 DynamoDB Streams (sur la table watchdog-deliberations)
     └─► Aggregator Lambda (Go, ARM64)
             ├─ Calcule et agrège les statistiques globales du conseil (climat, votes, thèmes)
             ├─ Écrit la synthèse globale du conseil dans DynamoDB
-            └─ Invoque également le Validator Lambda en fin de traitement (si non encore fait).
+            └─ Passe le conseil complet à PENDING et invoque le Validator.
 
 Validator Lambda (Go, ARM64) — Le "QC Gateway" & Générateur Deprivé
     ├─ 1. Charge le conseil et toutes ses délibérations (Query paginée via GSI).
@@ -35,10 +34,10 @@ Validator Lambda (Go, ARM64) — Le "QC Gateway" & Générateur Deprivé
     ├─ 4a. Verdict = QUARANTINED (si anomalie HIGH) :
     │       ├─ Écrit le rapport de violation (qc_report) et passe le statut à QUARANTINED.
     │       ├─ Émet une métrique CloudWatch "QcQuarantined" (Alarme SNS activée).
-    │       └─ [Optionnel] Auto-guérison : Ré-enfile les PDFs des délibérations en faute dans SQS (limite de 2 essais).
+    │       └─ Conserve les fiches et suspend durablement la séance.
     └─ 4b. Verdict = APPROVED :
             ├─ Sélectionne les champs ColdDeliberation, dont le résumé et les impacts rédigés par le Worker.
-            ├─ Invoque Gemini (gemini-2.5-pro) sous privation sensorielle pour générer le contenu de la newsletter.
+            ├─ Invoque Gemini (gemini-3.8-flash, configurable) sur les faits structurés pour générer le contenu de la newsletter.
             ├─ Sauvegarde les newsletter_params et passe le statut du conseil à APPROVED.
             └─ Invoque le Publisher puis le Notifier (de manière asynchrone).
 
@@ -59,15 +58,18 @@ Publisher Lambda (Go, ARM64)
 Notifier Lambda (Go, ARM64)
     ├─ Reçoit les newsletter_params pré-générés et approuvés.
     ├─ Relit les paramètres validés du conseil APPROVED, puis crée le brouillon Brevo pour la liste de production.
-    ├─ Avec AUTO_SEND_ENABLED=false (défaut), crée et envoie une campagne distincte de même contenu vers la liste
-    │  test #3, sans envoyer le brouillon de production ; sendTest ajoute un aperçu si BREVO_TEST_EMAIL est configuré.
-    ├─ Avec AUTO_SEND_ENABLED=true, appelle sendNow sur la campagne de production après l'aperçu.
-    ├─ Enregistre l'identifiant de la campagne de production dans DynamoDB ; une invocation reconcile_only
-    │  vérifie son statut Brevo après envoi manuel et renseigne newsletter_sent_at seulement si elle est sent.
-    └─ En mode test isolé (test_list_id = 3), envoie uniquement à la liste test sans toucher au registre public.
+    ├─ Crée une campagne distincte pour la liste test #3 et vérifie ses destinataires avant sendNow.
+    │  Si BREVO_TEST_EMAIL est configuré, sendTest ajoute un aperçu individuel.
+    ├─ Le mode draft_only prépare uniquement le brouillon de production.
+    └─ Enregistre l’identifiant du brouillon et réconcilie newsletter_sent_at sur une sentDate confirmée par Brevo.
+
+Commande d’administration release (locale, identité AWS dédiée)
+    ├─ Examine le brouillon de production, ses destinataires et la version exacte du contenu.
+    ├─ Après confirmation explicite, écrit une autorisation unique par campagne dans NewsletterReleases.
+    └─ Envoie ou programme le brouillon existant. Une réponse incertaine exige une réconciliation par ID.
 
 BrevoCampaignWebhook Lambda (Go, ARM64) — créée si WEBHOOK_SECRET est configuré, avec Function URL publique protégée par ce jeton
-    ├─ Reçoit les événements marketing email `delivered` de Brevo (camp_id, ts_sent).
+    ├─ Reçoit les événements marketing email `delivered` de Brevo (camp_id).
     ├─ Retrouve le conseil APPROVED par newsletter_campaign_id et contrôle la campagne Brevo et sa liste de production.
     └─ Inscrit newsletter_sent_at conditionnellement, sans écraser un envoi déjà enregistré.
 

@@ -1,0 +1,70 @@
+{
+  "critical_facts": [
+    {
+      "id": "engagement",
+      "kind": "DECISION",
+      "audience": "BRIEF",
+      "label": "Participation de la commune à hauteur de 25 % du coût des travaux.",
+      "status": "ENGAGE",
+      "evidence": {
+        "page": 2,
+        "excerpt": "De s'engager à participer à hauteur de 25 % du coût total des travaux estimés à 1.5 M€ HT par le versement d'une subvention d'équipement à la SASP UBB pour un montant maximum de 394 000 € et selon les modalités financières qui seront définies dans le cadre d'une convention."
+      }
+    },
+    {
+      "id": "aide",
+      "kind": "FINANCE",
+      "audience": "ARTICLE",
+      "label": "Subvention maximale à la SASP UBB",
+      "status": "ENGAGE",
+      "evidence": {
+        "page": 2,
+        "excerpt": "De s'engager à participer à hauteur de 25 % du coût total des travaux estimés à 1.5 M€ HT par le versement d'une subvention d'équipement à la SASP UBB pour un montant maximum de 394 000 € et selon les modalités financières qui seront définies dans le cadre d'une convention."
+      },
+      "money": {
+        "cents": 39400000,
+        "role": "PLAFOND",
+        "category": "SUBVENTION"
+      }
+    },
+    {
+      "id": "vote",
+      "kind": "VOTE",
+      "audience": "ARTICLE",
+      "label": "Vote du conseil",
+      "status": "ADOPTE",
+      "evidence": {
+        "page": 3,
+        "excerpt": "Pour 35 Abstentions 3"
+      },
+      "vote": {
+        "against": 0,
+        "abstain": 3,
+        "for": 35
+      }
+    }
+  ],
+  "title": "Participation au terrain synthétique du stade André Moga",
+  "summary": "Le 16 novembre 2026, la Ville s’engage à participer à hauteur de 25 % des travaux, dans la limite de 394 000 €. Une convention définira les modalités financières.",
+  "topic_tag": "Sport",
+  "is_substantial": false,
+  "acronyms": {},
+  "analysis_data": {
+    "decision": "Participer à l’aménagement du terrain synthétique.",
+    "impacts": "Participation plafonnée à 394 000 €."
+  },
+  "budget_impact": 394000,
+  "budget_type": "DÉPENSE",
+  "budget_note": "Subvention plafonnée à 394 000 €.",
+  "budget_breakdown": [],
+  "budget_changes": [],
+  "climate_impact": "neutre",
+  "key_points": [],
+  "vote": {
+    "has_vote": true,
+    "pour": 35,
+    "contre": 0,
+    "abstention": 3
+  },
+  "disagreements": null
+}

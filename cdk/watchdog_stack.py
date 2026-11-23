@@ -128,8 +128,9 @@ class WatchdogStack(Stack):
         )
 
         # ── Gemini Models ────────────────────────────────────────────────
-        worker_model = "gemini-2.5-flash"
-        aggregator_model = "gemini-2.5-pro"
+        worker_model = os.environ.get("GEMINI_PDF_EXTRACT_MODEL") or "gemini-3.5-flash-lite"
+        pdf_fact_check_model = os.environ.get("GEMINI_PDF_VERIFY_MODEL") or "gemini-3.8-flash"
+        newsletter_fact_check_model = os.environ.get("GEMINI_NEWSLETTER_VERIFY_MODEL") or "gemini-3.8-flash"
 
         # ── Lambda common config ──────────────────────────────────────────
         common_env = {
@@ -169,6 +170,7 @@ class WatchdogStack(Stack):
             environment={
                 **common_env,
                 "GEMINI_MODEL": worker_model,
+                "GEMINI_FACT_CHECK_MODEL": pdf_fact_check_model,
             },
         )
         worker.add_event_source(lambda_events.SqsEventSource(
@@ -177,7 +179,7 @@ class WatchdogStack(Stack):
             report_batch_item_failures=True,
         ))
         councils_table.grant(worker, "dynamodb:GetItem", "dynamodb:UpdateItem")
-        deliberations_table.grant(worker, "dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:UpdateItem")
+        deliberations_table.grant(worker, "dynamodb:ConditionCheckItem", "dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:UpdateItem")
 
         # ── Lambda: Publisher ─────────────────────────────────────────────
         publisher = lambda_.Function(
@@ -218,7 +220,6 @@ class WatchdogStack(Stack):
             log_retention=logs.RetentionDays.TWO_WEEKS,
             environment={
                 **common_env,
-                "GEMINI_MODEL": aggregator_model,
                 # VALIDATOR_FUNCTION_NAME wired below after validator is defined
             },
         )
@@ -232,7 +233,7 @@ class WatchdogStack(Stack):
         deliberations_table.grant_read_data(aggregator)
 
         # ── Lambda: Validator (QC gateway) ───────────────────────────────────
-        validator_gemini_model = "gemini-2.5-pro"
+        validator_gemini_model = os.environ.get("GEMINI_NEWSLETTER_WRITE_MODEL") or "gemini-3.8-flash"
         validator = lambda_.Function(
             self, "Validator",
             runtime=lambda_.Runtime.PROVIDED_AL2023,
@@ -247,18 +248,15 @@ class WatchdogStack(Stack):
                 "DELIBERATIONS_TABLE": deliberations_table.table_name,
                 "GEMINI_API_KEY": gemini_api_key,
                 "GEMINI_MODEL": validator_gemini_model,
+                "GEMINI_FACT_CHECK_MODEL": newsletter_fact_check_model,
                 "PUBLISHER_FUNCTION_NAME": publisher.function_name,
                 "NOTIFIER_FUNCTION_NAME": "placeholder",  # overridden below after notifier is defined
             },
         )
         councils_table.grant(validator, "dynamodb:GetItem", "dynamodb:Query", "dynamodb:Scan", "dynamodb:UpdateItem")
-        deliberations_table.grant(validator, "dynamodb:Query", "dynamodb:DeleteItem")
+        deliberations_table.grant(validator, "dynamodb:Query", "dynamodb:Scan")
         publisher.grant_invoke(validator)
         # notifier.grant_invoke(validator) added after notifier is defined
-        # Self-heal: validator re-enqueues PDFs to the worker queue on QUARANTINE.
-        pdf_queue.grant_send_messages(validator)
-        validator.add_environment("PDF_QUEUE_URL", pdf_queue.queue_url)
-
         # Worker routes completions through QC gateway
         validator.grant_invoke(worker)
         worker.add_environment("VALIDATOR_FUNCTION_NAME", validator.function_name)
@@ -327,6 +325,38 @@ class WatchdogStack(Stack):
             alarm_description="PDF DLQ non-empty: at least one PDF processing failed after 3 retries.",
         ).add_alarm_action(cw_actions.SnsAction(notifier_dlq_alarm_topic))
 
+        newsletter_releases = dynamodb.Table(
+            self, "NewsletterReleases",
+            table_name="watchdog-newsletter-releases",
+            partition_key=dynamodb.Attribute(name="campaign_id", type=dynamodb.AttributeType.NUMBER),
+            billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
+            removal_policy=RemovalPolicy.RETAIN,
+        )
+        # Attach this policy only to the operator role used by the local release command.
+        release_operator_policy = iam.ManagedPolicy(
+            self, "NewsletterReleaseOperatorPolicy",
+            statements=[
+                iam.PolicyStatement(
+                    actions=["dynamodb:GetItem", "dynamodb:PutItem"],
+                    resources=[newsletter_releases.table_arn],
+                ),
+                iam.PolicyStatement(
+                    actions=["dynamodb:GetItem"],
+                    resources=[councils_table.table_arn],
+                ),
+                iam.PolicyStatement(
+                    actions=["dynamodb:UpdateItem"],
+                    resources=[councils_table.table_arn],
+                    conditions={
+                        "ForAllValues:StringEquals": {
+                            "dynamodb:Attributes": ["council_id", "newsletter_pending_at", "newsletter_sent_at"],
+                        },
+                        "Null": {"dynamodb:Attributes": "false"},
+                    },
+                ),
+            ],
+        )
+
         notifier = lambda_.Function(
             self, "Notifier",
             runtime=lambda_.Runtime.PROVIDED_AL2023,
@@ -340,19 +370,21 @@ class WatchdogStack(Stack):
                 "COUNCILS_TABLE": councils_table.table_name,
                 "DELIBERATIONS_TABLE": deliberations_table.table_name,
                 "GEMINI_API_KEY": gemini_api_key,
-                "GEMINI_MODEL": "gemini-2.5-pro",
+                "GEMINI_MODEL": validator_gemini_model,
+                "GEMINI_FACT_CHECK_MODEL": newsletter_fact_check_model,
                 "BREVO_API_KEY": mail_api_key,
                 "BREVO_NEWSLETTER_TEMPLATE_ID": brevo_newsletter_template_id,
                 "BREVO_LIST_ID": brevo_list_id,
                 "SENDER_EMAIL": sender_email,
                 "BREVO_TEST_EMAIL": os.environ.get("BREVO_TEST_EMAIL", admin_email),
-                "AUTO_SEND_ENABLED": os.environ.get("AUTO_SEND_ENABLED", "false"),
+                "NEWSLETTER_RELEASES_TABLE": newsletter_releases.table_name,
             },
         )
         # Notifier needs write access to councils to mark newsletter_sent_at
         # for idempotence (prevents duplicate sends on retry / re-aggregation).
         councils_table.grant(notifier, "dynamodb:GetItem", "dynamodb:UpdateItem", "dynamodb:Scan")
         deliberations_table.grant_read_data(notifier)
+        newsletter_releases.grant(notifier, "dynamodb:GetItem")
         # Wire validator → notifier now that notifier is defined.
         notifier.grant_invoke(validator)
         validator.add_environment("NOTIFIER_FUNCTION_NAME", notifier.function_name)
@@ -537,25 +569,21 @@ class WatchdogStack(Stack):
                 width=12
             ),
             cloudwatch.LogQueryWidget(
-                title="Gemini Token Usage (Input/Output)",
-                log_group_names=[worker.log_group.log_group_name],
-                query_lines=[
-                    "filter @message like /METRIC: GeminiUsage/",
-                    "parse @message \"input=* output=*\" as in_t, out_t",
-                    "stats sum(in_t) as Total_Input, sum(out_t) as Total_Output by bin(1d)"
+                title="Gemini — tentatives et tokens par étape",
+                log_group_names=[
+                    worker.log_group.log_group_name,
+                    validator.log_group.log_group_name,
+                    notifier.log_group.log_group_name,
                 ],
-                width=12
-            ),
-            cloudwatch.LogQueryWidget(
-                title="Estimation Coût Gemini ($)",
-                log_group_names=[worker.log_group.log_group_name],
                 query_lines=[
-                    "filter @message like /METRIC: GeminiUsage/",
-                    "parse @message \"input=* output=*\" as in_t, out_t",
-                    "fields (in_t * 0.00000125) as cost_in, (out_t * 0.00000375) as cost_out",
-                    "stats sum(cost_in + cost_out) as Total_Cost_USD by bin(1d)"
+                    r"parse @message /(?<attempt>\{.*\})/",
+                    "fields jsonParse(attempt) as m",
+                    'filter m.event = "gemini_attempt"',
+                    "stats count(*) as attempts, pct(m.duration_ms, 95) as p95_ms, "
+                    "sum(m.input_tokens) as input_tokens, sum(m.output_tokens) as output_tokens, "
+                    "sum(m.thinking_tokens) as thinking_tokens by m.stage, m.requested_model, bin(1d)",
                 ],
-                width=12
+                width=12,
             )
         )
 
@@ -567,6 +595,7 @@ class WatchdogStack(Stack):
         )
 
         # ── Stack Outputs ─────────────────────────────────────────────────
+        CfnOutput(self, "NewsletterReleaseOperatorPolicyArn", value=release_operator_policy.managed_policy_arn)
         CfnOutput(self, "WebsiteUrl", value=website_bucket.bucket_website_url)
         CfnOutput(self, "CloudFrontUrl", value=distribution.distribution_domain_name)
         CfnOutput(self, "ApiUrl", value=api.url)

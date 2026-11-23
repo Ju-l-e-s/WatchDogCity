@@ -1,0 +1,216 @@
+{
+  "critical_facts": [
+    {
+      "id": "fact_decision_convention",
+      "kind": "DECISION",
+      "audience": "BRIEF",
+      "label": "Approbation des termes de la convention de financement avec Bordeaux Métropole pour le fonds de concours '1 Million d'arbres'",
+      "status": "ADOPTE",
+      "evidence": {
+        "page": 2,
+        "excerpt": "Article 1 : D’approuver les termes de la convention de financement proposée par Bordeaux Métropole."
+      }
+    },
+    {
+      "id": "fact_subvention_montant",
+      "kind": "FINANCE",
+      "audience": "BRIEF",
+      "label": "Montant maximal de la subvention accordée par Bordeaux Métropole",
+      "status": "PREVU",
+      "evidence": {
+        "page": 2,
+        "excerpt": "Cette demande a abouti à l’établissement d’une convention financière qu’il convient de valider par délibération du Conseil municipal pour un montant de subvention de 23 792 €."
+      },
+      "money": {
+        "cents": 2379200,
+        "category": "SUBVENTION",
+        "role": "PLAFOND"
+      }
+    },
+    {
+      "id": "fact_depenses_eligibles",
+      "kind": "FINANCE",
+      "audience": "ARTICLE",
+      "label": "Montant des dépenses éligibles hors taxes retenu pour les deux projets",
+      "status": "CONSTATE",
+      "evidence": {
+        "page": 5,
+        "excerpt": "Bordeaux Métropole s’engage à octroyer à la commune une subvention de 23 792 € (pour un montant de dépenses éligibles de 47 582,18 € HT)."
+      },
+      "money": {
+        "cents": 4758218,
+        "category": "COUT_ELIGIBLE",
+        "role": "TOTAL",
+        "basis": "HT"
+      }
+    },
+    {
+      "id": "fact_depenses_payees",
+      "kind": "FINANCE",
+      "audience": "SITE",
+      "label": "Montant total TTC payé par la commune pour les travaux",
+      "status": "PAYE",
+      "evidence": {
+        "page": 16,
+        "excerpt": "TOTAL 47 582,18 57 889,35",
+        "cell": "Ligne TOTAL, colonne Montant payé"
+      },
+      "money": {
+        "cents": 5788935,
+        "category": "DEPENSE",
+        "role": "TOTAL"
+      }
+    },
+    {
+      "id": "fact_condition_calcul",
+      "kind": "CONDITION",
+      "audience": "ARTICLE",
+      "label": "Règle de proportionnalité de la subvention en cas de dépenses réelles inférieures aux dépenses éligibles",
+      "status": "PREVU",
+      "evidence": {
+        "page": 5,
+        "excerpt": "Dans l’hypothèse où les dépenses réelles s’avèreraient être inférieures au montant des dépenses éligibles retenu, le montant définitif de la subvention sera déterminé par application de la règle de proportionnalité suivante : Subvention définitive = Dépenses réelles x Subvention attribuée / Montant des dépenses éligibles"
+      },
+      "financial_fact_id": "fact_subvention_montant"
+    },
+    {
+      "id": "fact_impact_arbres",
+      "kind": "EXECUTION",
+      "audience": "BRIEF",
+      "label": "Plantation totale d'arbres sur les sites de l'école La Ferrade et du parc des Sœurs de la Charité",
+      "status": "REALISE",
+      "evidence": {
+        "page": 5,
+        "excerpt": "Un total de 495 arbres est planté sur ces deux projets."
+      }
+    },
+    {
+      "id": "fact_vote",
+      "kind": "VOTE",
+      "audience": "ARTICLE",
+      "label": "Vote du conseil",
+      "status": "ADOPTE",
+      "evidence": {
+        "page": 3,
+        "excerpt": "VOTANTS : 39 VOIX Pour 39 ADOPTÉE À L’UNANIMITÉ"
+      },
+      "vote": {
+        "for": 39,
+        "against": 0,
+        "abstain": 0
+      }
+    },
+    {
+      "id": "versement",
+      "kind": "CONDITION",
+      "audience": "ARTICLE",
+      "label": "Elle procèdera au versement de la subvention en une seule fois après obtention des justificatifs mentionnés à l’article 5 de la présente convention signée.",
+      "status": "CONDITIONNEL",
+      "evidence": {
+        "page": 6,
+        "excerpt": "Elle procèdera au versement de la subvention en une seule fois après obtention des justificatifs mentionnés à l’article 5 de la présente convention signée."
+      },
+      "financial_fact_id": "fact_subvention_montant"
+    },
+    {
+      "id": "delai",
+      "kind": "CONDITION",
+      "audience": "ARTICLE",
+      "label": "Article 5 - JUSTIFICATIFS La Commune bénéficiaire s'engage à fournir dans les six mois suivant la fin de la réalisation de l’investissement (du projet s’il se réalise sur une seule année ou de la phase réalisée) :",
+      "status": "CONDITIONNEL",
+      "evidence": {
+        "page": 6,
+        "excerpt": "Article 5 - JUSTIFICATIFS La Commune bénéficiaire s'engage à fournir dans les six mois suivant la fin de la réalisation de l’investissement (du projet s’il se réalise sur une seule année ou de la phase réalisée) :"
+      },
+      "financial_fact_id": "fact_subvention_montant"
+    },
+    {
+      "id": "decompte",
+      "kind": "CONDITION",
+      "audience": "ARTICLE",
+      "label": "Le décompte définitif certifié par le trésorier payeur comprenant les factures concernant les frais d’études, les travaux et/ou conseil s’il y a lieu (entreprise, MOE, associations …), les fournitures liées aux plantations et les végétaux,",
+      "status": "CONDITIONNEL",
+      "evidence": {
+        "page": 6,
+        "excerpt": "Le décompte définitif certifié par le trésorier payeur comprenant les factures concernant les frais d’études, les travaux et/ou conseil s’il y a lieu (entreprise, MOE, associations …), les fournitures liées aux plantations et les végétaux,"
+      },
+      "financial_fact_id": "fact_subvention_montant"
+    },
+    {
+      "id": "quantite",
+      "kind": "CONDITION",
+      "audience": "ARTICLE",
+      "label": "Le décompte définitif de la quantité de végétaux plantés dans le cadre du projet présenté, ou distribués aux habitants,",
+      "status": "CONDITIONNEL",
+      "evidence": {
+        "page": 6,
+        "excerpt": "Le décompte définitif de la quantité de végétaux plantés dans le cadre du projet présenté, ou distribués aux habitants,"
+      },
+      "financial_fact_id": "fact_subvention_montant"
+    },
+    {
+      "id": "bilan",
+      "kind": "CONDITION",
+      "audience": "ARTICLE",
+      "label": "Le bilan financier de l’opération signé du Maire ou de son représentant.",
+      "status": "CONDITIONNEL",
+      "evidence": {
+        "page": 6,
+        "excerpt": "Le bilan financier de l’opération signé du Maire ou de son représentant."
+      },
+      "financial_fact_id": "fact_subvention_montant"
+    },
+    {
+      "id": "date_decision",
+      "kind": "DATE",
+      "audience": "ARTICLE",
+      "label": "Délibération du 28 septembre 2026",
+      "status": "CONSTATE",
+      "evidence": {
+        "page": 3,
+        "excerpt": "Fait et délibéré le 28 septembre 2026"
+      }
+    },
+    {
+      "id": "autorisation",
+      "kind": "DECISION",
+      "audience": "ARTICLE",
+      "label": "Le maire est autorisé à signer les documents du dossier.",
+      "status": "AUTORISE",
+      "evidence": {
+        "page": 2,
+        "excerpt": "Article 2 : D’autoriser Monsieur le Maire, ou son représentant, à signer tous documents se rapportant à ce dossier."
+      }
+    }
+  ],
+  "title": "Subvention métropolitaine pour la plantation d'arbres au parc des Sœurs et à l'école La Ferrade",
+  "summary": "Le 28 septembre 2026, le conseil approuve la convention pour les plantations 2024–2025 et autorise la signature. L’aide est plafonnée à 23 792 €. Le dossier atteste les travaux réalisés, sans attester l’encaissement de l’aide.",
+  "topic_tag": "Environnement",
+  "is_substantial": false,
+  "acronyms": {},
+  "analysis_data": {
+    "contexte": "Dans le cadre de son programme « Plantons 1 million d'arbres », Bordeaux Métropole propose un fonds de concours aux communes membres pour financer jusqu'à 50 % des dépenses éligibles liées aux opérations de plantation et de renaturation sur les fonciers communaux.",
+    "decision": "Le conseil municipal approuve la convention financière avec Bordeaux Métropole pour percevoir une subvention de 23 792 € et autorise le maire à signer tous les documents relatifs à ce dossier.",
+    "impacts": "Plantation de 495 arbres répartis entre le parc des Sœurs de la Charité et la cour de l'école maternelle La Ferrade.",
+    "points_debattus": null
+  },
+  "budget_impact": 23792,
+  "budget_type": "RECETTE",
+  "budget_note": "Subvention d'investissement de Bordeaux Métropole plafonnée à 23 792 €, calculée sur la base de 47 582,18 € HT de dépenses éligibles pour des travaux réalisés à hauteur de 57 889,35 € TTC.",
+  "budget_breakdown": [],
+  "budget_changes": [],
+  "climate_impact": "positif",
+  "key_points": [
+    "Approbation d'une convention financière prévoyant une aide métropolitaine de 23 792 €.",
+    "Plantation effective de 495 arbres au parc des Sœurs de la Charité et dans la cour de l'école La Ferrade.",
+    "Coût éligible total des travaux arrêté à 47 582,18 € HT.",
+    "Adoption de la délibération à l'unanimité des 39 votants."
+  ],
+  "vote": {
+    "has_vote": true,
+    "pour": 39,
+    "contre": 0,
+    "abstention": 0
+  },
+  "disagreements": null
+}

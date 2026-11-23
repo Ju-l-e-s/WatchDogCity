@@ -45,7 +45,7 @@ PRÉREQUIS:
 
 USAGE:
   go run . article    --pdf <chemin.pdf>  [--model gemini-2.5-pro]
-  go run . newsletter [--fixtures <chemin.json>] [--sample] [--model gemini-2.5-pro]
+  go run . newsletter [--fixtures <chemin.json>] [--sample] [--model gemini-3.8-flash] [--fact-check-model gemini-3.8-flash]
   go run . newsletter-test (--council-id <id> | --fixture <fichier.json>) [--template-file <fichier.html>] [--send --confirm-list-id 3]
   go run . help
 
@@ -55,7 +55,8 @@ SOUS-COMMANDES:
   newsletter-test Lit les paramètres APPROVED et prépare un vrai email Brevo pour la liste test #3
 
 OPTIONS GLOBALES:
-  --model      Modèle Gemini pour article/newsletter (défaut: gemini-2.5-pro)
+  --model      Modèle Gemini pour article ou newsletter
+  --fact-check-model  Modèle de vérification de la newsletter
 
 EXEMPLES:
   # Tester l'analyse d'un PDF

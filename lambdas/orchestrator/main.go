@@ -34,6 +34,7 @@ const (
 
 type OrchestratorEvent struct {
 	TargetURL string `json:"target_url"`
+	DraftOnly bool   `json:"draft_only"`
 }
 
 type SQSMessage struct {
@@ -95,6 +96,7 @@ func buildCouncilUpdateInput(table string, c CouncilListing, expectedIDs []strin
 		Key: map[string]types.AttributeValue{
 			"council_id": &types.AttributeValueMemberS{Value: c.CouncilID},
 		},
+		ConditionExpression: aws.String("attribute_not_exists(qc_status) AND attribute_not_exists(pdf_review_held) AND attribute_not_exists(pdf_reviews_pending)"),
 		UpdateExpression: aws.String(
 			"SET title = :t, summary = :s, category = :c, #date = :d, " +
 				"source_url = :u, total_pdfs = :tp, expected_pdf_ids = :ids, " +
@@ -151,31 +153,44 @@ func (o *orchestrator) getCouncilWithRetry(ctx context.Context, councilID string
 }
 
 func (o *orchestrator) handle(ctx context.Context, event OrchestratorEvent) error {
-	// 1. Gérer la date du prochain conseil
-	nextDate, err := o.scraper.ScrapeNextCouncilDate(ctx, nextCouncilURL)
-	if err != nil {
-		log.Printf("warn: failed to scrape next council date: %v", err)
-	} else {
-		log.Printf("Found next council date: %s", nextDate)
-		oldDate, err := o.getNextCouncilMetadata(ctx)
-		if err != nil {
-			log.Printf("warn: failed to get old next council date from DB: %v", err)
-		}
-		if nextDate != oldDate {
-			log.Printf("Next council date changed from %q to %q — updating DB and invoking publisher", oldDate, nextDate)
-			o.updateNextCouncilMetadata(ctx, nextDate)
-			o.invokePublisher(ctx)
-		} else {
-			log.Printf("Next council date unchanged (%q) — no-op", nextDate)
-		}
+	if event.DraftOnly != (event.TargetURL != "") {
+		return fmt.Errorf("pilot requires target_url and draft_only together")
 	}
+	if !event.DraftOnly {
+		// 1. Gérer la date du prochain conseil
+		nextDate, err := o.scraper.ScrapeNextCouncilDate(ctx, nextCouncilURL)
+		if err != nil {
+			log.Printf("warn: failed to scrape next council date: %v", err)
+		} else {
+			log.Printf("Found next council date: %s", nextDate)
+			oldDate, err := o.getNextCouncilMetadata(ctx)
+			if err != nil {
+				log.Printf("warn: failed to get old next council date from DB: %v", err)
+			}
+			if nextDate != oldDate {
+				log.Printf("Next council date changed from %q to %q — updating DB and invoking publisher", oldDate, nextDate)
+				o.updateNextCouncilMetadata(ctx, nextDate)
+				o.invokePublisher(ctx)
+			} else {
+				log.Printf("Next council date unchanged (%q) — no-op", nextDate)
+			}
+		}
 
+	}
 	// 2. Gérer la liste des délibérations
 	listings, err := o.scraper.ScrapeCouncilList(ctx)
 	if err != nil {
 		return fmt.Errorf("scrape council list: %w", err)
 	}
 	log.Printf("found %d councils on page", len(listings))
+
+	if event.DraftOnly {
+		i := slices.IndexFunc(listings, func(c CouncilListing) bool { return c.URL == event.TargetURL && c.Category == "Conseil municipal" })
+		if i < 0 {
+			return fmt.Errorf("municipal council not found: %s", event.TargetURL)
+		}
+		listings = listings[i : i+1]
+	}
 
 	var errs []error
 	for _, council := range listings {
@@ -186,6 +201,18 @@ func (o *orchestrator) handle(ctx context.Context, event OrchestratorEvent) erro
 			continue
 		}
 		if existing.Item != nil {
+			if event.DraftOnly {
+				flag, ok := existing.Item["newsletter_draft_only"].(*types.AttributeValueMemberBOOL)
+				if !ok || !flag.Value {
+					return fmt.Errorf("pilot requires a new or draft-only council")
+				}
+			}
+			if existing.Item["pdf_review_held"] != nil || existing.Item["pdf_reviews_pending"] != nil {
+				continue
+			}
+			if status, ok := existing.Item["qc_status"].(*types.AttributeValueMemberS); ok && status.Value == "QUARANTINED" {
+				continue
+			}
 			processed, okP := attrInt(existing.Item, "processed_pdfs")
 			total, okT := attrInt(existing.Item, "total_pdfs")
 
@@ -256,10 +283,16 @@ func (o *orchestrator) handle(ctx context.Context, event OrchestratorEvent) erro
 
 		pdfs, err := o.scraper.ScrapePDFLinks(ctx, council.URL)
 		if err != nil {
+			if event.DraftOnly {
+				return fmt.Errorf("pilot PDF manifest: %w", err)
+			}
 			log.Printf("warn: failed to scrape PDFs for %s: %v", council.CouncilID, err)
 			continue
 		}
 		if len(pdfs) == 0 {
+			if event.DraftOnly {
+				return fmt.Errorf("empty pilot PDF manifest")
+			}
 			log.Printf("no PDFs found for council %s", council.CouncilID)
 			continue
 		}
@@ -279,11 +312,17 @@ func (o *orchestrator) handle(ctx context.Context, event OrchestratorEvent) erro
 				":cid": &types.AttributeValueMemberS{Value: council.CouncilID},
 			},
 		})
-		if err == nil {
-			for _, pitem := range qItems {
-				if idAttr, ok := pitem["id"].(*types.AttributeValueMemberS); ok {
-					processedSet[idAttr.Value] = true
-				}
+		if err != nil {
+			errs = append(errs, fmt.Errorf("list deliberations for %s: %w", council.CouncilID, err))
+			continue
+		}
+		for _, pitem := range qItems {
+			counted, ok := pitem["counted"].(*types.AttributeValueMemberBOOL)
+			if !ok || !counted.Value {
+				continue
+			}
+			if idAttr, ok := pitem["id"].(*types.AttributeValueMemberS); ok {
+				processedSet[idAttr.Value] = true
 			}
 		}
 
@@ -295,6 +334,11 @@ func (o *orchestrator) handle(ctx context.Context, event OrchestratorEvent) erro
 		}
 
 		input := buildCouncilUpdateInput(o.councilsTable, council, expectedIDs, len(processedSet), time.Now().UTC())
+		if event.DraftOnly {
+			input.UpdateExpression = aws.String(*input.UpdateExpression + ", newsletter_draft_only = :draft")
+			input.ConditionExpression = aws.String(*input.ConditionExpression + " AND (attribute_not_exists(council_id) OR newsletter_draft_only = :draft)")
+			input.ExpressionAttributeValues[":draft"] = &types.AttributeValueMemberBOOL{Value: true}
+		}
 		if _, err := o.ddb.UpdateItem(ctx, input); err != nil {
 			log.Printf("error processing council %s: %v", council.CouncilID, err)
 			errs = append(errs, fmt.Errorf("council %s: %w", council.CouncilID, err))
@@ -341,12 +385,12 @@ func (o *orchestrator) handle(ctx context.Context, event OrchestratorEvent) erro
 				Entries:  entries,
 			})
 			if err != nil {
-				log.Printf("error sending SQS batch (council %s): %v", council.CouncilID, err)
+				errs = append(errs, fmt.Errorf("enqueue PDFs for %s: %w", council.CouncilID, err))
 				continue
 			}
 			queuedCount += len(out.Successful)
 			for _, f := range out.Failed {
-				log.Printf("warn: SQS batch entry %s failed: code=%s msg=%s", aws.ToString(f.Id), aws.ToString(f.Code), aws.ToString(f.Message))
+				errs = append(errs, fmt.Errorf("enqueue council %s entry %s: %s", council.CouncilID, aws.ToString(f.Id), aws.ToString(f.Code)))
 			}
 		}
 		log.Printf("Queued %d new PDFs for council %s (already processed: %d/%d)", queuedCount, council.Title, len(processedSet), len(pdfs))

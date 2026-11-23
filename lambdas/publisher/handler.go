@@ -20,6 +20,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/watchdog/shared"
 )
 
 // publisherLockKey is the councils-table metadata row used as a short-lived
@@ -71,6 +72,7 @@ type DeliberationRecord struct {
 	ID              string                `dynamodbav:"id"`
 	Counted         bool                  `dynamodbav:"counted"`
 	FactCheckModel  string                `dynamodbav:"fact_check_model"`
+	SourceFacts     *shared.SourceFacts   `dynamodbav:"source_facts"`
 	FactCheckedAt   string                `dynamodbav:"fact_checked_at"`
 	CouncilID       string                `dynamodbav:"council_id"`
 	Title           string                `dynamodbav:"title"`
@@ -112,7 +114,31 @@ type CouncilOutput struct {
 	Deliberations []DeliberationOutput `json:"deliberations"`
 }
 
+type PublicSourceFact struct {
+	Text    string `json:"text"`
+	Page    int    `json:"page"`
+	Passage string `json:"passage"`
+	Cell    string `json:"cell,omitempty"`
+}
+
+func publicSourceFacts(source *shared.SourceFacts) []PublicSourceFact {
+	if !source.Reviewed() {
+		return nil
+	}
+	var facts []PublicSourceFact
+	for _, fact := range source.Facts {
+		if fact.Audience != "EXTRACTION" {
+			facts = append(facts, PublicSourceFact{Text: fact.Text(), Page: fact.Evidence.Page,
+				Passage: fact.Evidence.Excerpt, Cell: fact.Evidence.Cell})
+		}
+	}
+	return facts
+}
+
 type DeliberationOutput struct {
+	EssentialFacts  []PublicSourceFact `json:"essential_facts,omitempty"`
+	SourcePDFSHA256 string             `json:"source_pdf_sha256,omitempty"`
+
 	ID              string                `json:"id"`
 	Title           string                `json:"title"`
 	TopicTag        string                `json:"topic_tag"`
@@ -189,8 +215,15 @@ func buildDataJSON(ctx context.Context, ddb *dynamodb.Client, councils []Council
 			Analysis:  analysis,
 		}
 		for _, d := range councilDelibs {
+			facts := publicSourceFacts(d.SourceFacts)
+			pdfHash := ""
+			if len(facts) > 0 {
+				pdfHash = d.SourceFacts.PDFSHA256
+			}
 			co.Deliberations = append(co.Deliberations, DeliberationOutput{
 				ID:              d.ID,
+				EssentialFacts:  facts,
+				SourcePDFSHA256: pdfHash,
 				Title:           d.Title,
 				TopicTag:        d.TopicTag,
 				PDFURL:          d.PDFURL,
@@ -276,7 +309,11 @@ func HandleRequest(ctx context.Context, event PublisherEvent) error {
 	// single S3 object overwritten in full; two concurrent publishers would
 	// otherwise race and the slower write would silently win (last-write-wins).
 	owner := lambdaRequestID(ctx)
-	lockTTL := time.Now().Add(2 * time.Minute).Unix()
+	deadline, ok := ctx.Deadline()
+	if !ok {
+		deadline = time.Now().Add(5 * time.Minute)
+	}
+	lockTTL := deadline.Unix() + 1
 	_, lerr := ddb.UpdateItem(ctx, &dynamodb.UpdateItemInput{
 		TableName: aws.String(os.Getenv("COUNCILS_TABLE")),
 		Key: map[string]types.AttributeValue{
@@ -293,8 +330,7 @@ func HandleRequest(ctx context.Context, event PublisherEvent) error {
 	if lerr != nil {
 		var ccfe *types.ConditionalCheckFailedException
 		if errors.As(lerr, &ccfe) {
-			log.Printf("publisher lock held by another instance, skipping (it will publish the latest state)")
-			return nil
+			return fmt.Errorf("publisher already running; retry to include newer approvals: %w", lerr)
 		}
 		return fmt.Errorf("acquire publisher lock: %w", lerr)
 	}
@@ -374,7 +410,8 @@ func fetchAllData(ctx context.Context, ddb *dynamodb.Client) ([]CouncilRecord, m
 	var lastKey map[string]types.AttributeValue
 	for {
 		cOut, err := ddb.Scan(ctx, &dynamodb.ScanInput{
-			TableName: aws.String(os.Getenv("COUNCILS_TABLE")),
+			ConsistentRead: aws.Bool(true),
+			TableName:      aws.String(os.Getenv("COUNCILS_TABLE")),
 			// Hard filter: only QC-approved councils appear on the public website.
 			// Councils without qc_status (pre-gate) are excluded intentionally.
 			FilterExpression: aws.String(
@@ -415,6 +452,7 @@ func fetchAllData(ctx context.Context, ddb *dynamodb.Client) ([]CouncilRecord, m
 	lastKey = nil
 	for {
 		dOut, err := ddb.Scan(ctx, &dynamodb.ScanInput{
+			ConsistentRead:    aws.Bool(true),
 			TableName:         aws.String(os.Getenv("DELIBERATIONS_TABLE")),
 			ExclusiveStartKey: lastKey,
 		})

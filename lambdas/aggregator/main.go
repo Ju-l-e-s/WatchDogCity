@@ -48,6 +48,7 @@ type CouncilAnalysis struct {
 // Aggregator must match that contract — a previous nested layout under a
 // "vote" map silently produced nil pointers and broke voteClimat detection.
 type Deliberation struct {
+	Counted      bool   `dynamodbav:"counted"`
 	ID           string `dynamodbav:"id"`
 	CouncilID    string `dynamodbav:"council_id"`
 	BudgetImpact int64  `dynamodbav:"budget_impact"`
@@ -59,56 +60,45 @@ type Deliberation struct {
 
 func handler(ctx context.Context, event events.DynamoDBEvent) error {
 	for _, record := range event.Records {
-		// On ne traite que les nouvelles délibérations
-		if record.EventName != "INSERT" {
+		// The Worker commits counted and the council counter in one transaction.
+		counted, ok := record.Change.NewImage["counted"]
+		if !ok || counted.DataType() != events.DataTypeBoolean || !counted.Boolean() {
 			continue
 		}
-
-		councilIDAttr := record.Change.NewImage["council_id"]
-		councilID := councilIDAttr.String()
-		if councilID == "" {
-			continue
+		id, ok := record.Change.NewImage["council_id"]
+		if !ok || id.DataType() != events.DataTypeString {
+			return fmt.Errorf("counted record missing council_id")
 		}
-
-		// 1. Récupérer le nombre total attendu (total_pdfs)
+		councilID := id.String()
 		councilResp, err := ddb.GetItem(ctx, &dynamodb.GetItemInput{
-			TableName: aws.String(os.Getenv("COUNCILS_TABLE")),
-			Key: map[string]types.AttributeValue{
-				"council_id": &types.AttributeValueMemberS{Value: councilID},
-			},
-		})
-		if err != nil || councilResp.Item == nil {
-			log.Printf("council %s not found: %v", councilID, err)
-			continue
-		}
-
-		var totalExpected int
-		if val, ok := councilResp.Item["total_pdfs"].(*types.AttributeValueMemberN); ok {
-			fmt.Sscanf(val.Value, "%d", &totalExpected)
-		}
-
-		// 2. Compter les délibérations actuelles pour ce conseil
-		queryOutput, err := ddb.Query(ctx, &dynamodb.QueryInput{
-			TableName:              aws.String(os.Getenv("DELIBERATIONS_TABLE")),
-			IndexName:              aws.String("council_id-index"),
-			KeyConditionExpression: aws.String("council_id = :cid"),
-			ExpressionAttributeValues: map[string]types.AttributeValue{
-				":cid": &types.AttributeValueMemberS{Value: councilID},
-			},
-			Select: types.SelectCount,
+			TableName: aws.String(os.Getenv("COUNCILS_TABLE")), ConsistentRead: aws.Bool(true),
+			Key: map[string]types.AttributeValue{"council_id": &types.AttributeValueMemberS{Value: councilID}},
 		})
 		if err != nil {
-			log.Printf("error counting deliberations for %s: %v", councilID, err)
+			return err
+		}
+		if councilResp.Item == nil {
+			return fmt.Errorf("missing council %s", councilID)
+		}
+		var c struct {
+			Processed int    `dynamodbav:"processed_pdfs"`
+			Total     int    `dynamodbav:"total_pdfs"`
+			Status    string `dynamodbav:"qc_status"`
+		}
+		if err := attributevalue.UnmarshalMap(councilResp.Item, &c); err != nil {
+			return err
+		}
+		if councilResp.Item["pdf_review_held"] != nil || councilResp.Item["pdf_reviews_pending"] != nil {
 			continue
 		}
-
-		count := int(queryOutput.Count)
-		log.Printf("Council %s progress: %d/%d", councilID, count, totalExpected)
-
-		// 3. Déclenchement de l'agrégation si complet
-		if count >= totalExpected && totalExpected > 0 {
-			log.Printf("🎯 All deliberations received for council %s. Starting synthesis...", councilID)
-			if err := runSynthesis(ctx, ddb, lambdaClient, councilID); err != nil {
+		if c.Status == "PENDING" {
+			if err := invokeValidator(ctx, lambdaClient, councilID); err != nil {
+				return err
+			}
+			continue
+		}
+		if c.Status == "" && c.Total > 0 && c.Processed == c.Total {
+			if err := runSynthesis(ctx, ddb, lambdaClient, councilID, c.Total); err != nil {
 				log.Printf("Synthesis failed for %s: %v", councilID, err)
 				return err
 			}
@@ -118,9 +108,9 @@ func handler(ctx context.Context, event events.DynamoDBEvent) error {
 	return nil
 }
 
-func runSynthesis(ctx context.Context, ddb *dynamodb.Client, lambdaClient *lambdaService.Client, councilID string) error {
+func runSynthesis(ctx context.Context, ddb *dynamodb.Client, lambdaClient *lambdaService.Client, councilID string, expected int) error {
 	// 1. Récupérer toutes les délibérations du conseil
-	queryOutput, err := ddb.Query(ctx, &dynamodb.QueryInput{
+	pages := dynamodb.NewQueryPaginator(ddb, &dynamodb.QueryInput{
 		TableName:              aws.String(os.Getenv("DELIBERATIONS_TABLE")),
 		IndexName:              aws.String("council_id-index"),
 		KeyConditionExpression: aws.String("council_id = :cid"),
@@ -128,13 +118,25 @@ func runSynthesis(ctx context.Context, ddb *dynamodb.Client, lambdaClient *lambd
 			":cid": &types.AttributeValueMemberS{Value: councilID},
 		},
 	})
-	if err != nil {
-		return err
-	}
-
 	var delibs []Deliberation
-	if err := attributevalue.UnmarshalListOfMaps(queryOutput.Items, &delibs); err != nil {
-		return err
+	for pages.HasMorePages() {
+		page, err := pages.NextPage(ctx)
+		if err != nil {
+			return err
+		}
+		var rows []Deliberation
+		if err := attributevalue.UnmarshalListOfMaps(page.Items, &rows); err != nil {
+			return err
+		}
+		for _, row := range rows {
+			if !row.Counted {
+				return fmt.Errorf("index not yet counted for %s", row.ID)
+			}
+		}
+		delibs = append(delibs, rows...)
+	}
+	if len(delibs) != expected {
+		return fmt.Errorf("council %s: index returned %d of %d deliberations", councilID, len(delibs), expected)
 	}
 
 	// 2. Calculs statistiques
@@ -158,14 +160,15 @@ func runSynthesis(ctx context.Context, ddb *dynamodb.Client, lambdaClient *lambd
 	}
 
 	analysisMap, _ := attributevalue.MarshalMap(analysis)
-	_, err = ddb.UpdateItem(ctx, &dynamodb.UpdateItemInput{
+	_, err := ddb.UpdateItem(ctx, &dynamodb.UpdateItemInput{
 		TableName: aws.String(os.Getenv("COUNCILS_TABLE")),
 		Key: map[string]types.AttributeValue{
 			"council_id": &types.AttributeValueMemberS{Value: councilID},
 		},
 		UpdateExpression:    aws.String("SET analysis = :a, updated_at = :u, qc_status = :pending"),
-		ConditionExpression: aws.String("attribute_not_exists(qc_status)"),
+		ConditionExpression: aws.String("attribute_not_exists(qc_status) AND attribute_not_exists(pdf_review_held) AND attribute_not_exists(pdf_reviews_pending) AND processed_pdfs = total_pdfs AND total_pdfs = :total"),
 		ExpressionAttributeValues: map[string]types.AttributeValue{
+			":total":   &types.AttributeValueMemberN{Value: fmt.Sprint(expected)},
 			":a":       &types.AttributeValueMemberM{Value: analysisMap},
 			":u":       &types.AttributeValueMemberS{Value: time.Now().UTC().Format(time.RFC3339)},
 			":pending": &types.AttributeValueMemberS{Value: "PENDING"},
@@ -180,6 +183,10 @@ func runSynthesis(ctx context.Context, ddb *dynamodb.Client, lambdaClient *lambd
 		return fmt.Errorf("update analysis and set qc_status=PENDING for %s: %w", councilID, err)
 	}
 
+	return invokeValidator(ctx, lambdaClient, councilID)
+}
+
+func invokeValidator(ctx context.Context, lambdaClient *lambdaService.Client, councilID string) error {
 	payload, err := buildValidatorPayload(councilID)
 	if err != nil {
 		return fmt.Errorf("marshal validator payload: %w", err)

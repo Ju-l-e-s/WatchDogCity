@@ -1,0 +1,509 @@
+{
+  "reference_sha256": "bdb67392e891e5499b870ea098f21168ff1ae62bc4511fc10fbe982d3472889a",
+  "baseline_sha256": "1a99a278b0948989b6b48b7884bb34aa4cf669c353d3d96666efd0abd5640db3",
+  "responses": [
+    {
+      "case": "D10-2026_128.pdf",
+      "stage": "pdf_extract",
+      "model_version": "gemini-3.5-flash-lite",
+      "usage": {
+        "PromptTokenCount": 5298,
+        "CandidatesTokenCount": 1267,
+        "ThoughtsTokenCount": 0,
+        "TotalTokenCount": 6565
+      },
+      "duration_ms": 3884,
+      "cost_estimated_usd": 0.0047569,
+      "finish_reason": "STOP",
+      "text": "{\n  \"title\": \"Actualisation des enveloppes pluriannuelles pour les grands projets de la ville\",\n  \"summary\": \"Le Conseil municipal ajuste les enveloppes financières pluriannuelles (autorisations de programme et crédits de paiement) pour quatre grands projets d'investissement de la commune en 2026, actant notamment une diminution pour la construction du groupe scolaire Prévert.\",\n  \"topic_tag\": \"Budget\",\n  \"is_substantial\": true,\n  \"acronyms\": {\n    },\n  \"analysis_data\": {\n    \"contexte\": \"Le conseil municipal gère ses dépenses d'équipement sur plusieurs années par le biais d'Autorisations de Programme (AP, enveloppes globales autorisant à engager des projets) et de Crédits de Paiement (CP, sommes payables pour l'année en cours). Une mise à jour est présentée dans le cadre de la décision modificative budgétaire.\",\n    \"decision\": \"Le conseil municipal approuve l'actualisation et la révision de la répartition des crédits des quatre autorisations de programme de la commune pour l'exercice 2026.\",\n    \"impacts\": \"Néant\",\n    \"points_debattus\": \"L'ajustement budgétaire a fait l'objet d'un vote adopté à la majorité, avec l'abstention de neuf conseillers municipaux.\"\n  },\n  \"budget_impact\": 0,\n  \"budget_type\": \"AUCUN\",\n  \"budget_note\": \"\",\n  \"budget_breakdown\": [],\n  \"budget_changes\": [\n    {\n      \"scope\": \"AP\",\n      \"direction\": \"BAISSE\",\n      \"label\": \"Création Groupe scolaire Prévert\",\n      \"amount\": 500000,\n      \"period\": \"2026\"\n    },\n    {\n      \"scope\": \"CP\",\n      \"direction\": \"BAISSE\",\n      \"label\": \"Création Groupe scolaire Prévert\",\n      \"amount\": 200000,\n      \"period\": \"2026\"\n    },\n    {\n      \"scope\": \"CP\",\n      \"direction\": \"BAISSE\",\n      \"label\": \"Création d'un Complexe Sportif Polyvalent\",\n      \"amount\": 1000000,\n      \"period\": \"2026\"\n    }\n  ],\n  \"climate_impact\": \"neutre\",\n  \"key_points\": [\n    \"Révision à la baisse de 500 000 euros de l'enveloppe globale de l'autorisation de programme du groupe scolaire Prévert.\",\n    \"Ajustement des crédits de paiement de l'exercice 2026 pour le groupe scolaire Prévert (-200 000 euros) et pour le complexe sportif polyvalent (-1 000 000 euros).\",\n    \"Le bilan concerne quatre grands projets : la cuisine municipale, l'école Prévert, le complexe sportif polyvalent et l'extension du restaurant scolaire Joliot Curie.\"\n  ],\n  \"vote\": {\n    \"has_vote\": true,\n    \"pour\": 30,\n    \"contre\": 0,\n    \"abstention\": 9\n  },\n  \"disagreements\": \"Neuf élus se sont abstenus lors du vote de la délibération : Mme Edwige LUCBERNET, Mme Marie-Laure PIROTH, Mme Marie JANVIER, M. Julien LEFEBVRE, M. Vincent BOIVINET, Mme Aurélie BOUSQUET, M. Rémi JOUSSIAUME, M. Pierre OUALLET et M. Clément ROSSIGNOL PUECH.\",\n  \"critical_facts\": [\n    {\n      \"id\": \"dec_01\",\n      \"kind\": \"DECISION\",\n      \"audience\": \"SITE\",\n      \"label\": \"Approbation du bilan de l'actualisation et de la révision des autorisations de programme et des crédits de paiement\",\n      \"status\": \"ADOPTE\",\n      \"evidence\": {\n        \"page\": 3,\n        \"excerpt\": \"Article 1 : D’approuver, conformément à l’annexe jointe à la délibération, le bilan de l’actualisation et la révision des autorisations de programme et des crédits de paiement.\"\n      }\n    },\n    {\n      \"id\": \"vote_01\",\n      \"kind\": \"VOTE\",\n      \"audience\": \"SITE\",\n      \"label\": \"Vote du conseil municipal sur l'actualisation des AP et CP\",\n      \"status\": \"ADOPTE\",\n      \"evidence\": {\n        \"page\": 3,\n        \"excerpt\": \"Pour 30, Abstentions 9\"\n      },\n      \"vote\": {\n        \"for\": 30,\n        \"against\": 0,\n        \"abstain\": 9\n      }\n    },\n    {\n      \"id\": \"fin_01\",\n      \"kind\": \"FINANCE\",\n      \"audience\": \"EXTRACTION\",\n      \"label\": \"Révision de l'AP pour la création du groupe scolaire Prévert\",\n      \"status\": \"ADOPTE\",\n      \"evidence\": {\n        \"page\": 4,\n        \"excerpt\": \"- 500 000 €\"\n      },\n      \"money\": {\n        \"cents\": -50000000,\n        \"category\": \"AP\",\n        \"role\": \"COMPOSANTE\"\n      }\n    }\n  ]\n}"
+    },
+    {
+      "case": "D10-2026_128.pdf",
+      "stage": "pdf_verify",
+      "model_version": "gemini-3.8-flash",
+      "usage": {
+        "PromptTokenCount": 3640,
+        "CandidatesTokenCount": 244,
+        "ThoughtsTokenCount": 2557,
+        "TotalTokenCount": 6441
+      },
+      "duration_ms": 24684,
+      "cost_estimated_usd": 0.01323375,
+      "finish_reason": "STOP",
+      "text": "{\n  \"checked_fields\": [\n    \"title\",\n    \"summary\",\n    \"topic_tag\",\n    \"is_substantial\",\n    \"acronyms\",\n    \"analysis_data\",\n    \"budget_impact\",\n    \"budget_type\",\n    \"budget_note\",\n    \"budget_breakdown\",\n    \"budget_changes\",\n    \"climate_impact\",\n    \"key_points\",\n    \"vote\",\n    \"disagreements\",\n    \"critical_facts\"\n  ],\n  \"coverage\": [\n    {\n      \"fact_id\": \"dec_01\",\n      \"status\": \"CONFIRMED\",\n      \"page\": 3\n    },\n    {\n      \"fact_id\": \"vote_01\",\n      \"status\": \"CONFIRMED\",\n      \"page\": 3\n    },\n    {\n      \"fact_id\": \"fin_01\",\n      \"status\": \"CONFIRMED\",\n      \"page\": 4\n    }\n  ],\n  \"findings\": []\n}"
+    },
+    {
+      "case": "D09-2026_127.pdf",
+      "stage": "pdf_extract",
+      "model_version": "gemini-3.5-flash-lite",
+      "usage": {
+        "PromptTokenCount": 5842,
+        "CandidatesTokenCount": 697,
+        "ThoughtsTokenCount": 0,
+        "TotalTokenCount": 6539
+      },
+      "duration_ms": 2535,
+      "cost_estimated_usd": 0.0034951,
+      "finish_reason": "STOP",
+      "text": "{\n  \"title\": \"Ajustement du budget municipal 2026\",\n  \"summary\": \"Le conseil municipal adopte la première décision modificative du budget de l'exercice 2026, ajustant les crédits de fonctionnement et d'investissement.\",\n  \"topic_tag\": \"Budget\",\n  \"is_substantial\": true,\n  \"acronyms\": {},\n  \"analysis_data\": {\n    \"contexte\": \"L'ajustement des comptes en cours d'année permet d'intégrer les dépenses et ressources nouvelles nécessaires.\",\n    \"decision\": \"Adopter la première décision modificative du budget 2026, chapitre par chapitre, tant en fonctionnement qu'en investissement.\",\n    \"impacts\": \"Néant\",\n    \"points_debattus\": null\n  },\n  \"budget_impact\": 0,\n  \"budget_type\": \"AUCUN\",\n  \"budget_note\": \"\",\n  \"budget_breakdown\": [],\n  \"budget_changes\": [],\n  \"climate_impact\": \"neutre\",\n  \"key_points\": [\n    \"Ajustement des crédits de fonctionnement et d'investissement pour l'exercice 2026.\",\n    \"Vote de la première décision modificative du budget.\"\n  ],\n  \"vote\": {\n    \"has_vote\": true,\n    \"pour\": 30,\n    \"contre\": 9,\n    \"abstention\": null\n  },\n  \"disagreements\": \"9 conseillers ont voté contre (Mme Edwige Lucbernet, Mme Marie-Laure Piroth, Mme Marie Janvier, M. Julien Lefebvre, M. Vincent Boivinet, Mme Aurélie Bousquet, M. Rémi Joussiaume, M. Pierre Ouallet, M. Clément Rossignol Puech).\",\n  \"critical_facts\": [\n    {\n      \"id\": \"decision_dm1_2026\",\n      \"kind\": \"DECISION\",\n      \"audience\": \"BRIEF\",\n      \"label\": \"Adoption de la décision modificative N°1 du budget 2026\",\n      \"status\": \"ADOPTE\",\n      \"evidence\": {\n        \"page\": 4,\n        \"excerpt\": \"Article 1 : D'adopter la décision modificative N°1 de l'exercice 2026 chapitre par chapitre, en fonctionnement et en investissement, selon les montants présentés.\"\n      }\n    },\n    {\n      \"id\": \"vote_dm1_2026\",\n      \"kind\": \"VOTE\",\n      \"audience\": \"BRIEF\",\n      \"label\": \"Vote du conseil sur la délibération\",\n      \"status\": \"ADOPTE\",\n      \"evidence\": {\n        \"page\": 5,\n        \"excerpt\": \"Pour 30, Contre 9\"\n      },\n      \"vote\": {\n        \"for\": 30,\n        \"against\": 9,\n        \"abstain\": null\n      }\n    }\n  ]\n}"
+    },
+    {
+      "case": "D09-2026_127.pdf",
+      "stage": "pdf_verify",
+      "model_version": "gemini-3.8-flash",
+      "usage": {
+        "PromptTokenCount": 3759,
+        "CandidatesTokenCount": 429,
+        "ThoughtsTokenCount": 1566,
+        "TotalTokenCount": 5754
+      },
+      "duration_ms": 16750,
+      "cost_estimated_usd": 0.0103005,
+      "finish_reason": "STOP",
+      "text": "{\n  \"checked_fields\": [\n    \"title\",\n    \"summary\",\n    \"topic_tag\",\n    \"is_substantial\",\n    \"acronyms\",\n    \"analysis_data\",\n    \"budget_impact\",\n    \"budget_type\",\n    \"budget_note\",\n    \"budget_breakdown\",\n    \"budget_changes\",\n    \"climate_impact\",\n    \"key_points\",\n    \"vote\",\n    \"disagreements\",\n    \"critical_facts\"\n  ],\n  \"coverage\": [\n    {\n      \"fact_id\": \"decision_dm1_2026\",\n      \"status\": \"CONFIRMED\",\n      \"page\": 4\n    },\n    {\n      \"fact_id\": \"vote_dm1_2026\",\n      \"status\": \"CONFIRMED\",\n      \"page\": 5\n    }\n  ],\n  \"findings\": [\n    {\n      \"kind\": \"OMISSION\",\n      \"field\": \"critical_facts\",\n      \"fact_id\": \"\",\n      \"claim\": \"Les montants globaux et l'équilibre de la décision modificative n°1 (233 364,06 € en section de fonctionnement et -1 102 550,42 € en section d'investissement) sont omis.\",\n      \"reason\": \"La délibération a pour objet l'adoption des ajustements budgétaires de la DM n°1 de l'exercice 2026. L'absence totale des montants votés par section prive la synthèse des chiffres essentiels de la décision.\",\n      \"resolution\": \"BLOCK\",\n      \"evidence\": {\n        \"page\": 3,\n        \"excerpt\": \"Total Dépenses d'investissement -1 102 550,42\"\n      }\n    }\n  ]\n}"
+    },
+    {
+      "case": "D07-2026_125.pdf",
+      "stage": "pdf_extract",
+      "model_version": "gemini-3.5-flash-lite",
+      "usage": {
+        "PromptTokenCount": 4778,
+        "CandidatesTokenCount": 1686,
+        "ThoughtsTokenCount": 0,
+        "TotalTokenCount": 6464
+      },
+      "duration_ms": 4230,
+      "cost_estimated_usd": 0.0056484,
+      "finish_reason": "STOP",
+      "text": "{\n  \"title\": \"Recrutement de sept agents recenseurs vacataires et désignation du coordonnateur\",\n  \"summary\": \"La commune procède au recrutement de sept agents recenseurs et désigne un coordonnateur pour l'enquête annuelle de recensement de la population qui se déroulera du 21 janvier au 27 février 2027.\",\n  \"topic_tag\": \"Administration\",\n  \"is_substantial\": false,\n  \"acronyms\": {},\n  \"analysis_data\": {\n    \"contexte\": \"Le maire est responsable de l'enquête annuelle de recensement de la population en partenariat avec l'Institut National de la Statistique et des Études Économiques (INSEE).\",\n    \"decision\": \"Le conseil municipal décide de recruter sept agents recenseurs vacataires du 21 janvier au 27 février 2027, de fixer leur rémunération à la tâche ou forfaitaire, d'autoriser le versement d'indemnités horaires pour travaux supplémentaires aux agents municipaux en cas de besoin, et de désigner un coordonnateur d'enquête.\",\n    \"impacts\": \"Recrutement de 7 agents recenseurs vacataires pour réaliser le recensement auprès de la population et des habitations mobiles et personnes sans abri.\",\n    \"points_debattus\": null\n  },\n  \"budget_impact\": 0,\n  \"budget_type\": \"AUCUN\",\n  \"budget_note\": \"\",\n  \"budget_breakdown\": [],\n  \"budget_changes\": [],\n  \"climate_impact\": \"neutre\",\n  \"key_points\": [\n    \"Recrutement de 7 agents recenseurs vacataires pour la période du 21 janvier au 27 février 2027\",\n    \"Définition de la rémunération par type de document (feuille de logement, enquête famille, bulletin individuel) et forfaits pour la formation et les déplacements\",\n    \"Désignation d'un coordonnateur d'enquête et d'un coordonnateur adjoint\",\n    \"Imputation des crédits sur le chapitre 012 du budget principal de la Ville\"\n  ],\n  \"vote\": {\n    \"has_vote\": true,\n    \"pour\": 38,\n    \"contre\": 0,\n    \"abstention\": 0\n  },\n  \"disagreements\": \"Aucun désaccord, procédure standard.\",\n  \"critical_facts\": [\n    {\n      \"id\": \"fact_decision_recrutement\",\n      \"kind\": \"DECISION\",\n      \"audience\": \"BRIEF\",\n      \"label\": \"Recrutement de sept agents recenseurs vacataires et désignation du coordonnateur\",\n      \"status\": \"ADOPTE\",\n      \"evidence\": {\n        \"page\": 3,\n        \"excerpt\": \"ADOPTÉE À L'UNANIMITÉ\"\n      }\n    },\n    {\n      \"id\": \"fact_date_periode\",\n      \"kind\": \"DATE\",\n      \"audience\": \"BRIEF\",\n      \"label\": \"Période des opérations de recensement du 21 janvier 2027 au 27 février 2027\",\n      \"status\": \"PREVU\",\n      \"evidence\": {\n        \"page\": 3,\n        \"excerpt\": \"Article 1 : De recruter 7 agents vacataires du 21 janvier 2027 au 27 février 2027\"\n      }\n    },\n    {\n      \"id\": \"fact_finance_tarif_logement\",\n      \"kind\": \"FINANCE\",\n      \"audience\": \"SITE\",\n      \"label\": \"Rémunération par feuille de logement remplie\",\n      \"status\": \"ADOPTE\",\n      \"evidence\": {\n        \"page\": 3,\n        \"excerpt\": \"Feuille de logement : 2,07 € / feuille remplie\"\n      },\n      \"money\": {\n        \"cents\": 207,\n        \"category\": \"TARIF\",\n        \"role\": \"TARIF\",\n        \"basis\": \"par feuille remplie\"\n      }\n    },\n    {\n      \"id\": \"fact_finance_tarif_famille\",\n      \"kind\": \"FINANCE\",\n      \"audience\": \"SITE\",\n      \"label\": \"Rémunération par enquête famille remplie\",\n      \"status\": \"ADOPTE\",\n      \"evidence\": {\n        \"page\": 3,\n        \"excerpt\": \"Enquête famille : 2,00€ / par enquête remplie\"\n      },\n      \"money\": {\n        \"cents\": 200,\n        \"category\": \"TARIF\",\n        \"role\": \"TARIF\",\n        \"basis\": \"par enquête remplie\"\n      }\n    },\n    {\n      \"id\": \"fact_finance_tarif_bulletin\",\n      \"kind\": \"FINANCE\",\n      \"audience\": \"SITE\",\n      \"label\": \"Rémunération par bulletin individuel rempli\",\n      \"status\": \"ADOPTE\",\n      \"evidence\": {\n        \"page\": 3,\n        \"excerpt\": \"Bulletin individuel : 3,11 € / bulletin rempli\"\n      },\n      \"money\": {\n        \"cents\": 311,\n        \"category\": \"TARIF\",\n        \"role\": \"TARIF\",\n        \"basis\": \"par bulletin rempli\"\n      }\n    },\n    {\n      \"id\": \"fact_finance_forfait_formation\",\n      \"kind\": \"FINANCE\",\n      \"audience\": \"SITE\",\n      \"label\": \"Forfait pour les formations et la tournée de repérage\",\n      \"status\": \"ADOPTE\",\n      \"evidence\": {\n        \"page\": 3,\n        \"excerpt\": \"Formations/Repérage : 75 € pour les formations et la tournée de repérage\"\n      },\n      \"money\": {\n        \"cents\": 7500,\n        \"category\": \"DEPENSE\",\n        \"role\": \"MONTANT\",\n        \"basis\": \"forfait global formations et repérage\"\n      }\n    },\n    {\n      \"id\": \"fact_finance_forfait_deplacement\",\n      \"kind\": \"FINANCE\",\n      \"audience\": \"SITE\",\n      \"label\": \"Forfait déplacement pour toute la période de recensement\",\n      \"status\": \"ADOPTE\",\n      \"evidence\": {\n        \"page\": 3,\n        \"excerpt\": \"Forfait déplacement : 35 € pour toute la période de recensement\"\n      },\n      \"money\": {\n        \"cents\": 3500,\n        \"category\": \"DEPENSE\",\n        \"role\": \"MONTANT\",\n        \"basis\": \"forfait global déplacement\"\n      }\n    },\n    {\n      \"id\": \"fact_vote_result\",\n      \"kind\": \"VOTE\",\n      \"audience\": \"BRIEF\",\n      \"label\": \"Vote du conseil municipal sur la délibération\",\n      \"status\": \"ADOPTE\",\n      \"evidence\": {\n        \"page\": 3,\n        \"excerpt\": \"Pour 38\"\n      },\n      \"vote\": {\n        \"for\": 38,\n        \"against\": 0,\n        \"abstain\": 0\n      }\n    }\n  ]\n}"
+    },
+    {
+      "case": "D07-2026_125.pdf",
+      "stage": "pdf_verify",
+      "model_version": "gemini-3.8-flash",
+      "usage": {
+        "PromptTokenCount": 3330,
+        "CandidatesTokenCount": 450,
+        "ThoughtsTokenCount": 919,
+        "TotalTokenCount": 4699
+      },
+      "duration_ms": 10389,
+      "cost_estimated_usd": 0.00763125,
+      "finish_reason": "STOP",
+      "text": "{\n  \"checked_fields\": [\n    \"title\",\n    \"summary\",\n    \"topic_tag\",\n    \"is_substantial\",\n    \"acronyms\",\n    \"analysis_data\",\n    \"budget_impact\",\n    \"budget_type\",\n    \"budget_note\",\n    \"budget_breakdown\",\n    \"budget_changes\",\n    \"climate_impact\",\n    \"key_points\",\n    \"vote\",\n    \"disagreements\",\n    \"critical_facts\"\n  ],\n  \"coverage\": [\n    {\n      \"fact_id\": \"fact_decision_recrutement\",\n      \"status\": \"CONFIRMED\",\n      \"page\": 3\n    },\n    {\n      \"fact_id\": \"fact_date_periode\",\n      \"status\": \"CONFIRMED\",\n      \"page\": 3\n    },\n    {\n      \"fact_id\": \"fact_finance_tarif_logement\",\n      \"status\": \"CONFIRMED\",\n      \"page\": 3\n    },\n    {\n      \"fact_id\": \"fact_finance_tarif_famille\",\n      \"status\": \"CONFIRMED\",\n      \"page\": 3\n    },\n    {\n      \"fact_id\": \"fact_finance_tarif_bulletin\",\n      \"status\": \"CONFIRMED\",\n      \"page\": 3\n    },\n    {\n      \"fact_id\": \"fact_finance_forfait_formation\",\n      \"status\": \"CONFIRMED\",\n      \"page\": 3\n    },\n    {\n      \"fact_id\": \"fact_finance_forfait_deplacement\",\n      \"status\": \"CONFIRMED\",\n      \"page\": 3\n    },\n    {\n      \"fact_id\": \"fact_vote_result\",\n      \"status\": \"CONFIRMED\",\n      \"page\": 3\n    }\n  ],\n  \"findings\": []\n}"
+    },
+    {
+      "case": "D23-2026_113.pdf",
+      "stage": "pdf_extract",
+      "model_version": "gemini-3.5-flash-lite",
+      "usage": {
+        "PromptTokenCount": 12226,
+        "CandidatesTokenCount": 995,
+        "ThoughtsTokenCount": 0,
+        "TotalTokenCount": 13221
+      },
+      "duration_ms": 5507,
+      "cost_estimated_usd": 0.0061553,
+      "finish_reason": "STOP",
+      "text": "{\n  \"title\": \"Versement d'une subvention de Bordeaux Métropole pour la plantation d'arbres à Bègles\",\n  \"summary\": \"Le Conseil municipal approuve la convention financière avec Bordeaux Métropole pour le versement d'une subvention d'investissement de 23 792 euros dans le cadre du programme \\\"1 million d'arbres\\\" pour des projets de renaturation et d'aménagement paysager.\",\n  \"topic_tag\": \"Environnement\",\n  \"is_substantial\": true,\n  \"acronyms\": {},\n  \"analysis_data\": {\n    \"contexte\": \"La ville de Bègles s'inscrit dans le programme de Bordeaux Métropole visant à planter un million d'arbres sur le territoire métropolitain.\",\n    \"decision\": \"Le conseil municipal approuve la convention de financement d'un montant de 23 792 euros octroyée par Bordeaux Métropole pour les projets de plantations réalisés au parc des Sœurs de la Charité et à la cour de l'école maternelle La Ferrade.\",\n    \"impacts\": \"Aménagement paysager et végétalisation de la cour de l'école maternelle La Ferrade ainsi que du parc des Sœurs de la Charité, comprenant la plantation de 495 arbres au total.\",\n    \"points_debattus\": null\n  },\n  \"budget_impact\": 23792,\n  \"budget_type\": \"RECETTE\",\n  \"budget_note\": \"Recette d'investissement ponctuelle perçue de Bordeaux Métropole sous forme de subvention.\",\n  \"budget_breakdown\": [],\n  \"budget_changes\": [],\n  \"climate_impact\": \"positif\",\n  \"key_points\": [\n    \"Approbation de la convention de versement d'un fonds de concours de 23 792 € par Bordeaux Métropole.\",\n    \"Financement partiel de travaux de végétalisation et d'aménagement au parc des Sœurs de la Charité et à l'école maternelle La Ferrade.\",\n    \"Total de 495 arbres plantés sur l'ensemble de ces deux projets.\",\n    \"Vote unanime du Conseil municipal.\"\n  ],\n  \"vote\": {\n    \"has_vote\": true,\n    \"pour\": 39,\n    \"contre\": 0,\n    \"abstention\": 0\n  },\n  \"disagreements\": \"Aucun désaccord, procédure standard.\",\n  \"critical_facts\": [\n    {\n      \"id\": \"fact_decision_subvention\",\n      \"kind\": \"DECISION\",\n      \"audience\": \"BRIEF\",\n      \"label\": \"Approbation de la convention de versement du fonds de concours \\\"1 million d'arbres\\\" pour 23 792 €\",\n      \"status\": \"ADOPTE\",\n      \"evidence\": {\n        \"page\": 2,\n        \"excerpt\": \"Cette demande a abouti à l'établissement d'une convention financière qu'il convient de valider par délibération du Conseil municipal pour un montant de subvention de 23 792 €.\"\n      }\n    },\n    {\n      \"id\": \"fact_finance_subvention\",\n      \"kind\": \"FINANCE\",\n      \"audience\": \"SITE\",\n      \"label\": \"Montant de la subvention d'investissement attribuée par Bordeaux Métropole\",\n      \"status\": \"ADOPTE\",\n      \"evidence\": {\n        \"page\": 2,\n        \"excerpt\": \"montant de subvention de 23 792 €\"\n      },\n      \"money\": {\n        \"cents\": 2379200,\n        \"category\": \"SUBVENTION\",\n        \"role\": \"MONTANT\"\n      }\n    },\n    {\n      \"id\": \"fact_vote_delib\",\n      \"kind\": \"VOTE\",\n      \"audience\": \"BRIEF\",\n      \"label\": \"Vote du conseil municipal sur la délibération\",\n      \"status\": \"ADOPTE\",\n      \"evidence\": {\n        \"page\": 3,\n        \"excerpt\": \"ADOPTÉE À L'UNANIMITÉ - Pour : 39\"\n      },\n      \"vote\": {\n        \"for\": 39,\n        \"against\": 0,\n        \"abstain\": 0\n      }\n    }\n  ]\n}"
+    },
+    {
+      "case": "D23-2026_113.pdf",
+      "stage": "pdf_verify",
+      "model_version": "gemini-3.8-flash",
+      "usage": {
+        "PromptTokenCount": 10380,
+        "CandidatesTokenCount": 250,
+        "ThoughtsTokenCount": 511,
+        "TotalTokenCount": 11141
+      },
+      "duration_ms": 10257,
+      "cost_estimated_usd": 0.01063875,
+      "finish_reason": "STOP",
+      "text": "{\n  \"checked_fields\": [\n    \"title\",\n    \"summary\",\n    \"topic_tag\",\n    \"is_substantial\",\n    \"acronyms\",\n    \"analysis_data\",\n    \"budget_impact\",\n    \"budget_type\",\n    \"budget_note\",\n    \"budget_breakdown\",\n    \"budget_changes\",\n    \"climate_impact\",\n    \"key_points\",\n    \"vote\",\n    \"disagreements\",\n    \"critical_facts\"\n  ],\n  \"coverage\": [\n    {\n      \"fact_id\": \"fact_decision_subvention\",\n      \"status\": \"CONFIRMED\",\n      \"page\": 2\n    },\n    {\n      \"fact_id\": \"fact_finance_subvention\",\n      \"status\": \"CONFIRMED\",\n      \"page\": 2\n    },\n    {\n      \"fact_id\": \"fact_vote_delib\",\n      \"status\": \"CONFIRMED\",\n      \"page\": 3\n    }\n  ],\n  \"findings\": []\n}"
+    },
+    {
+      "case": "newsletter_16_novembre",
+      "stage": "newsletter_write",
+      "model_version": "gemini-3.8-flash",
+      "usage": {
+        "PromptTokenCount": 4333,
+        "CandidatesTokenCount": 721,
+        "ThoughtsTokenCount": 0,
+        "TotalTokenCount": 5054
+      },
+      "duration_ms": 6382,
+      "cost_estimated_usd": 0.0059535,
+      "finish_reason": "STOP",
+      "text": "{\n  \"email_subject\": \"\",\n  \"council_title\": \"Conseil municipal du 16 novembre 2026\",\n  \"council_date\": \"16 novembre 2026\",\n  \"main_issue\": \"\",\n  \"budget_total\": \"\",\n  \"has_global_budget\": false,\n  \"vote_climat\": \"VOTES NON UNANIMES\",\n  \"climat_color\": \"\",\n  \"vote_stats\": \"2 délib. non unanimes / 1 avec voix contre / 1 avec abstention / jusqu'à 9 voix contre\",\n  \"total_delibs_in_council\": 3,\n  \"tensions\": [\n    {\n      \"source_id\": \"D09-2026_127.pdf\",\n      \"title\": \"Décision modificative n°1 du budget 2026\",\n      \"context\": \"Le conseil municipal adopte la décision modificative n°1 du budget 2026, modifiant les crédits de fonctionnement et d'investissement. L'ajustement prévoit une diminution d'environ 1,1 million d'euros en investissement et une augmentation d'environ 233 000 euros en fonctionnement.\",\n      \"impact\": \"\",\n      \"budget\": \"\",\n      \"has_budget\": false,\n      \"vote_details\": \"9 votes contre\"\n    }\n  ],\n  \"adopted\": [\n    {\n      \"source_id\": \"D07-2026_125.pdf\",\n      \"tag\": \"Administration\",\n      \"title\": \"Recrutement d'agents pour le recensement de la population\",\n      \"context\": \"Le conseil municipal décide de recruter sept agents vacataires pour assurer les opérations de recensement prévues du 21 janvier au 27 février 2027. L'opération concerne environ 1 438 logements de la commune.\",\n      \"impact\": \"Le recensement de la population se déroule du 21 janvier au 27 février 2027, avec un recensement des habitations mobiles et des personnes sans abri les 21 et 22 janvier 2027.\",\n      \"budget\": \"\",\n      \"has_budget\": false\n    }\n  ],\n  \"briefs\": [\n    {\n      \"source_id\": \"D10-2026_128.pdf\",\n      \"tag\": \"Budget\",\n      \"summary\": \"Le conseil approuve l'actualisation des enveloppes pluriannuelles et des paiements prévus en 2026, avec 9 abstentions. La décision prévoit notamment une baisse de 500 000 euros sur l'enveloppe pluriannuelle du groupe scolaire Prévert et une baisse de 1,2 million d'euros sur les paiements de l'année 2026 pour ce groupe scolaire et le complexe sportif.\"\n    }\n  ],\n  \"next_meeting\": \"\",\n  \"website_url\": \"https://lobservatoiredebegles.fr\",\n  \"total_councils\": 1,\n  \"total_delibs\": 3\n}"
+    },
+    {
+      "case": "newsletter_16_novembre",
+      "stage": "newsletter_verify",
+      "model_version": "gemini-3.8-flash",
+      "usage": {
+        "PromptTokenCount": 4042,
+        "CandidatesTokenCount": 16,
+        "ThoughtsTokenCount": 1972,
+        "TotalTokenCount": 6030
+      },
+      "duration_ms": 15294,
+      "cost_estimated_usd": 0.0104865,
+      "finish_reason": "STOP",
+      "text": "{\n  \"supported\": true,\n  \"issues\": []\n}"
+    },
+    {
+      "case": "control_disbursement",
+      "stage": "pdf_verify",
+      "model_version": "gemini-3.8-flash",
+      "usage": {
+        "PromptTokenCount": 10700,
+        "CandidatesTokenCount": 583,
+        "ThoughtsTokenCount": 1228,
+        "TotalTokenCount": 12511
+      },
+      "duration_ms": 17188,
+      "cost_estimated_usd": 0.01481625,
+      "finish_reason": "STOP",
+      "text": "{\n  \"checked_fields\": [\n    \"title\",\n    \"summary\",\n    \"topic_tag\",\n    \"is_substantial\",\n    \"acronyms\",\n    \"analysis_data\",\n    \"budget_impact\",\n    \"budget_type\",\n    \"budget_note\",\n    \"budget_breakdown\",\n    \"budget_changes\",\n    \"climate_impact\",\n    \"key_points\",\n    \"vote\",\n    \"disagreements\",\n    \"critical_facts\"\n  ],\n  \"coverage\": [\n    {\n      \"fact_id\": \"D23-decision\",\n      \"status\": \"CONFIRMED\",\n      \"page\": 2\n    },\n    {\n      \"fact_id\": \"D23-stade\",\n      \"status\": \"CONFIRMED\",\n      \"page\": 1\n    },\n    {\n      \"fact_id\": \"D23-plafond\",\n      \"status\": \"CONFIRMED\",\n      \"page\": 5\n    },\n    {\n      \"fact_id\": \"D23-cout-eligible\",\n      \"status\": \"CONFIRMED\",\n      \"page\": 5\n    },\n    {\n      \"fact_id\": \"D23-reduction\",\n      \"status\": \"CONFIRMED\",\n      \"page\": 5\n    },\n    {\n      \"fact_id\": \"D23-vote\",\n      \"status\": \"CONFIRMED\",\n      \"page\": 3\n    },\n    {\n      \"fact_id\": \"D23-conditions\",\n      \"status\": \"CONFIRMED\",\n      \"page\": 6\n    }\n  ],\n  \"findings\": [\n    {\n      \"kind\": \"CONTRADICTION\",\n      \"field\": \"summary\",\n      \"fact_id\": \"D23-conditions\",\n      \"claim\": \"La subvention a déjà été versée.\",\n      \"reason\": \"L'article 4 de la convention prévoit que Bordeaux Métropole procèdera au versement de la subvention en une seule fois après réception de la convention signée et transmission des justificatifs requis. La subvention n'a donc pas encore été versée.\",\n      \"resolution\": \"BLOCK\",\n      \"evidence\": {\n        \"page\": 6,\n        \"excerpt\": \"Elle procèdera au versement de la subvention en une seule fois après obtention des justificatifs mentionnés à l’article 5 de la présente convention signée.\"\n      }\n    }\n  ]\n}"
+    },
+    {
+      "case": "control_omission",
+      "stage": "pdf_verify",
+      "model_version": "gemini-3.8-flash",
+      "usage": {
+        "PromptTokenCount": 10550,
+        "CandidatesTokenCount": 563,
+        "ThoughtsTokenCount": 3518,
+        "TotalTokenCount": 14631
+      },
+      "duration_ms": 35422,
+      "cost_estimated_usd": 0.02321625,
+      "finish_reason": "MAX_TOKENS",
+      "text": "{\n  \"checked_fields\": [\n    \"title\",\n    \"summary\",\n    \"topic_tag\",\n    \"is_substantial\",\n    \"acronyms\",\n    \"analysis_data\",\n    \"budget_impact\",\n    \"budget_type\",\n    \"budget_note\",\n    \"budget_breakdown\",\n    \"budget_changes\",\n    \"climate_impact\",\n    \"key_points\",\n    \"vote\",\n    \"disagreements\",\n    \"critical_facts\"\n  ],\n  \"coverage\": [\n    {\n      \"fact_id\": \"D23-decision\",\n      \"status\": \"CONFIRMED\",\n      \"page\": 2\n    },\n    {\n      \"fact_id\": \"D23-stade\",\n      \"status\": \"ISSUE\",\n      \"page\": 1\n    },\n    {\n      \"fact_id\": \"D23-plafond\",\n      \"status\": \"CONFIRMED\",\n      \"page\": 5\n    },\n    {\n      \"fact_id\": \"D23-cout-eligible\",\n      \"status\": \"CONFIRMED\",\n      \"page\": 5\n    },\n    {\n      \"fact_id\": \"D23-reduction\",\n      \"status\": \"CONFIRMED\",\n      \"page\": 5\n    },\n    {\n      \"fact_id\": \"D23-vote\",\n      \"status\": \"CONFIRMED\",\n      \"page\": 3\n    }\n  ],\n  \"findings\": [\n    {\n      \"kind\": \"UNSUPPORTED\",\n      \"field\": \"critical_facts[1].evidence\",\n      \"fact_id\": \"D23-stade\",\n      \"claim\": \"Les plantations de 2024–2025 ont été réalisées au parc des Sœurs de la Charité et dans la cour de l’école La Ferrade\",\n      \"reason\": \"La page 1 et l'extrait cité ('POUR LES PLANTATIONS 2024-2025') ne mentionnent pas les sites de réalisation (Parc des Sœurs de la Charité et école La Ferrade), qui ne sont mentionnés qu'à partir de la page 2.\",\n      \"resolution\": \"BLOCK\",\n      \"evidence\": {\n        \"page\": 1,\n        \"excerpt\": \"POUR LES PLANTATIONS 2024-2025\"\n      }\n"
+    }
+  ],
+  "newsletter_input": [
+    {
+      "ID": "D07-2026_125.pdf",
+      "Title": "Recrutement pour le recensement",
+      "TopicTag": "Administration",
+      "BudgetImpact": 0,
+      "BudgetType": "AUCUN",
+      "BudgetNote": "",
+      "BudgetChanges": null,
+      "HasVote": true,
+      "Pour": 38,
+      "Contre": 0,
+      "Abstention": 0,
+      "ClimateImpact": "neutre",
+      "IsSubstantial": true,
+      "HasDisagreement": false,
+      "SourceFacts": {
+        "version": 2,
+        "pdf_sha256": "c9c6048b39bc17e9f9814db26dff7535d9d03b70397f79665f1b3c735acd44b2",
+        "proof_status": "MODEL_REVIEWED",
+        "reviewed_payload_sha256": "bdb67392e891e5499b870ea098f21168ff1ae62bc4511fc10fbe982d3472889a",
+        "facts": [
+          {
+            "id": "D07-recrutement",
+            "kind": "DECISION",
+            "audience": "BRIEF",
+            "label": "Le conseil décide de recruter sept agents vacataires pour le recensement du 21 janvier au 27 février 2027.",
+            "status": "ADOPTE",
+            "evidence": {
+              "page": 3,
+              "excerpt": "De recruter 7 agents vacataires du 21 janvier 2027 au 27 février 2027",
+              "cell": "Dispositif, article 1, premier alinéa"
+            }
+          },
+          {
+            "id": "D07-portee",
+            "kind": "CIVIC_SCOPE",
+            "audience": "SITE",
+            "label": "Le recensement de la population concerne environ 1 438 logements",
+            "status": "PREVU",
+            "evidence": {
+              "page": 3,
+              "excerpt": "De recruter 7 agents vacataires du 21 janvier 2027 au 27 février 2027",
+              "cell": "Dispositif, article 1, premier alinéa"
+            }
+          },
+          {
+            "id": "D07-hmsa",
+            "kind": "DATE",
+            "audience": "SITE",
+            "label": "Les habitations mobiles et les personnes sans abri seront recensées les 21 et 22 janvier 2027",
+            "status": "PREVU",
+            "evidence": {
+              "page": 3,
+              "excerpt": "Recensement des Habitations mobiles et personnes sans abri (HMSA) le 21 et 22 janvier 2027",
+              "cell": "Article 1, deuxième point relatif aux opérations"
+            }
+          },
+          {
+            "id": "D07-vote",
+            "kind": "VOTE",
+            "audience": "SITE",
+            "label": "Vote du conseil",
+            "status": "CONSTATE",
+            "evidence": {
+              "page": 3,
+              "excerpt": "VOTANTS : 38 VOIX / Pour 38 / ADOPTÉE À L’UNANIMITÉ",
+              "cell": "Tableau VOTANTS, adopté à l’unanimité"
+            },
+            "vote": {
+              "for": 38,
+              "against": 0,
+              "abstain": 0
+            }
+          }
+        ]
+      },
+      "Summary": "Environ 1 438 logements sont concernés. Le recensement des habitations mobiles et des personnes sans abri est prévu les 21 et 22 janvier 2027. Une partie de la rémunération dépend du travail effectué, aucun coût total n’est chiffré.",
+      "Decision": "Le conseil décide de recruter sept agents vacataires pour le recensement du 21 janvier au 27 février 2027.",
+      "Impacts": "Le recensement de la population se déroule du 21 janvier au 27 février 2027."
+    },
+    {
+      "ID": "D09-2026_127.pdf",
+      "Title": "Décision modificative n°1 du budget 2026",
+      "TopicTag": "Budget",
+      "BudgetImpact": 0,
+      "BudgetType": "AUCUN",
+      "BudgetNote": "",
+      "BudgetChanges": null,
+      "HasVote": true,
+      "Pour": 30,
+      "Contre": 9,
+      "Abstention": 0,
+      "ClimateImpact": "neutre",
+      "IsSubstantial": true,
+      "HasDisagreement": false,
+      "SourceFacts": {
+        "version": 2,
+        "pdf_sha256": "f47b62183f9a7b1fbd5c399da077a8c413c45c8d12ccf282215e4944a8ff44d0",
+        "proof_status": "MODEL_REVIEWED",
+        "reviewed_payload_sha256": "bdb67392e891e5499b870ea098f21168ff1ae62bc4511fc10fbe982d3472889a",
+        "facts": [
+          {
+            "id": "D09-decision",
+            "kind": "DECISION",
+            "audience": "BRIEF",
+            "label": "Le conseil adopte la décision modificative n°1 du budget 2026, en fonctionnement et en investissement.",
+            "status": "ADOPTE",
+            "evidence": {
+              "page": 4,
+              "excerpt": "D’adopter la décision modificative N°1 de l’exercice 2026 chapitre par chapitre, en fonctionnement et en investissement",
+              "cell": "Dispositif, article 1"
+            }
+          },
+          {
+            "id": "D09-investissement",
+            "kind": "FINANCE",
+            "audience": "BRIEF",
+            "label": "Ajustement voté des crédits d’investissement",
+            "status": "CONSTATE",
+            "evidence": {
+              "page": 3,
+              "excerpt": "Total Dépenses d’investissement : -1 102 550,42 | Total Recettes d’investissement : -1 102 550,42",
+              "cell": "Tableau Équilibre du budget DM1 2026, lignes Total Dépenses d’investissement et Total Recettes d’investissement"
+            },
+            "money": {
+              "cents": -110255042,
+              "category": "INVESTISSEMENT",
+              "role": "TOTAL",
+              "period": "en 2026"
+            }
+          },
+          {
+            "id": "D09-fonctionnement",
+            "kind": "FINANCE",
+            "audience": "BRIEF",
+            "label": "Ajustement voté des crédits de fonctionnement",
+            "status": "CONSTATE",
+            "evidence": {
+              "page": 4,
+              "excerpt": "Total Dépenses de fonctionnement : 233 364,06 | Total Recettes de fonctionnement : 233 364,06",
+              "cell": "Lignes Total Dépenses de fonctionnement et Total Recettes de fonctionnement"
+            },
+            "money": {
+              "cents": 23336406,
+              "category": "FONCTIONNEMENT",
+              "role": "TOTAL",
+              "period": "en 2026"
+            }
+          },
+          {
+            "id": "D09-vote",
+            "kind": "VOTE",
+            "audience": "BRIEF",
+            "label": "Vote du conseil",
+            "status": "CONSTATE",
+            "evidence": {
+              "page": 5,
+              "excerpt": "VOTANTS : 39 VOIX / Pour 30 / Contre 9",
+              "cell": "Tableau VOTANTS, adopté à la majorité"
+            },
+            "vote": {
+              "for": 30,
+              "against": 9,
+              "abstain": 0
+            }
+          }
+        ]
+      },
+      "Summary": "Ajustement voté de −1 102 550,42 € en investissement et +233 364,06 € en fonctionnement, chacun en dépenses comme en recettes dans sa section. Il s’agit de variations de prévisions budgétaires.",
+      "Decision": "Le conseil adopte la décision modificative n°1 du budget 2026, en fonctionnement et en investissement.",
+      "Impacts": "Néant"
+    },
+    {
+      "ID": "D10-2026_128.pdf",
+      "Title": "Révision des enveloppes et crédits de paiement 2026",
+      "TopicTag": "Budget",
+      "BudgetImpact": 0,
+      "BudgetType": "AUCUN",
+      "BudgetNote": "",
+      "BudgetChanges": [
+        {
+          "scope": "AP",
+          "direction": "BAISSE",
+          "label": "Groupe scolaire Prévert",
+          "amount": 500000
+        },
+        {
+          "scope": "CP",
+          "direction": "BAISSE",
+          "label": "Groupe scolaire Prévert",
+          "amount": 200000,
+          "period": "2026"
+        },
+        {
+          "scope": "CP",
+          "direction": "BAISSE",
+          "label": "Complexe sportif polyvalent",
+          "amount": 1000000,
+          "period": "2026"
+        }
+      ],
+      "HasVote": true,
+      "Pour": 30,
+      "Contre": 0,
+      "Abstention": 9,
+      "ClimateImpact": "neutre",
+      "IsSubstantial": true,
+      "HasDisagreement": false,
+      "SourceFacts": {
+        "version": 2,
+        "pdf_sha256": "c83796108e73a8366f53542a4cb6e855b679b6a5ae57f14cb33ae10ccb1dc985",
+        "proof_status": "MODEL_REVIEWED",
+        "reviewed_payload_sha256": "bdb67392e891e5499b870ea098f21168ff1ae62bc4511fc10fbe982d3472889a",
+        "facts": [
+          {
+            "id": "D10-decision",
+            "kind": "DECISION",
+            "audience": "BRIEF",
+            "label": "Le conseil approuve l’actualisation et la révision des autorisations de programme et des crédits de paiement.",
+            "status": "ADOPTE",
+            "evidence": {
+              "page": 3,
+              "excerpt": "le bilan de l’actualisation et la révision des autorisations de programme et des crédits de paiement",
+              "cell": "Dispositif, article 1 et date de séance"
+            }
+          },
+          {
+            "id": "D10-ap-prevert",
+            "kind": "FINANCE",
+            "audience": "BRIEF",
+            "label": "Variation de l’enveloppe pluriannuelle du groupe scolaire Prévert",
+            "status": "CONSTATE",
+            "evidence": {
+              "page": 3,
+              "excerpt": "du groupe scolaire Prévert de moins 500 000 Euros",
+              "cell": "Considérant sur la révision de l’autorisation 23_01 avant clôture"
+            },
+            "money": {
+              "cents": -50000000,
+              "category": "AP",
+              "role": "COMPOSANTE"
+            }
+          },
+          {
+            "id": "D10-cp-prevert",
+            "kind": "FINANCE",
+            "audience": "BRIEF",
+            "label": "Réajustement imprimé des paiements prévus pour le groupe scolaire Prévert",
+            "status": "CONSTATE",
+            "evidence": {
+              "page": 4,
+              "excerpt": "23-01 Création Groupe scolaire Prevert | Réajustement Répartition des CP 2026_DM1 : - 200,000 €",
+              "cell": "Ligne 23-01, colonne Réajustement Répartition des CP 2026_DM1"
+            },
+            "money": {
+              "cents": -20000000,
+              "category": "CP",
+              "role": "COMPOSANTE",
+              "period": "en 2026"
+            }
+          },
+          {
+            "id": "D10-cp-complexe",
+            "kind": "FINANCE",
+            "audience": "BRIEF",
+            "label": "Réajustement des paiements prévus pour le complexe sportif polyvalent",
+            "status": "CONSTATE",
+            "evidence": {
+              "page": 4,
+              "excerpt": "25-01 Création d’un Complexe Sportif Polyvalent | Réajustement Répartition des CP 2026_DM1 : - 1,000,000 €",
+              "cell": "Ligne 25-01, colonne Réajustement Répartition des CP 2026_DM1"
+            },
+            "money": {
+              "cents": -100000000,
+              "category": "CP",
+              "role": "COMPOSANTE",
+              "period": "en 2026"
+            }
+          },
+          {
+            "id": "D10-cp-total",
+            "kind": "FINANCE",
+            "audience": "ARTICLE",
+            "label": "Total du réajustement imprimé des paiements prévus",
+            "status": "CONSTATE",
+            "evidence": {
+              "page": 4,
+              "excerpt": "TOTAL | Réajustement Répartition des CP 2026_DM1 : -1,200,000 €",
+              "cell": "Ligne TOTAL, colonne Réajustement Répartition des CP 2026_DM1"
+            },
+            "money": {
+              "cents": -120000000,
+              "category": "CP",
+              "role": "TOTAL",
+              "period": "en 2026"
+            }
+          },
+          {
+            "id": "D10-vote",
+            "kind": "VOTE",
+            "audience": "BRIEF",
+            "label": "Vote du conseil",
+            "status": "CONSTATE",
+            "evidence": {
+              "page": 3,
+              "excerpt": "VOTANTS : 39 VOIX / Pour 30 / Abstentions 9",
+              "cell": "Tableau VOTANTS, adopté à la majorité"
+            },
+            "vote": {
+              "for": 30,
+              "against": 0,
+              "abstain": 9
+            }
+          }
+        ]
+      },
+      "Summary": "L’annexe indique une baisse d’autorisation de programme de 500 000 € pour le groupe scolaire Prévert. La colonne de réajustement des crédits de paiement 2026 indique −200 000 € pour Prévert et −1 000 000 € pour le complexe sportif, soit −1 200 000 € au total. Pour Prévert, les colonnes de crédits ouverts avant et après donnent un écart arithmétique de −700 000 €, différent de la valeur indiquée pour le réajustement. L’acte ne réconcilie pas les valeurs.",
+      "Decision": "Le conseil approuve l’actualisation et la révision des autorisations de programme et des crédits de paiement.",
+      "Impacts": "Néant"
+    }
+  ],
+  "assembled_d10_brief": "Le conseil approuve l'actualisation des enveloppes pluriannuelles et des paiements prévus en 2026, avec 9 abstentions. La décision prévoit notamment une baisse de 500 000 euros sur l'enveloppe pluriannuelle du groupe scolaire Prévert et une baisse de 1,2 million d'euros sur les paiements de l'année 2026 pour ce groupe scolaire et le complexe sportif. Le conseil approuve l’actualisation et la révision des autorisations de programme et des crédits de paiement. Variation de l’enveloppe pluriannuelle du groupe scolaire Prévert : −500 000 €. Réajustement imprimé des paiements prévus pour le groupe scolaire Prévert : −200 000 € en 2026. Réajustement des paiements prévus pour le complexe sportif polyvalent : −1 000 000 € en 2026. Vote du conseil : 30 pour, 0 contre, 9 abstentions."
+}

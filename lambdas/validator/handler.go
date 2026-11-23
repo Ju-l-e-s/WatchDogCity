@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"log"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -17,7 +16,6 @@ import (
 	ddbtypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	awslambda "github.com/aws/aws-sdk-go-v2/service/lambda"
 	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
-	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/watchdog/shared"
 )
 
@@ -39,11 +37,6 @@ type ddbAPI interface {
 	Query(ctx context.Context, in *dynamodb.QueryInput, opts ...func(*dynamodb.Options)) (*dynamodb.QueryOutput, error)
 	Scan(ctx context.Context, in *dynamodb.ScanInput, opts ...func(*dynamodb.Options)) (*dynamodb.ScanOutput, error)
 	UpdateItem(ctx context.Context, in *dynamodb.UpdateItemInput, opts ...func(*dynamodb.Options)) (*dynamodb.UpdateItemOutput, error)
-	DeleteItem(ctx context.Context, in *dynamodb.DeleteItemInput, opts ...func(*dynamodb.Options)) (*dynamodb.DeleteItemOutput, error)
-}
-
-type sqsAPI interface {
-	SendMessage(ctx context.Context, in *sqs.SendMessageInput, opts ...func(*sqs.Options)) (*sqs.SendMessageOutput, error)
 }
 
 type lambdaAPI interface {
@@ -55,12 +48,10 @@ type lambdaAPI interface {
 type ValidatorHandler struct {
 	ddb                ddbAPI
 	lambdaClient       lambdaAPI
-	sqsClient          sqsAPI
 	councilsTable      string
 	deliberationsTable string
 	publisherFnName    string
 	notifierFnName     string
-	sqsQueueURL        string // PDF processing queue; empty = self-heal disabled
 	geminiDeps         shared.GeminiDeps
 	cfg                shared.QcConfig
 }
@@ -68,16 +59,18 @@ type ValidatorHandler struct {
 // ── DynamoDB record types ─────────────────────────────────────────────────────
 
 type councilRec struct {
-	CouncilID           string   `dynamodbav:"council_id"`
-	Title               string   `dynamodbav:"title"`
-	Category            string   `dynamodbav:"category"`
-	Date                string   `dynamodbav:"date"`
-	TotalPdfs           int      `dynamodbav:"total_pdfs"`
-	ProcessedPdfs       int      `dynamodbav:"processed_pdfs"`
-	QcStatus            string   `dynamodbav:"qc_status"`
-	QcAttempts          int      `dynamodbav:"qc_attempts"`
-	ExpectedPDFIDs      []string `dynamodbav:"expected_pdf_ids"`
-	CompletenessVersion int      `dynamodbav:"qc_completeness_version"`
+	CouncilID            string   `dynamodbav:"council_id"`
+	Title                string   `dynamodbav:"title"`
+	Category             string   `dynamodbav:"category"`
+	Date                 string   `dynamodbav:"date"`
+	TotalPdfs            int      `dynamodbav:"total_pdfs"`
+	ProcessedPdfs        int      `dynamodbav:"processed_pdfs"`
+	QcStatus             string   `dynamodbav:"qc_status"`
+	QcAttempts           int      `dynamodbav:"qc_attempts"`
+	ExpectedPDFIDs       []string `dynamodbav:"expected_pdf_ids"`
+	DispatchPending      bool     `dynamodbav:"qc_dispatch_pending"`
+	NewsletterParamsJSON string   `dynamodbav:"newsletter_params_json"`
+	CompletenessVersion  int      `dynamodbav:"qc_completeness_version"`
 }
 
 type analysisDataRec struct {
@@ -96,6 +89,7 @@ type deliberationRec struct {
 	ID              string                `dynamodbav:"id"`
 	Counted         bool                  `dynamodbav:"counted"`
 	FactCheckModel  string                `dynamodbav:"fact_check_model"`
+	SourceFacts     *shared.SourceFacts   `dynamodbav:"source_facts"`
 	FactCheckedAt   string                `dynamodbav:"fact_checked_at"`
 	Title           string                `dynamodbav:"title"`
 	TopicTag        string                `dynamodbav:"topic_tag"`
@@ -118,7 +112,7 @@ type deliberationRec struct {
 
 // ── Handler ───────────────────────────────────────────────────────────────────
 
-func (h *ValidatorHandler) HandleRequest(ctx context.Context, event ValidatorEvent) error {
+func (h *ValidatorHandler) HandleRequest(ctx context.Context, event ValidatorEvent) (resultErr error) {
 	councilID := event.CouncilID
 	if event.RefreshNewsletter {
 		return h.refreshApprovedNewsletter(ctx, councilID)
@@ -128,12 +122,35 @@ func (h *ValidatorHandler) HandleRequest(ctx context.Context, event ValidatorEve
 	// other state (already validated, already validating, or terminal).
 	if err := h.claimValidating(ctx, councilID); err != nil {
 		if errors.Is(err, errAlreadyClaimed) {
+			var conflict *types.ConditionalCheckFailedException
+			if errors.As(err, &conflict) && conflict.Item["pdf_review_held"] == nil && conflict.Item["pdf_reviews_pending"] == nil {
+				var approved councilRec
+				if err := attributevalue.UnmarshalMap(conflict.Item, &approved); err != nil {
+					return err
+				}
+				if approved.QcStatus == "APPROVED" && approved.DispatchPending {
+					var params shared.NewsletterParams
+					if err := json.Unmarshal([]byte(approved.NewsletterParamsJSON), &params); err != nil {
+						return err
+					}
+					return h.dispatchApproved(ctx, &approved, &params)
+				}
+			}
 			log.Printf("council %s already claimed for validation — skipping", councilID)
 			return nil
 		}
 		return fmt.Errorf("claim validating for %s: %w", councilID, err)
 	}
 
+	defer func() {
+		if resultErr != nil {
+			cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), 3*time.Second)
+			defer cancel()
+			if err := h.releaseValidating(cleanup, councilID); err != nil {
+				resultErr = errors.Join(resultErr, err)
+			}
+		}
+	}()
 	council, err := h.fetchCouncil(ctx, councilID)
 	if err != nil {
 		return fmt.Errorf("fetch council %s: %w", councilID, err)
@@ -168,28 +185,9 @@ func (h *ValidatorHandler) HandleRequest(ctx context.Context, event ValidatorEve
 	verdict := shared.Decide(violations)
 
 	if verdict.Status == "QUARANTINED" {
-		if err := h.handleQuarantine(ctx, councilID, verdict); err != nil {
-			return err
-		}
-		// Re-analyzing only the PDFs already stored cannot recover a missing
-		// source ID. Keep the council quarantined for a source-manifest rescan.
-		if !hasCompletenessViolation(verdict) {
-			h.maybeHeal(ctx, council, delibs)
-		}
-		return nil
+		return h.handleQuarantine(ctx, councilID, verdict)
 	}
 	return h.handleApproved(ctx, council, deliberationViews, verdict)
-}
-
-func hasCompletenessViolation(verdict shared.Verdict) bool {
-	for _, violation := range verdict.Violations {
-		if violation.Rule == "S7_INCOMPLETE_COUNCIL" ||
-			strings.HasPrefix(violation.Rule, "S8_") ||
-			violation.Rule == "S9_MISSING_FACT_CHECK" {
-			return true
-		}
-	}
-	return false
 }
 
 // refreshApprovedNewsletter reruns the same QC and newsletter generator for an
@@ -254,23 +252,30 @@ func (h *ValidatorHandler) refreshApprovedNewsletter(ctx context.Context, counci
 // claimValidating atomically transitions qc_status PENDING → VALIDATING and
 // increments qc_attempts. Returns errAlreadyClaimed for any non-PENDING state.
 func (h *ValidatorHandler) claimValidating(ctx context.Context, councilID string) error {
+	until, ok := ctx.Deadline()
+	if !ok {
+		until = time.Now().Add(10 * time.Minute)
+	}
 	_, err := h.ddb.UpdateItem(ctx, &dynamodb.UpdateItemInput{
 		TableName: aws.String(h.councilsTable),
 		Key: map[string]types.AttributeValue{
 			"council_id": &types.AttributeValueMemberS{Value: councilID},
 		},
-		UpdateExpression:    aws.String("SET qc_status = :validating ADD qc_attempts :one"),
-		ConditionExpression: aws.String("qc_status = :pending"),
+		ReturnValuesOnConditionCheckFailure: types.ReturnValuesOnConditionCheckFailureAllOld,
+		UpdateExpression:                    aws.String("SET qc_status = :validating, qc_validation_until = :until ADD qc_attempts :one"),
+		ConditionExpression:                 aws.String("(qc_status = :pending OR (qc_status = :validating AND qc_validation_until < :now)) AND attribute_not_exists(pdf_review_held) AND attribute_not_exists(pdf_reviews_pending)"),
 		ExpressionAttributeValues: map[string]types.AttributeValue{
 			":validating": &types.AttributeValueMemberS{Value: "VALIDATING"},
 			":pending":    &types.AttributeValueMemberS{Value: "PENDING"},
 			":one":        &types.AttributeValueMemberN{Value: "1"},
+			":now":        &types.AttributeValueMemberN{Value: fmt.Sprint(time.Now().UnixMilli())},
+			":until":      &types.AttributeValueMemberN{Value: fmt.Sprint(until.UnixMilli())},
 		},
 	})
 	if err != nil {
 		var ccfe *ddbtypes.ConditionalCheckFailedException
 		if errors.As(err, &ccfe) {
-			return errAlreadyClaimed
+			return errors.Join(errAlreadyClaimed, err)
 		}
 		return err
 	}
@@ -330,8 +335,15 @@ func (h *ValidatorHandler) handleApproved(
 		if errors.As(err, &factErr) {
 			violations := make([]shared.Violation, 0, len(factErr.Issues))
 			for _, issue := range factErr.Issues {
+				rule := "N1_UNSUPPORTED_NEWSLETTER_CLAIM"
+				switch issue.Kind {
+				case "CONTRADICTION":
+					rule = "N1_NEWSLETTER_CONTRADICTION"
+				case "OMISSION":
+					rule = "N1_NEWSLETTER_ESSENTIAL_OMISSION"
+				}
 				violations = append(violations, shared.Violation{
-					Rule: "N1_UNSUPPORTED_NEWSLETTER_CLAIM", Severity: shared.SeverityHigh,
+					Rule: rule, Severity: shared.SeverityHigh,
 					Field: issue.Location, Detail: issue.Claim + " — " + issue.Reason,
 				})
 			}
@@ -343,12 +355,7 @@ func (h *ValidatorHandler) handleApproved(
 			}
 			return h.handleQuarantine(ctx, council.CouncilID, shared.Decide(violations))
 		}
-		// A transport or generation failure is transient. Release the claim so
-		// Lambda's asynchronous retry can run the full gate again. No publication
-		// or notification has happened yet.
-		if releaseErr := h.releaseValidating(ctx, council.CouncilID); releaseErr != nil {
-			return fmt.Errorf("generate newsletter: %w; release validation claim: %v", err, releaseErr)
-		}
+
 		return err
 	}
 
@@ -381,10 +388,12 @@ func (h *ValidatorHandler) handleApproved(
 		UpdateExpression: aws.String(
 			"SET qc_status = :a, qc_validated_at = :ts, newsletter_params_json = :p" +
 				", qc_completeness_version = :cv" +
-				", qc_neant_rate = :nr, qc_budget_total = :bt",
+				", qc_neant_rate = :nr, qc_budget_total = :bt, qc_dispatch_pending = :yes REMOVE qc_validation_until",
 		),
-		ConditionExpression: aws.String("qc_status = :validating"),
+		ConditionExpression:                 aws.String("qc_status = :validating AND attribute_not_exists(pdf_review_held) AND attribute_not_exists(pdf_reviews_pending)"),
+		ReturnValuesOnConditionCheckFailure: types.ReturnValuesOnConditionCheckFailureAllOld,
 		ExpressionAttributeValues: map[string]types.AttributeValue{
+			":yes":        &types.AttributeValueMemberBOOL{Value: true},
 			":a":          &types.AttributeValueMemberS{Value: "APPROVED"},
 			":ts":         &types.AttributeValueMemberS{Value: ts},
 			":p":          &types.AttributeValueMemberS{Value: string(paramsJSON)},
@@ -399,24 +408,28 @@ func (h *ValidatorHandler) handleApproved(
 		if !errors.As(err, &ccfe) {
 			return fmt.Errorf("write approved for %s: %w", council.CouncilID, err)
 		}
-		// Another invocation got there first; proceed to notify anyway so
-		// the newsletter is not silently dropped on a race.
-		log.Printf("council %s: approved state already written by a concurrent invocation", council.CouncilID)
+		return nil // The winner dispatches its persisted approval.
 	}
+	return h.dispatchApproved(ctx, council, params)
+}
 
-	// Refresh the public website (data.json now includes this APPROVED council).
-	h.invokePublisher(ctx, council.CouncilID)
-	// Send newsletter only for Conseil municipal.
+func (h *ValidatorHandler) dispatchApproved(ctx context.Context, council *councilRec, params *shared.NewsletterParams) error {
+	if err := h.invokePublisher(ctx, council.CouncilID); err != nil {
+		return err
+	}
 	if council.Category == "" || council.Category == "Conseil municipal" {
-		h.invokeNotifier(ctx, council.CouncilID, params)
-		log.Printf("council %s APPROVED — invoking publisher and notifier", council.CouncilID)
-	} else {
-		log.Printf("council %s APPROVED (category=%q) — invoking publisher only, skipping newsletter", council.CouncilID, council.Category)
+		if err := h.invokeNotifier(ctx, council.CouncilID, params); err != nil {
+			return err
+		}
 	}
-	if len(verdict.Violations) > 0 {
-		log.Printf("  (%d WARN violations logged, not blocking)", len(verdict.Violations))
-	}
-	return nil
+	_, err := h.ddb.UpdateItem(ctx, &dynamodb.UpdateItemInput{
+		TableName:                 aws.String(h.councilsTable),
+		Key:                       map[string]types.AttributeValue{"council_id": &types.AttributeValueMemberS{Value: council.CouncilID}},
+		UpdateExpression:          aws.String("REMOVE qc_dispatch_pending"),
+		ConditionExpression:       aws.String("qc_status = :approved"),
+		ExpressionAttributeValues: map[string]types.AttributeValue{":approved": &types.AttributeValueMemberS{Value: "APPROVED"}},
+	})
+	return err
 }
 
 func (h *ValidatorHandler) releaseValidating(ctx context.Context, councilID string) error {
@@ -425,13 +438,17 @@ func (h *ValidatorHandler) releaseValidating(ctx context.Context, councilID stri
 		Key: map[string]types.AttributeValue{
 			"council_id": &types.AttributeValueMemberS{Value: councilID},
 		},
-		UpdateExpression:    aws.String("SET qc_status = :pending"),
+		UpdateExpression:    aws.String("SET qc_status = :pending REMOVE qc_validation_until"),
 		ConditionExpression: aws.String("qc_status = :validating"),
 		ExpressionAttributeValues: map[string]types.AttributeValue{
 			":pending":    &types.AttributeValueMemberS{Value: "PENDING"},
 			":validating": &types.AttributeValueMemberS{Value: "VALIDATING"},
 		},
 	})
+	var lost *types.ConditionalCheckFailedException
+	if errors.As(err, &lost) {
+		return nil
+	}
 	return err
 }
 
@@ -448,7 +465,7 @@ func (h *ValidatorHandler) generateNewsletterParams(ctx context.Context, council
 
 // invokePublisher fires the Publisher Lambda asynchronously so it regenerates
 // data.json now that this council is APPROVED and visible.
-func (h *ValidatorHandler) invokePublisher(ctx context.Context, councilID string) {
+func (h *ValidatorHandler) invokePublisher(ctx context.Context, councilID string) error {
 	payload, _ := json.Marshal(map[string]string{"council_id": councilID})
 	_, err := h.lambdaClient.Invoke(ctx, &awslambda.InvokeInput{
 		FunctionName:   aws.String(h.publisherFnName),
@@ -456,16 +473,17 @@ func (h *ValidatorHandler) invokePublisher(ctx context.Context, councilID string
 		Payload:        payload,
 	})
 	if err != nil {
-		log.Printf("error invoking publisher for council %s: %v", councilID, err)
+		return fmt.Errorf("invoke publisher for %s: %w", councilID, err)
 	}
+	return nil
 }
 
 // invokeNotifier fires the Notifier Lambda asynchronously with pre-generated
 // newsletter params embedded in the event payload.
-func (h *ValidatorHandler) invokeNotifier(ctx context.Context, councilID string, params *shared.NewsletterParams) {
+func (h *ValidatorHandler) invokeNotifier(ctx context.Context, councilID string, params *shared.NewsletterParams) error {
 	if h.notifierFnName == "" || h.notifierFnName == "disabled" || h.notifierFnName == "placeholder" {
 		log.Printf("notifier invocation skipped: notifier is disabled or placeholder (%s)", h.notifierFnName)
-		return
+		return nil
 	}
 	payload, _ := json.Marshal(map[string]interface{}{
 		"council_id":        councilID,
@@ -477,95 +495,17 @@ func (h *ValidatorHandler) invokeNotifier(ctx context.Context, councilID string,
 		Payload:        payload,
 	})
 	if err != nil {
-		log.Printf("error invoking notifier for council %s: %v", councilID, err)
+		return fmt.Errorf("invoke notifier for %s: %w", councilID, err)
 	}
-}
-
-// ── Self-heal ─────────────────────────────────────────────────────────────────
-
-// maxHealAttempts is the inclusive upper bound on qc_attempts before self-heal
-// is disabled. Councils that reach this threshold stay QUARANTINED permanently
-// and require manual review.
-const maxHealAttempts = 3
-
-// maybeHeal re-enqueues deliberation PDFs for fresh Gemini analysis when a
-// council has been QUARANTINED but has not yet exhausted its retry budget.
-//
-// Steps (best-effort — individual errors are logged, not returned):
-//  1. Delete all existing deliberation records so workers can re-insert them
-//     and the transactional counted-marker is reset.
-//  2. Reset the council row: REMOVE qc_status, SET processed_pdfs = 0.
-//  3. Send one SQS message per PDF so the worker Lambda re-processes them.
-//
-// If sqsClient or sqsQueueURL is unset (e.g. in tests or staging), heal is
-// silently skipped — the council remains QUARANTINED.
-func (h *ValidatorHandler) maybeHeal(ctx context.Context, council *councilRec, delibs []deliberationRec) {
-	if h.sqsClient == nil || h.sqsQueueURL == "" {
-		return
-	}
-	if council.QcAttempts >= maxHealAttempts {
-		log.Printf("council %s exhausted %d heal attempts — staying QUARANTINED", council.CouncilID, council.QcAttempts)
-		return
-	}
-
-	log.Printf("council %s QUARANTINED after %d attempt(s) — scheduling re-analysis", council.CouncilID, council.QcAttempts)
-
-	// 1. Delete deliberation records so workers write fresh analysis.
-	for _, d := range delibs {
-		if _, err := h.ddb.DeleteItem(ctx, &dynamodb.DeleteItemInput{
-			TableName: aws.String(h.deliberationsTable),
-			Key: map[string]types.AttributeValue{
-				"id": &types.AttributeValueMemberS{Value: d.ID},
-			},
-		}); err != nil {
-			log.Printf("warn: heal delete deliberation %s: %v", d.ID, err)
-		}
-	}
-
-	// 2. Reset council: clear qc_status so worker can re-claim; reset counter.
-	if _, err := h.ddb.UpdateItem(ctx, &dynamodb.UpdateItemInput{
-		TableName: aws.String(h.councilsTable),
-		Key: map[string]types.AttributeValue{
-			"council_id": &types.AttributeValueMemberS{Value: council.CouncilID},
-		},
-		UpdateExpression: aws.String("REMOVE qc_status SET processed_pdfs = :zero"),
-		ExpressionAttributeValues: map[string]types.AttributeValue{
-			":zero": &types.AttributeValueMemberN{Value: "0"},
-		},
-	}); err != nil {
-		log.Printf("error resetting council %s for heal: %v", council.CouncilID, err)
-		return // do not re-enqueue if state reset failed
-	}
-
-	// 3. Re-enqueue each PDF.
-	enqueued := 0
-	for _, d := range delibs {
-		if d.PDFURL == "" {
-			continue
-		}
-		body, _ := json.Marshal(map[string]interface{}{
-			"council_id": council.CouncilID,
-			"pdf_title":  d.Title,
-			"pdf_url":    d.PDFURL,
-			"total_pdfs": council.TotalPdfs,
-		})
-		if _, err := h.sqsClient.SendMessage(ctx, &sqs.SendMessageInput{
-			QueueUrl:    aws.String(h.sqsQueueURL),
-			MessageBody: aws.String(string(body)),
-		}); err != nil {
-			log.Printf("warn: heal re-enqueue PDF %s: %v", d.PDFURL, err)
-		} else {
-			enqueued++
-		}
-	}
-	log.Printf("council %s heal: re-enqueued %d/%d PDFs", council.CouncilID, enqueued, len(delibs))
+	return nil
 }
 
 // ── DynamoDB helpers ──────────────────────────────────────────────────────────
 
 func (h *ValidatorHandler) fetchCouncil(ctx context.Context, councilID string) (*councilRec, error) {
 	out, err := h.ddb.GetItem(ctx, &dynamodb.GetItemInput{
-		TableName: aws.String(h.councilsTable),
+		ConsistentRead: aws.Bool(true),
+		TableName:      aws.String(h.councilsTable),
 		Key: map[string]types.AttributeValue{
 			"council_id": &types.AttributeValueMemberS{Value: councilID},
 		},
@@ -694,6 +634,7 @@ func toDeliberationViews(recs []deliberationRec) []shared.DeliberationView {
 			Counted:        r.Counted,
 			FactCheckModel: r.FactCheckModel,
 			FactCheckedAt:  r.FactCheckedAt,
+			SourceFacts:    r.SourceFacts,
 			Title:          r.Title,
 			TopicTag:       r.TopicTag,
 			Summary:        r.Summary,
@@ -724,16 +665,6 @@ func toDeliberationViews(recs []deliberationRec) []shared.DeliberationView {
 func toColdDelibs(delibs []shared.DeliberationView) []shared.ColdDeliberation {
 	cold := make([]shared.ColdDeliberation, len(delibs))
 	for i, d := range delibs {
-		contre := 0
-		if d.VoteContre != nil {
-			contre = *d.VoteContre
-		}
-		abst := 0
-		if d.VoteAbstention != nil {
-			abst = *d.VoteAbstention
-		}
-		hasDisagreement := contre > 0 || abst > 0
-
 		impactsVal := ""
 		if d.AnalysisData.Impacts != nil {
 			impactsVal = *d.AnalysisData.Impacts
@@ -757,7 +688,8 @@ func toColdDelibs(delibs []shared.DeliberationView) []shared.ColdDeliberation {
 			Abstention:      d.VoteAbstention,
 			ClimateImpact:   d.ClimateImpact,
 			IsSubstantial:   d.IsSubstantial || d.BudgetImpact >= 5000,
-			HasDisagreement: hasDisagreement,
+			HasDisagreement: d.SourceFacts.HasKind("DISAGREEMENT"),
+			SourceFacts:     d.SourceFacts,
 			Summary:         d.Summary,
 			Decision:        decisionVal,
 			Impacts:         impactsVal,

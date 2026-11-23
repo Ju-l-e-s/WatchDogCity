@@ -728,6 +728,7 @@ function renderDeliberationRow(e) {
                             <div class="lg:col-span-7">
                                 <p class="text-slate-500 leading-relaxed text-base mb-8">${l}</p>
                                 ${c}
+                                ${renderEssentialFacts(e)}
                                 <div class="mt-8 pt-8 border-t border-slate-100/60 flex flex-wrap gap-4">
                                     <a href="${e.pdf_url}" target="_blank" class="inline-flex items-center gap-2 text-xs font-bold text-brand-600 hover:text-brand-700 bg-brand-50 px-4 py-2 rounded-lg transition-all border border-brand-100 hover:shadow-sm">
                                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
@@ -744,6 +745,21 @@ function renderDeliberationRow(e) {
             </div>
         </div>
     </div>`;
+}
+
+function renderEssentialFacts(deliberation) {
+    const facts = deliberation.essential_facts;
+    if (!Array.isArray(facts) || facts.length === 0) return "";
+    const pdf = deliberation.pdf_url || "";
+    const safePDF = /^https?:\/\//i.test(pdf) ? escapeHTML(pdf.split("#")[0]).replaceAll('"', "&quot;") : "";
+    const items = facts.filter(f => f && f.text && Number.isInteger(f.page) && f.page > 0).map(f => {
+        const page = safePDF
+            ? `<a class="underline text-brand-600" href="${safePDF}#page=${f.page}" target="_blank" rel="noopener">p. ${f.page}</a>`
+            : `p. ${f.page}`;
+        return `<li>${escapeHTML(f.text)} <span class="text-xs">(${page})</span></li>`;
+    });
+    if (!items.length) return "";
+    return `<details class="mb-6 text-sm text-slate-700"><summary class="cursor-pointer font-semibold">Faits essentiels et sources</summary><ul class="mt-3 space-y-2">${items.join("")}</ul></details>`;
 }
 
 function renderVoteBar(e, t, n, s) { if (null == t) return `<div class="flex justify-between text-[11px] font-light text-slate-300 tracking-wide"><span>${e}</span><span>—</span></div>`; return `<div><div class="flex justify-between text-[11px] font-medium mb-1"><span class="text-slate-600">${e}</span><span class="text-slate-600 font-semibold">${t}</span></div><div class="h-1.5 bg-slate-100 rounded-full overflow-hidden"><div class="${s} h-full rounded-full transition-all duration-500" style="width:${n > 0 ? t / n * 100 : 0}%"></div></div></div>` }

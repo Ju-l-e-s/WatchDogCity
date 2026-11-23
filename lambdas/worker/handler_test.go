@@ -2,11 +2,13 @@ package main
 
 import (
 	"context"
-	"strconv"
+	"encoding/json"
+	"errors"
+	"github.com/aws/aws-lambda-go/events"
+	"maps"
 	"strings"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
@@ -14,6 +16,7 @@ import (
 	awslambda "github.com/aws/aws-sdk-go-v2/service/lambda"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/watchdog/shared"
 )
 
 func verifiedGeminiResult(title, summary string) *GeminiResult {
@@ -22,17 +25,11 @@ func verifiedGeminiResult(title, summary string) *GeminiResult {
 }
 
 type mockDDB struct {
-	putItemInput  *dynamodb.PutItemInput
-	putItemErr    error
+	putItemInput  *types.Put
 	getItemOut    *dynamodb.GetItemOutput
 	updateItemOut *dynamodb.UpdateItemOutput
 	updateItemErr error
 	transactErr   error
-}
-
-func (m *mockDDB) PutItem(_ context.Context, params *dynamodb.PutItemInput, _ ...func(*dynamodb.Options)) (*dynamodb.PutItemOutput, error) {
-	m.putItemInput = params
-	return &dynamodb.PutItemOutput{}, m.putItemErr
 }
 
 func (m *mockDDB) GetItem(_ context.Context, params *dynamodb.GetItemInput, _ ...func(*dynamodb.Options)) (*dynamodb.GetItemOutput, error) {
@@ -55,6 +52,11 @@ func (m *mockDDB) UpdateItem(_ context.Context, params *dynamodb.UpdateItemInput
 }
 
 func (m *mockDDB) TransactWriteItems(_ context.Context, params *dynamodb.TransactWriteItemsInput, _ ...func(*dynamodb.Options)) (*dynamodb.TransactWriteItemsOutput, error) {
+	for _, item := range params.TransactItems {
+		if item.Put != nil {
+			m.putItemInput = item.Put
+		}
+	}
 	return &dynamodb.TransactWriteItemsOutput{}, m.transactErr
 }
 
@@ -91,7 +93,7 @@ func TestHandleRecord_TopicTagPersistence(t *testing.T) {
 	result.Vote.Contre = &contre
 	result.Vote.Abstention = &abs
 
-	err := h.handleRecord(context.Background(), msg, result)
+	err := h.handleRecord(context.Background(), msg, result, "owner")
 	require.NoError(t, err)
 
 	assert.NotNil(t, mockD.putItemInput)
@@ -104,18 +106,20 @@ func TestHandleRecord_TopicTagPersistence(t *testing.T) {
 }
 
 func TestHandleRecord_IdempotentDuplicate(t *testing.T) {
-	condErr := &types.ConditionalCheckFailedException{}
-	h := &WorkerHandler{
-		ddb: &mockDDB{putItemErr: condErr},
+	m := newConcurrentMock(1)
+	h := WorkerHandler{ddb: m}
+	msg := SQSPayload{CouncilID: "C1", PDFURL: "D1.pdf"}
+	run := func(context.Context, SQSPayload) (*GeminiResult, []byte, error) {
+		return verifiedGeminiResult("T", "S"), nil, nil
 	}
-	msg := SQSPayload{CouncilID: "conseil_municipal#2026-03-28", PDFURL: "https://example.com/D01.pdf", PDFTitle: "D01", TotalPDFs: 5}
-	err := h.handleRecord(context.Background(), msg, verifiedGeminiResult("t", "s"))
-	assert.NoError(t, err)
+	require.NoError(t, h.processPDF(context.Background(), msg, run))
+	require.NoError(t, h.processPDF(context.Background(), msg, nil))
+	require.Equal(t, 1, m.processed)
 }
 
 func TestHandleRecordRejectsUnverifiedResult(t *testing.T) {
 	h := &WorkerHandler{ddb: &mockDDB{}}
-	err := h.handleRecord(context.Background(), SQSPayload{PDFURL: "https://example.com/D01.pdf"}, &GeminiResult{Title: "T"})
+	err := h.handleRecord(context.Background(), SQSPayload{PDFURL: "https://example.com/D01.pdf"}, &GeminiResult{Title: "T"}, "owner")
 	require.ErrorContains(t, err, "without a passed PDF fact check")
 }
 
@@ -152,138 +156,84 @@ func TestDeliberationID(t *testing.T) {
 	}
 }
 
-// concurrentMockDDB is a thread-safe in-memory DynamoDB stand-in that honors
-// the conditional PutItem (attribute_not_exists(id)) so concurrent workers race
-// realistically over the same deliberation id.
+// Models the conditional writes and set membership used by the Worker.
 type concurrentMockDDB struct {
-	mu        sync.Mutex
-	delibs    map[string]map[string]types.AttributeValue
-	processed int
-	total     int
-	published bool
+	mockDDB
+	mu               sync.Mutex
+	council          map[string]types.AttributeValue
+	pending          map[string]bool
+	delibs           map[string]map[string]types.AttributeValue
+	processed, total int
+	failHold         bool
 }
 
 func newConcurrentMock(total int) *concurrentMockDDB {
-	return &concurrentMockDDB{delibs: map[string]map[string]types.AttributeValue{}, total: total}
+	return &concurrentMockDDB{
+		council: map[string]types.AttributeValue{}, pending: map[string]bool{}, delibs: map[string]map[string]types.AttributeValue{}, total: total}
 }
-
-func (m *concurrentMockDDB) PutItem(_ context.Context, p *dynamodb.PutItemInput, _ ...func(*dynamodb.Options)) (*dynamodb.PutItemOutput, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	id := p.Item["id"].(*types.AttributeValueMemberS).Value
-	if _, exists := m.delibs[id]; exists {
-		return nil, &types.ConditionalCheckFailedException{}
-	}
-	cp := make(map[string]types.AttributeValue, len(p.Item))
-	for k, v := range p.Item {
-		cp[k] = v
-	}
-	m.delibs[id] = cp
-	return &dynamodb.PutItemOutput{}, nil
-}
-
 func (m *concurrentMockDDB) GetItem(_ context.Context, p *dynamodb.GetItemInput, _ ...func(*dynamodb.Options)) (*dynamodb.GetItemOutput, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if _, ok := p.Key["council_id"]; ok {
-		item := map[string]types.AttributeValue{
-			"processed_pdfs": &types.AttributeValueMemberN{Value: strconv.Itoa(m.processed)},
-			"total_pdfs":     &types.AttributeValueMemberN{Value: strconv.Itoa(m.total)},
-		}
-		if m.published {
-			item["published_at"] = &types.AttributeValueMemberS{Value: "set"}
-		}
-		return &dynamodb.GetItemOutput{Item: item}, nil
+	if id, ok := p.Key["id"].(*types.AttributeValueMemberS); ok {
+		return &dynamodb.GetItemOutput{Item: maps.Clone(m.delibs[id.Value])}, nil
 	}
-	id := p.Key["id"].(*types.AttributeValueMemberS).Value
-	if it, ok := m.delibs[id]; ok {
-		// Return a copy, like real DynamoDB — the stored map keeps being mutated
-		// (e.g. counted) under lock by concurrent transactions.
-		cp := make(map[string]types.AttributeValue, len(it))
-		for k, v := range it {
-			cp[k] = v
-		}
-		return &dynamodb.GetItemOutput{Item: cp}, nil
-	}
-	return &dynamodb.GetItemOutput{}, nil
+	return &dynamodb.GetItemOutput{Item: maps.Clone(m.council)}, nil
 }
-
-// TransactWriteItems emulates the atomic counter bump + counted flag. It honors
-// attribute_not_exists(counted) on the deliberation and processed_pdfs <
-// total_pdfs on the council, returning per-item cancellation reasons on failure.
 func (m *concurrentMockDDB) TransactWriteItems(_ context.Context, p *dynamodb.TransactWriteItemsInput, _ ...func(*dynamodb.Options)) (*dynamodb.TransactWriteItemsOutput, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	var delibID string
-	for _, ti := range p.TransactItems {
-		if ti.Update == nil {
-			continue
-		}
-		if k, ok := ti.Update.Key["id"].(*types.AttributeValueMemberS); ok {
-			delibID = k.Value
-		}
+	u := p.TransactItems[0].Update
+	field := u.ExpressionAttributeNames["#hold"]
+	token := u.ExpressionAttributeValues[":owner"].(*types.AttributeValueMemberS).Value
+	id := u.ExpressionAttributeValues[":ids"].(*types.AttributeValueMemberSS).Value[0]
+	other := p.TransactItems[1]
+	if m.processed >= m.total || m.council["pdf_review_held"] != nil || m.council["qc_status"] != nil || isCounted(m.delibs[id]) {
+		return nil, &types.TransactionCanceledException{}
 	}
-	it := m.delibs[delibID]
-	if it == nil {
-		it = map[string]types.AttributeValue{}
-		m.delibs[delibID] = it
-	}
-	ccf, none := "ConditionalCheckFailed", "None"
-	if _, counted := it["counted"]; counted {
-		return nil, &types.TransactionCanceledException{
-			CancellationReasons: []types.CancellationReason{{Code: &none}, {Code: &ccf}},
+	if other.ConditionCheck != nil {
+		if aws.ToString(u.UpdateExpression) != "SET #hold = :owner ADD pdf_reviews_pending :ids" || !strings.Contains(aws.ToString(u.ConditionExpression), "attribute_not_exists(#hold)") || other.ConditionCheck.Key["id"].(*types.AttributeValueMemberS).Value != id {
+			panic("unguarded claim")
 		}
-	}
-	if m.processed >= m.total {
-		return nil, &types.TransactionCanceledException{
-			CancellationReasons: []types.CancellationReason{{Code: &ccf}, {Code: &none}},
+		if m.council[field] != nil {
+			return nil, &types.TransactionCanceledException{}
 		}
+		m.council[field] = &types.AttributeValueMemberS{Value: token}
+		m.pending[id] = true
+	} else {
+		if !strings.Contains(aws.ToString(u.ConditionExpression), "#hold = :owner") || !strings.Contains(aws.ToString(u.UpdateExpression), "DELETE pdf_reviews_pending :ids") {
+			panic("unfenced commit")
+		}
+		if owner, ok := m.council[field].(*types.AttributeValueMemberS); !ok || owner.Value != token {
+			return nil, &types.TransactionCanceledException{}
+		}
+		m.delibs[id] = maps.Clone(other.Put.Item)
+		delete(m.council, field)
+		delete(m.pending, id)
+		m.processed++
 	}
-	m.processed++
-	it["counted"] = &types.AttributeValueMemberBOOL{Value: true}
 	return &dynamodb.TransactWriteItemsOutput{}, nil
 }
-
 func (m *concurrentMockDDB) UpdateItem(_ context.Context, p *dynamodb.UpdateItemInput, _ ...func(*dynamodb.Options)) (*dynamodb.UpdateItemOutput, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if _, ok := p.Key["council_id"]; ok {
-		expr := aws.ToString(p.UpdateExpression)
-		// QC-gate claim, guarded by attribute_not_exists(qc_status).
-		if strings.Contains(expr, "qc_status") {
-			if m.published {
-				return nil, &types.ConditionalCheckFailedException{}
-			}
-			m.published = true
-			return &dynamodb.UpdateItemOutput{}, nil
-		}
-		// Counter increment, capped by processed_pdfs < total_pdfs.
-		if m.processed >= m.total {
-			return nil, &types.ConditionalCheckFailedException{}
-		}
-		m.processed++
-		return &dynamodb.UpdateItemOutput{Attributes: map[string]types.AttributeValue{
-			"processed_pdfs": &types.AttributeValueMemberN{Value: strconv.Itoa(m.processed)},
-			"total_pdfs":     &types.AttributeValueMemberN{Value: strconv.Itoa(m.total)},
-		}}, nil
+	field := p.ExpressionAttributeNames["#hold"]
+	if aws.ToString(p.ConditionExpression) != "#hold = :owner" {
+		panic("unfenced release")
 	}
-	// Deliberation partial-recovery SET, guarded by absent counted/fact check.
-	id := p.Key["id"].(*types.AttributeValueMemberS).Value
-	it := m.delibs[id]
-	if it == nil {
-		it = map[string]types.AttributeValue{}
-		m.delibs[id] = it
-	}
-	if _, counted := it["counted"]; counted {
+	owner, ok := m.council[field].(*types.AttributeValueMemberS)
+	if !ok || owner.Value != p.ExpressionAttributeValues[":owner"].(*types.AttributeValueMemberS).Value {
 		return nil, &types.ConditionalCheckFailedException{}
 	}
-	if _, verified := it["fact_checked_at"]; verified {
-		return nil, &types.ConditionalCheckFailedException{}
+	if marker := p.ExpressionAttributeValues[":marker"]; marker != nil {
+		if m.failHold {
+			return nil, errors.New("DynamoDB unavailable")
+		}
+		m.council[field] = marker
+		m.council["pdf_review_held"] = p.ExpressionAttributeValues[":yes"]
+	} else {
+		delete(m.council, field)
 	}
-	for name, key := range p.ExpressionAttributeNames {
-		valueKey := ":v" + strings.TrimPrefix(name, "#k")
-		it[key] = p.ExpressionAttributeValues[valueKey]
-	}
+	delete(m.pending, p.ExpressionAttributeValues[":ids"].(*types.AttributeValueMemberSS).Value[0])
 	return &dynamodb.UpdateItemOutput{}, nil
 }
 
@@ -306,18 +256,22 @@ func TestHandleRecord_ConcurrentDuplicateCountsOnce(t *testing.T) {
 		wg.Add(1)
 		go func(idx int) {
 			defer wg.Done()
-			errs[idx] = h.handleRecord(context.Background(), msg, newResult())
+			errs[idx] = h.processPDF(context.Background(), msg, func(context.Context, SQSPayload) (*GeminiResult, []byte, error) { return newResult(), nil, nil })
 		}(i)
 	}
 	wg.Wait()
 
-	require.NoError(t, errs[0])
-	require.NoError(t, errs[1])
+	require.True(t, errs[0] == nil || errs[1] == nil)
+	for _, err := range errs {
+		if err != nil {
+			require.ErrorContains(t, err, "unfinished PDF review")
+		}
+	}
 
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	assert.Equal(t, 1, m.processed, "counter must be incremented exactly once")
-	assert.True(t, hasAnalysisData(m.delibs["D01.pdf"]), "analysis_data must be present")
+	assert.True(t, m.delibs["D01.pdf"]["analysis_data"] != nil, "analysis_data must be present")
 }
 
 // countingLambda counts Invoke calls thread-safely.
@@ -347,7 +301,9 @@ func TestHandleRecord_ConcurrentCountingAtBoundary(t *testing.T) {
 		go func(idx int, url string) {
 			defer wg.Done()
 			msg := SQSPayload{CouncilID: "C1", PDFURL: "https://example.com/" + url, TotalPDFs: 3}
-			errs[idx] = h.handleRecord(context.Background(), msg, verifiedGeminiResult("T", "S"))
+			errs[idx] = h.processPDF(context.Background(), msg, func(context.Context, SQSPayload) (*GeminiResult, []byte, error) {
+				return verifiedGeminiResult("T", "S"), nil, nil
+			})
 		}(i, u)
 	}
 	wg.Wait()
@@ -381,8 +337,12 @@ func TestHandleRecord_RecoversUncountedAfterCrash(t *testing.T) {
 	msg := SQSPayload{CouncilID: "C1", PDFURL: "https://example.com/D01.pdf", TotalPDFs: 3}
 
 	// Two sequential retries: the first recovers and counts, the second is a noop.
-	require.NoError(t, h.handleRecord(context.Background(), msg, verifiedGeminiResult("T", "S")))
-	require.NoError(t, h.handleRecord(context.Background(), msg, verifiedGeminiResult("T", "S")))
+	require.NoError(t, h.processPDF(context.Background(), msg, func(context.Context, SQSPayload) (*GeminiResult, []byte, error) {
+		return verifiedGeminiResult("T", "S"), nil, nil
+	}))
+	require.NoError(t, h.processPDF(context.Background(), msg, func(context.Context, SQSPayload) (*GeminiResult, []byte, error) {
+		return verifiedGeminiResult("T", "S"), nil, nil
+	}))
 
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -391,4 +351,74 @@ func TestHandleRecord_RecoversUncountedAfterCrash(t *testing.T) {
 	assert.True(t, counted, "deliberation must be marked counted after recovery")
 }
 
-var _ = time.Now
+func TestHandleRecordRejectsChangedReviewedPayload(t *testing.T) {
+	result := verifiedGeminiResult("Titre", "Résumé validé")
+	result.CriticalFacts = []shared.SourceFact{{ID: "decision", Kind: "DECISION", Label: "Une décision"}}
+	payload, err := factCheckPayload(result)
+	require.NoError(t, err)
+	result.SourceFacts = &shared.SourceFacts{Version: shared.SourceFactsVersion, PDFSHA256: digest([]byte("%PDF")), ProofStatus: shared.ProofModelReviewed,
+		ReviewedPayloadSHA256: digest(payload), Facts: result.CriticalFacts}
+	result.BudgetNote = "La subvention a déjà été reçue."
+	// A write would dereference the absent DDB client. The check must happen first.
+	err = (&WorkerHandler{}).handleRecord(context.Background(), SQSPayload{}, result, "owner")
+	require.ErrorContains(t, err, "matching source fact review")
+}
+
+func TestSQSUnresolvedCriticalReview(t *testing.T) {
+	for _, writeFails := range []bool{false, true} {
+		t.Run(map[bool]string{false: "persisted", true: "DynamoDB_unavailable"}[writeFails], func(t *testing.T) {
+			m := newConcurrentMock(1)
+			m.failHold = writeFails
+			h := WorkerHandler{ddb: m}
+			msg := SQSPayload{CouncilID: "C1", PDFURL: "D1.pdf"}
+			body, err := json.Marshal(msg)
+			require.NoError(t, err)
+			event := events.SQSEvent{Records: []events.SQSMessage{{MessageId: "first", Body: string(body)}}}
+			duplicate := events.SQSEvent{Records: []events.SQSMessage{{MessageId: "duplicate", Body: string(body)}}}
+			started, finish := make(chan struct{}), make(chan struct{})
+			first := make(chan events.SQSEventResponse, 1)
+			go func() {
+				r, _ := h.handleBatch(context.Background(), event, func(context.Context, SQSPayload) (*GeminiResult, []byte, error) {
+					close(started)
+					<-finish
+					return nil, []byte("PDF"), errFactCheckRejected
+				})
+				first <- r
+			}()
+			<-started
+			r, err := h.handleBatch(context.Background(), duplicate, nil) // nil review must never be called
+			close(finish)
+			require.NoError(t, err)
+			require.Len(t, r.BatchItemFailures, 1)
+			result := <-first
+			replay, err := h.handleBatch(context.Background(), event, nil)
+			require.NoError(t, err)
+			if writeFails {
+				require.Equal(t, []events.SQSBatchItemFailure{{ItemIdentifier: "first"}}, result.BatchItemFailures)
+				require.Equal(t, result.BatchItemFailures, replay.BatchItemFailures)
+				require.True(t, m.pending["D1.pdf"])
+			} else {
+				require.Empty(t, result.BatchItemFailures)
+				require.Empty(t, replay.BatchItemFailures)
+				require.NotNil(t, m.council["pdf_review_held"])
+			}
+			require.Error(t, h.handleRecord(context.Background(), msg, verifiedGeminiResult("T", "S"), "obsolete"))
+			require.Error(t, h.finishAttempt(context.Background(), msg, "obsolete", nil, nil))
+			require.Zero(t, m.processed)
+			require.Empty(t, m.delibs)
+		})
+	}
+}
+func TestTechnicalFailureAllowsRetry(t *testing.T) {
+	m := newConcurrentMock(1)
+	h := WorkerHandler{ddb: m}
+	msg := SQSPayload{CouncilID: "C1", PDFURL: "D1.pdf"}
+	require.ErrorIs(t, h.processPDF(context.Background(), msg, func(context.Context, SQSPayload) (*GeminiResult, []byte, error) {
+		return nil, nil, context.DeadlineExceeded
+	}), context.DeadlineExceeded)
+	require.Empty(t, m.pending)
+	require.NoError(t, h.processPDF(context.Background(), msg, func(context.Context, SQSPayload) (*GeminiResult, []byte, error) {
+		return verifiedGeminiResult("T", "S"), nil, nil
+	}))
+	require.Equal(t, 1, m.processed)
+}

@@ -6,18 +6,12 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"regexp"
 	"strings"
 	"time"
 
 	"github.com/watchdog/shared"
 	"google.golang.org/genai"
 )
-
-// budgetAmountFloatRe strips decimal parts from any budget integer field.
-// Kept as defense in depth: even with ResponseSchema INTEGER, Gemini
-// occasionally emits floats (e.g. 2028913.40) instead of integers.
-var budgetAmountFloatRe = regexp.MustCompile(`("(?:budget_impact|amount)"\s*:\s*)(\d+)\.\d+`)
 
 var (
 	validTopicTags      = shared.TopicTags
@@ -28,23 +22,25 @@ var (
 const deliberationPrompt = `Tu es un vulgarisateur neutre et un traducteur factuel pour L'Observatoire de Bègles, chargé de décrypter les délibérations de la ville.
 Extrais les informations du PDF fourni au format JSON strict imposé par le schéma de réponse.
 
+Commence par critical_facts, puis rédige les champs publics à partir de ces faits. Parcours le dispositif, les tableaux et les articles pertinents de la convention. Pour chaque opération, relève le passage qui établit son stade et sa date avant de résumer. Vérifie en priorité les conditions qui changent le montant, le droit au versement ou son échéance.
+
 RÈGLES IMPÉRATIVES DE TRAITEMENT :
 
 1. CATÉGORISATION FINANCIÈRE ("budget_type", "budget_impact", "budget_changes") :
-   - Extrais le montant principal en EUROS ENTIERS dans "budget_impact" (pas en centimes ; ne multiplie ni ne convertis aucun montant). Valeur 0 si aucun montant.
-   - Une dépense ou une recette autorisée n'est pas à elle seule un montant chiffré. Si le PDF ne donne aucun total et qu'il est impossible de le calculer sans hypothèse (par exemple une rémunération dépendant d'un volume futur), indique 0 et "AUCUN" ; n'estime rien.
+   - Extrais le montant principal en EUROS ENTIERS dans "budget_impact" (pas en centimes ; ne multiplie aucun montant dans ce champ historique). Valeur 0 si aucun montant principal adapté.
+   - Une dépense ou une recette autorisée n'est pas à elle seule un montant chiffré. Si seul un barème est fourni, conserve les tarifs et consigne l'absence de total dans un fait OTHER sans money, avec son passage. Mets 0 et "AUCUN" uniquement comme indicateurs historiques ; n'estime pas un volume inconnu.
    - Tu DOIS qualifier ce flux dans "budget_type" en utilisant UNIQUEMENT l'une de ces 4 valeurs exactes :
-     * "DÉPENSE" : La ville paie ou verse de l'argent (subvention, achat, travaux, frais).
-     * "RECETTE" : La ville gagne ou collecte de l'argent (impôts, taxes, vente de biens, dotations).
+     * "DÉPENSE" : Sortie du point de vue de la ville, à son stade documenté (achat, subvention, travaux, frais).
+     * "RECETTE" : Entrée du point de vue de la ville, à son stade documenté (impôts, vente, dotations, aide sollicitée).
      * "CAUTION" : La ville se porte garante ou cautionne un prêt (ex: Agence France Locale).
      * "AUCUN" : si et seulement si budget_impact = 0. Tout montant non nul (même faible) DOIT porter le type DÉPENSE, RECETTE ou CAUTION. Réciproquement, budget_impact = 0 impose budget_type = "AUCUN".
    - Pour une délibération qui modifie des crédits ou enveloppes pluriannuelles (AP/CP), n'enregistre PAS ces variations comme une dépense ou une recette dans budget_impact. Mets budget_impact=0, budget_type="AUCUN", et décris chaque variation dans budget_changes avec scope="AP" ou "CP", direction="HAUSSE" ou "BAISSE", le libellé, le montant positif en euros entiers et la période si elle est indiquée. Distingue chaque enveloppe et période ; ne confonds jamais le total CP et une composante AP.
-   - Pour les autres montants financiers, budget_changes=[] et utilise les champs historiques budget_impact/type.
-   - Renseigne "budget_note" en une phrase courte lorsque budget_impact est non nul : précise si le montant est ponctuel, mensuel ou annuel, sa composition si plusieurs flux sont additionnés, et s'il est voté, demandé, conditionnel ou déjà versé. N'invente aucune période ou certitude absente du PDF. Si aucun montant n'est connu, laisse "budget_note" vide.
+   - Pour les autres montants financiers, laisse budget_changes vide. budget_impact/type est un affichage historique en euros entiers, réserve-le à un montant représentatif. Conserve tous les chiffres essentiels, leur signe et leurs centimes dans critical_facts. Si aucun montant unique ne représente fidèlement la décision, utilise 0 et AUCUN dans les champs historiques. Ne somme pas des flux hétérogènes.
+   - Go reconstruit "budget_note". Préserve chaque clause qui change le montant, le versement ou son délai dans un fait CONDITION avec son propre passage. Indique dans financial_fact_id l'identifiant du fait FINANCE concerné lorsqu'il est identifiable. Un plafond ajustable exige le plafond, l'assiette et une condition distincte pour la règle de réduction. Réserve « forfaitaire » à un forfait attesté. Sans montant principal, laisse "budget_note" vide.
 
 2. TITRE ("title") :
    - Titre vulgarisé, factuel, neutre et descriptif de l'objet de la délibération. Rédige un titre simple pour un non-initié, évite le jargon technocratique.
-   - Ce titre est la SEULE phrase reprise telle quelle par la newsletter publique : il doit pouvoir être publié sans relecture.
+   - La newsletter peut reprendre ce titre tel quel. Rédige une phrase autonome, contrôlée comme les autres champs.
 
 3. DÉCISION ("decision") :
    - Champ OBLIGATOIRE et non vide : indique ce qui a été décidé ou voté, en une phrase factuelle et simple.
@@ -62,30 +58,29 @@ RÈGLES IMPÉRATIVES DE TRAITEMENT :
      * Ne cite jamais d'articles de loi ou de codes juridiques bruts (ex: bannir "article L.2241-1 du CGCT", "décret n°..."). Écris plutôt : "Conformément à la loi..." ou "Selon la réglementation...".
      * Vulgarise systématiquement tous les acronymes ou termes techniques entre parenthèses lors de leur première apparition. Pour AP, explique "enveloppe autorisée pour engager un projet sur plusieurs années" ; pour CP, explique "paiements prévus pour une année donnée". Ne présente jamais AP/CP sans cette explication dans le texte destiné au public.
    - STYLE JOURNALISTIQUE PÉDAGOGIQUE :
-     * Traduis les termes administratifs en langage clair (ex: au lieu d'écrire "décision budgétaire modificative" ou "budget supplémentaire", explique : "Le conseil ajuste les comptes en cours d'année pour réallouer l'argent là où les besoins sont les plus urgents.").
+     * Traduis les termes administratifs en langage clair (ex: au lieu d'écrire "décision budgétaire modificative" ou "budget supplémentaire", explique : "Le conseil ajuste les comptes en cours d'année pour modifier les crédits de l'année.").
      * Évite les répétitions et les formules vides de sens (ne pas écrire "le budget est concentré sur le budget").
-     * Dans les champs textuels ("summary", "impacts", etc.), arrondis systématiquement les grands chiffres pour faciliter la lecture (ex: écris "environ 7 millions d'euros" au lieu de "7 034 925,77 euros" ou "7034925"). Remarque : le montant exact en centimes ne doit figurer que dans le champ numérique "budget_impact" du JSON.
+     * Dans les champs textuels, un grand chiffre peut être arrondi si tu écris « environ » et conserves le signe, la période et le référent. Conserve les montants exacts dans critical_facts. Un tarif, un écart ou un seuil dont la précision change le sens reste exact.
      * Reste neutre et objectif. Aucun jugement de valeur (bannis "excellent", "ambitieux", "très coûteux").
 
 6. RECADRAGE DE LA SECTION DÉSACCORDS / CONTROVERSES ("disagreements") :
    - Fais la différence entre une règle de procédure administrative obligatoire (ex: "Le maire a dû quitter la salle car il ne peut pas voter sur son propre bilan financier") et un véritable débat politique ou vote d'opposition.
-   - Si le vote comporte des voix contre ou des abstentions, indique leurs nombres de façon neutre et n'affirme pas "Aucun désaccord". N'invente pas les raisons d'une abstention ou d'un vote contre.
+   - Si le vote comporte des voix contre ou des abstentions, indique leurs nombres de façon neutre et n'affirme pas que le vote était unanime. Un désaccord exprimé exige un passage du PDF qui le documente. N'invente pas les raisons d'une abstention ou d'un vote contre.
    - Écris "Aucun désaccord, procédure standard." uniquement si le PDF établit qu'il n'y a ni voix contre ni abstention, ou si aucun vote n'a eu lieu et qu'aucune controverse n'est rapportée.
 
 7. STADE, TEMPS ET PÉRIODE :
-   - Distingue strictement une proposition, une décision qui autorise une opération, une convention signée, un paiement reçu ou effectué, et une réalisation effective. Une autorisation ne prouve ni la signature ni l'encaissement.
-   - Respecte la chronologie du PDF : des travaux déjà réalisés, même financés aujourd'hui, ne sont pas des travaux à venir. Un objectif de maintien ou de création n'est pas un résultat déjà atteint.
-   - Conserve les dates de prise d'effet et la période des montants (annuel, mensuel, ponctuel). Ne présente pas une recette annuelle comme une somme ponctuelle et ne confonds pas une redevance avec un remboursement de frais.
-   - Applique ces règles au titre, au résumé, à la décision, aux impacts et aux points clés, sans donner un degré de certitude supérieur au document.
+   - Un fait par opération et stade : REALISE pour les travaux attestés, même si leur financement reste à venir. Distingue ADOPTE pour la décision, AUTORISE pour la signature permise, SIGNE si celle-ci est attestée, PAYE ou RECU uniquement pour le transfert lui-même. Un mandat de dépenses de la ville ne prouve pas l'encaissement d'une aide. Sans attestation de transfert, ne conclus pas non plus au non-versement.
+   - Pour les aides, relève le mode de versement, les justificatifs, le délai et son point de départ, y compris par phase. Conserve les conditions cumulatives de caducité. Crée un fait DATE pour la décision datée et pour chaque créneau distinct applicable à un public précis. Le texte public reprend ces stades et périodes.
+   - Pour les tableaux, conserve le total et les variations par section et par ligne, y compris AP/CP. Ne compare que la même série, le même périmètre et la même période. Une baisse des crédits d'un exercice ne prouve pas un report sur un autre. Pour une divergence, distingue les valeurs imprimées de l'écart calculé et conserve les en-têtes. Dans total_of, utilise seulement les identifiants extraits et comparables. Si l'écart reste incertain, signale-le sans inventer de cause.
 
 Règles supplémentaires :
 - Le champ "budget_breakdown" est un tableau de ventilation détaillée. Laisse vide [] sauf si c'est un VOTE DU BUDGET ou des subventions à de multiples associations.
-  Si renseigné : la SOMME EXACTE des "amount" DOIT être rigoureusement égale à "budget_impact" (tolérance 0).
+  Si renseigné, représente une ventilation complète. L’arrondi à l’euro peut faire varier la somme historique de 1 € au plus.
   Pour "topic_tag" dans budget_breakdown, utilise UNIQUEMENT une de ces valeurs exactes : Administration, Sport, Budget, Sécurité, Environnement, Mobilité, Social, Culture, Urbanisme, Éducation.
 - "is_substantial" vaut "true" pour un budget, une DSP, un projet structurant, ou une décision réglementaire / motion à forte portée symbolique ou écologique globale (ex: motions d'opposition aux vols de nuit, chartes environnementales, etc.), même si son budget est de 0 €.
 - Si pas de vote, "has_vote" = false et compteurs à null.
-- Si "has_vote" = true, au moins un des compteurs (pour/contre/abstention) doit être un entier ≥ 0. Total plausible ≤ 40.
-- Ne génère aucun texte en dehors du JSON.`
+- Si "has_vote" = true, au moins un des compteurs (pour/contre/abstention) doit être un entier ≥ 0. Total plausible ≤ 60. Un compteur non indiqué reste à null.
+- Ne génère aucun texte en dehors du JSON.` + sourceFactsInstructions
 
 type BudgetBreakdownItem struct {
 	TopicTag string `json:"topic_tag" dynamodbav:"topic_tag"`
@@ -126,7 +121,9 @@ type GeminiResult struct {
 		Contre     *int `json:"contre"`
 		Abstention *int `json:"abstention"`
 	} `json:"vote"`
-	Disagreements *string `json:"disagreements"`
+	Disagreements *string             `json:"disagreements"`
+	CriticalFacts []shared.SourceFact `json:"critical_facts,omitempty"`
+	SourceFacts   *shared.SourceFacts `json:"-"`
 
 	// Consumption metadata (populated post-call)
 	InputTokens  int32 `json:"input_tokens"`
@@ -134,6 +131,8 @@ type GeminiResult struct {
 	// Set only after the separate PDF fact-check has accepted the public fields.
 	FactCheckModel string `json:"-"`
 	FactCheckedAt  string `json:"-"`
+	// In-memory clue for locating a possible omission in the original PDF.
+	budgetNoteBeforeProjection string
 }
 
 // deliberationSchema is the authoritative output contract enforced at the
@@ -142,8 +141,9 @@ type GeminiResult struct {
 var deliberationSchema = &genai.Schema{
 	Type: genai.TypeObject,
 	Properties: map[string]*genai.Schema{
-		"title":   {Type: genai.TypeString},
-		"summary": {Type: genai.TypeString},
+		"critical_facts": deliberationFactsSchema(),
+		"title":          {Type: genai.TypeString},
+		"summary":        {Type: genai.TypeString},
 		"topic_tag": {
 			Type:   genai.TypeString,
 			Format: "enum",
@@ -160,6 +160,7 @@ var deliberationSchema = &genai.Schema{
 				"points_debattus": {Type: genai.TypeString, Nullable: ptrBool(true)},
 			},
 			PropertyOrdering: []string{"contexte", "decision", "impacts", "points_debattus"},
+			Required:         []string{"decision", "impacts"},
 		},
 		"budget_impact": {Type: genai.TypeInteger, Format: "int64"},
 		"budget_type": {
@@ -212,14 +213,14 @@ var deliberationSchema = &genai.Schema{
 		"disagreements": {Type: genai.TypeString, Nullable: ptrBool(true)},
 	},
 	PropertyOrdering: []string{
-		"title", "summary", "topic_tag", "is_substantial", "acronyms",
+		"critical_facts", "title", "summary", "topic_tag", "is_substantial", "acronyms",
 		"analysis_data", "budget_impact", "budget_type", "budget_note", "budget_breakdown", "budget_changes",
 		"climate_impact", "key_points", "vote", "disagreements",
 	},
 	Required: []string{
 		"title", "summary", "topic_tag", "is_substantial",
 		"analysis_data", "budget_impact", "budget_type", "budget_note",
-		"budget_changes", "climate_impact", "key_points", "vote",
+		"budget_changes", "climate_impact", "key_points", "vote", "critical_facts",
 	},
 }
 
@@ -230,11 +231,12 @@ func ptrInt32(i int32) *int32       { return &i }
 func analyzeWithGemini(ctx context.Context, apiKey string, pdfBytes []byte) (*GeminiResult, error) {
 	modelName := os.Getenv("GEMINI_MODEL")
 	if modelName == "" {
-		modelName = "gemini-2.5-pro"
+		modelName = shared.PDFExtractionModel
 	}
 
 	client, err := genai.NewClient(ctx, &genai.ClientConfig{
 		APIKey:      apiKey,
+		Backend:     genai.BackendGeminiAPI,
 		HTTPOptions: genai.HTTPOptions{APIVersion: "v1beta"},
 		HTTPClient: &http.Client{
 			Timeout: 120 * time.Second,
@@ -244,7 +246,20 @@ func analyzeWithGemini(ctx context.Context, apiKey string, pdfBytes []byte) (*Ge
 		return nil, fmt.Errorf("create gemini client: %w", err)
 	}
 
-	contents := []*genai.Content{
+	cfg := shared.GeminiJSONConfig(modelName, genai.ThinkingLevelMinimal, deliberationSchema, pdfExtractionMaxTokens)
+	resp, err := shared.CallGeminiWithRetry(ctx, shared.ObserveGemini("pdf_extract", modelName, cfg, func(ctx context.Context) (*genai.GenerateContentResponse, error) {
+		return client.Models.GenerateContent(ctx, modelName, pdfExtractionContents(pdfBytes), cfg)
+	}), 4)
+	if err != nil {
+		return nil, fmt.Errorf("gemini generate: %w", err)
+	}
+	return validatePDFExtraction(resp, pdfBytes)
+}
+
+const pdfExtractionMaxTokens = 8192
+
+func pdfExtractionContents(pdfBytes []byte) []*genai.Content {
+	return []*genai.Content{
 		{
 			Role: "user",
 			Parts: []*genai.Part{
@@ -261,36 +276,34 @@ func analyzeWithGemini(ctx context.Context, apiKey string, pdfBytes []byte) (*Ge
 		},
 	}
 
-	resp, err := shared.CallGeminiWithRetry(ctx, func(ctx context.Context) (*genai.GenerateContentResponse, error) {
-		return client.Models.GenerateContent(
-			ctx,
-			modelName,
-			contents,
-			&genai.GenerateContentConfig{
-				Temperature:      ptrFloat32(0),
-				ResponseMIMEType: "application/json",
-				ResponseSchema:   deliberationSchema,
-				MaxOutputTokens:  8192,
-			},
-		)
-	}, 4)
+}
+
+func validatePDFExtraction(resp *genai.GenerateContentResponse, pdfBytes []byte) (*GeminiResult, error) {
+	raw, err := shared.GeminiJSONText(resp)
 	if err != nil {
-		return nil, fmt.Errorf("gemini generate: %w", err)
+		return nil, err
 	}
-
-	if len(resp.Candidates) == 0 || resp.Candidates[0].Content == nil || len(resp.Candidates[0].Content.Parts) == 0 {
-		return nil, fmt.Errorf("gemini returned empty response")
-	}
-
-	raw := resp.Candidates[0].Content.Parts[0].Text
 	result, err := parseGeminiResponse(raw)
 	if err != nil {
 		return nil, err
 	}
 
+	if err := validateCriticalFacts(result); err != nil {
+		return nil, fmt.Errorf("validate Gemini source facts: %w", err)
+	}
+	originalBudgetNote := strings.TrimSpace(result.BudgetNote)
+	if err := projectBudgetNote(result); err != nil {
+		return nil, err
+	}
+	if originalBudgetNote != strings.TrimSpace(result.BudgetNote) {
+		result.budgetNoteBeforeProjection = originalBudgetNote
+	}
 	if err := validateGeminiResult(result); err != nil {
 		return nil, fmt.Errorf("validate gemini result: %w", err)
 	}
+
+	result.SourceFacts = &shared.SourceFacts{Version: shared.SourceFactsVersion, PDFSHA256: digest(pdfBytes),
+		ProofStatus: shared.ProofStructural, Facts: result.CriticalFacts}
 
 	if resp.UsageMetadata != nil {
 		result.InputTokens = resp.UsageMetadata.PromptTokenCount
@@ -309,13 +322,9 @@ func parseGeminiResponse(raw string) (*GeminiResult, error) {
 	raw = strings.TrimSuffix(raw, "```")
 	raw = strings.TrimSpace(raw)
 
-	// Defensive: even with TypeInteger in the schema, Gemini sometimes emits
-	// floats for budget_impact / amount. Truncate to int.
-	raw = budgetAmountFloatRe.ReplaceAllString(raw, "${1}${2}")
-
 	var res GeminiResult
 	if err := json.Unmarshal([]byte(raw), &res); err != nil {
-		return nil, fmt.Errorf("unmarshal gemini json: %w (raw: %s)", err, raw)
+		return nil, fmt.Errorf("unmarshal gemini json: %w", err)
 	}
 
 	// Defensive: Gemini sometimes emits the literal string "null" instead of
@@ -350,8 +359,8 @@ func validateGeminiResult(r *GeminiResult) error {
 	}
 	r.ClimateImpact = canonical
 
-	if r.BudgetType == "AUCUN" && r.BudgetImpact != 0 {
-		return fmt.Errorf("budget_type=AUCUN but budget_impact=%d", r.BudgetImpact)
+	if r.BudgetImpact < 0 || (r.BudgetType == "AUCUN") != (r.BudgetImpact == 0) {
+		return fmt.Errorf("budget_type=%s incompatible with budget_impact=%d", r.BudgetType, r.BudgetImpact)
 	}
 	if len(r.BudgetChanges) > 0 && (r.BudgetImpact != 0 || r.BudgetType != "AUCUN") {
 		return fmt.Errorf("budget_changes must be separate from budget_impact/type")
@@ -370,6 +379,26 @@ func validateGeminiResult(r *GeminiResult) error {
 	if r.BudgetImpact != 0 && strings.TrimSpace(r.BudgetNote) == "" {
 		return fmt.Errorf("budget_note required when budget_impact=%d", r.BudgetImpact)
 	}
+	if r.CriticalFacts != nil {
+		if strings.TrimSpace(r.Title) == "" || strings.TrimSpace(r.Summary) == "" ||
+			r.AnalysisData.Decision == nil || strings.TrimSpace(*r.AnalysisData.Decision) == "" ||
+			r.AnalysisData.Impacts == nil || strings.TrimSpace(*r.AnalysisData.Impacts) == "" {
+			return fmt.Errorf("missing decision, impacts, title or summary")
+		}
+		total, known := 0, 0
+		for _, count := range []*int{r.Vote.Pour, r.Vote.Contre, r.Vote.Abstention} {
+			if count != nil {
+				if !r.Vote.HasVote || *count < 0 || *count > 60 {
+					return fmt.Errorf("invalid counter for documented vote")
+				}
+				total += *count
+				known++
+			}
+		}
+		if (r.Vote.HasVote && known == 0) || total > 60 {
+			return fmt.Errorf("incomplete or implausible documented vote")
+		}
+	}
 	if len(r.BudgetBreakdown) > 0 {
 		var sum int64
 		for i := range r.BudgetBreakdown {
@@ -379,6 +408,9 @@ func validateGeminiResult(r *GeminiResult) error {
 				return fmt.Errorf("invalid breakdown topic_tag %q", b.TopicTag)
 			}
 			b.TopicTag = canonical
+			if b.Amount < 0 {
+				return fmt.Errorf("negative budget breakdown amount")
+			}
 			sum += b.Amount
 		}
 		// Allow 1€ rounding tolerance.

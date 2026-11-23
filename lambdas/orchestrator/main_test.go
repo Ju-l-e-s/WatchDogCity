@@ -260,3 +260,23 @@ func TestHandleIsolatesPerCouncilErrors(t *testing.T) {
 	assert.Equal(t, 2, db.updateCount, "UpdateItem must be called for c1 and c3, not c2")
 	assert.Equal(t, 2, sqsMock.batchCount, "one SQS batch per successfully processed council")
 }
+
+func TestDraftPilotScopesEnqueueAndStoresMode(t *testing.T) {
+	const url = "https://example.test/council"
+	d := &mockDDB{getItemFn: func(ctx context.Context, in *dynamodb.GetItemInput, _ ...func(*dynamodb.Options)) (*dynamodb.GetItemOutput, error) {
+		require.Equal(t, url, in.Key["council_id"].(*types.AttributeValueMemberS).Value)
+		return &dynamodb.GetItemOutput{}, nil
+	}}
+	q := &mockSQS{}
+	o := orchestrator{ddb: d, sqs: q, scraper: &mockScraper{councils: []CouncilListing{
+		{CouncilID: "other", URL: "other", Category: "Conseil municipal"}, {CouncilID: url, URL: url, Category: "Conseil municipal"}},
+		pdfs: map[string][]PDFItem{url: {{URL: "https://example.test/D01.pdf"}}}}}
+	require.Error(t, o.handle(context.Background(), OrchestratorEvent{DraftOnly: true}))
+	require.Error(t, o.handle(context.Background(), OrchestratorEvent{TargetURL: url}))
+	require.Error(t, o.handle(context.Background(), OrchestratorEvent{DraftOnly: true, TargetURL: "missing"}))
+	require.NoError(t, o.handle(context.Background(), OrchestratorEvent{DraftOnly: true, TargetURL: url}))
+	require.Len(t, d.updates, 1)
+	require.Contains(t, *d.updates[0].UpdateExpression, "newsletter_draft_only = :draft")
+	require.True(t, d.updates[0].ExpressionAttributeValues[":draft"].(*types.AttributeValueMemberBOOL).Value)
+	require.Equal(t, 1, q.batchCount)
+}

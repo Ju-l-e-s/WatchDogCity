@@ -30,14 +30,15 @@ type CouncilOutput struct {
 }
 
 type DeliberationOutput struct {
-	ID            string `json:"id"`
-	Title         string `json:"title"`
-	TopicTag      string `json:"topic_tag"`
-	Summary       string `json:"summary"`
-	IsSubstantial bool   `json:"is_substantial"`
-	BudgetImpact  int64  `json:"budget_impact"`
-	BudgetType    string `json:"budget_type"`
-	BudgetNote    string `json:"budget_note"`
+	ID            string                `json:"id"`
+	Title         string                `json:"title"`
+	TopicTag      string                `json:"topic_tag"`
+	Summary       string                `json:"summary"`
+	IsSubstantial bool                  `json:"is_substantial"`
+	BudgetImpact  int64                 `json:"budget_impact"`
+	BudgetType    string                `json:"budget_type"`
+	BudgetNote    string                `json:"budget_note"`
+	BudgetChanges []shared.BudgetChange `json:"budget_changes"`
 	Vote          struct {
 		HasVote    bool `json:"has_vote"`
 		Pour       *int `json:"pour"`
@@ -56,7 +57,8 @@ func runNewsletter(args []string) error {
 	fs := flag.NewFlagSet("newsletter", flag.ExitOnError)
 	fixturesPath := fs.String("fixtures", "", "Chemin vers le fichier JSON des délibérations")
 	sample := fs.Bool("sample", false, "Utiliser les données de délibérations de test par défaut (frontend/data.json)")
-	model := fs.String("model", "gemini-2.5-pro", "Modèle Gemini à utiliser")
+	model := fs.String("model", shared.GeminiFlashModel, "Modèle Gemini de rédaction")
+	factCheckModel := fs.String("fact-check-model", shared.GeminiFlashModel, "Modèle Gemini de vérification")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -128,15 +130,6 @@ func runNewsletter(args []string) error {
 	// 4. Map deliberations to ColdDeliberations
 	var coldDelibs []shared.ColdDeliberation
 	for _, d := range targetCouncil.Deliberations {
-		contre := 0
-		if d.Vote.Contre != nil {
-			contre = *d.Vote.Contre
-		}
-		abst := 0
-		if d.Vote.Abstention != nil {
-			abst = *d.Vote.Abstention
-		}
-		hasDisagreement := d.Disagreements != nil && *d.Disagreements != "" && *d.Disagreements != "null"
 
 		budgetType := d.BudgetType
 		if budgetType == "" {
@@ -162,22 +155,22 @@ func runNewsletter(args []string) error {
 		}
 
 		coldDelibs = append(coldDelibs, shared.ColdDeliberation{
-			ID:              d.ID,
-			Title:           d.Title,
-			TopicTag:        d.TopicTag,
-			BudgetImpact:    d.BudgetImpact,
-			BudgetType:      budgetType,
-			BudgetNote:      d.BudgetNote,
-			HasVote:         d.Vote.HasVote,
-			Pour:            d.Vote.Pour,
-			Contre:          d.Vote.Contre,
-			Abstention:      d.Vote.Abstention,
-			ClimateImpact:   climateImpact,
-			IsSubstantial:   d.IsSubstantial || d.BudgetImpact >= 5000,
-			HasDisagreement: hasDisagreement || contre > 0 || abst > 0,
-			Summary:         d.Summary,
-			Decision:        decisionVal,
-			Impacts:         impactsVal,
+			ID:            d.ID,
+			Title:         d.Title,
+			TopicTag:      d.TopicTag,
+			BudgetImpact:  d.BudgetImpact,
+			BudgetType:    budgetType,
+			BudgetNote:    d.BudgetNote,
+			BudgetChanges: d.BudgetChanges,
+			HasVote:       d.Vote.HasVote,
+			Pour:          d.Vote.Pour,
+			Contre:        d.Vote.Contre,
+			Abstention:    d.Vote.Abstention,
+			ClimateImpact: climateImpact,
+			IsSubstantial: d.IsSubstantial || d.BudgetImpact >= 5000,
+			Summary:       d.Summary,
+			Decision:      decisionVal,
+			Impacts:       impactsVal,
 		})
 	}
 
@@ -202,8 +195,9 @@ func runNewsletter(args []string) error {
 
 	start := time.Now()
 	deps := shared.GeminiDeps{
-		APIKey: apiKey,
-		Model:  *model,
+		APIKey:         apiKey,
+		Model:          *model,
+		FactCheckModel: *factCheckModel,
 	}
 	params, err := shared.GenerateNewsletterParams(
 		ctx,
